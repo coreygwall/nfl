@@ -1,0 +1,245 @@
+import type { Abbr } from "../shared/teams.ts";
+import type { Game, Pick, Player, Winner } from "../shared/types.ts";
+import type { PlayerPick } from "../shared/scoring.ts";
+
+interface GameRow {
+  id: string;
+  season: number;
+  week: number;
+  kickoff_at: string;
+  away: string;
+  home: string;
+  neutral: number;
+  venue: string | null;
+  winner: string | null;
+  away_score: number | null;
+  home_score: number | null;
+  result_updated_at: string | null;
+}
+
+interface PlayerRow {
+  id: string;
+  name: string;
+  name_key: string;
+  created_at: string;
+  last_seen_at: string;
+}
+
+interface PickRow {
+  player_id: string;
+  game_id: string;
+  week: number;
+  team: string;
+  rank: number;
+}
+
+export interface PlayerRecord extends Player {
+  nameKey: string;
+  createdAt: string;
+  lastSeenAt: string;
+}
+
+export interface ScheduleGame {
+  id: string;
+  week: number;
+  kickoff: string;
+  away: string;
+  home: string;
+  neutral: boolean;
+  venue: string | null;
+}
+
+const toGame = (r: GameRow): Game => ({
+  id: r.id,
+  season: r.season,
+  week: r.week,
+  kickoffAt: r.kickoff_at,
+  away: r.away as Abbr,
+  home: r.home as Abbr,
+  neutral: r.neutral === 1,
+  venue: r.venue,
+  winner: r.winner as Winner | null,
+  awayScore: r.away_score,
+  homeScore: r.home_score,
+});
+
+const toPlayer = (r: PlayerRow): PlayerRecord => ({
+  id: r.id,
+  name: r.name,
+  nameKey: r.name_key,
+  createdAt: r.created_at,
+  lastSeenAt: r.last_seen_at,
+});
+
+const toPick = (r: PickRow): PlayerPick => ({ playerId: r.player_id, gameId: r.game_id, team: r.team as Abbr, rank: r.rank });
+
+export const publicPlayer = (p: Player): Player => ({ id: p.id, name: p.name });
+
+// ---- games ----
+
+export async function listGames(db: D1Database, season: number): Promise<Game[]> {
+  const { results } = await db
+    .prepare("SELECT * FROM games WHERE season = ? ORDER BY week, kickoff_at, id")
+    .bind(season)
+    .all<GameRow>();
+  return results.map(toGame);
+}
+
+export async function listWeekGames(db: D1Database, season: number, week: number): Promise<Game[]> {
+  const { results } = await db
+    .prepare("SELECT * FROM games WHERE season = ? AND week = ? ORDER BY kickoff_at, id")
+    .bind(season, week)
+    .all<GameRow>();
+  return results.map(toGame);
+}
+
+export async function getGame(db: D1Database, id: string): Promise<Game | null> {
+  const row = await db.prepare("SELECT * FROM games WHERE id = ?").bind(id).first<GameRow>();
+  return row ? toGame(row) : null;
+}
+
+/** Inserts new games and refreshes schedule fields of existing ones. Never touches results. */
+export async function upsertGames(db: D1Database, season: number, games: ScheduleGame[]): Promise<number> {
+  const stmt = db.prepare(
+    `INSERT INTO games (id, season, week, kickoff_at, away, home, neutral, venue)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6, ?7, ?8)
+     ON CONFLICT(id) DO UPDATE SET
+       week = excluded.week, kickoff_at = excluded.kickoff_at, away = excluded.away,
+       home = excluded.home, neutral = excluded.neutral, venue = excluded.venue`,
+  );
+  const chunk = 40;
+  for (let i = 0; i < games.length; i += chunk) {
+    await db.batch(
+      games
+        .slice(i, i + chunk)
+        .map((g) => stmt.bind(g.id, season, g.week, g.kickoff, g.away, g.home, g.neutral ? 1 : 0, g.venue)),
+    );
+  }
+  return games.length;
+}
+
+export async function setResult(
+  db: D1Database,
+  id: string,
+  winner: Winner | null,
+  awayScore: number | null,
+  homeScore: number | null,
+  now: string,
+): Promise<void> {
+  await db
+    .prepare("UPDATE games SET winner = ?, away_score = ?, home_score = ?, result_updated_at = ? WHERE id = ?")
+    .bind(winner, awayScore, homeScore, winner === null ? null : now, id)
+    .run();
+}
+
+// ---- players ----
+
+export async function listPlayers(db: D1Database): Promise<PlayerRecord[]> {
+  const { results } = await db.prepare("SELECT * FROM players ORDER BY name COLLATE NOCASE").all<PlayerRow>();
+  return results.map(toPlayer);
+}
+
+export async function getPlayer(db: D1Database, id: string): Promise<PlayerRecord | null> {
+  const row = await db.prepare("SELECT * FROM players WHERE id = ?").bind(id).first<PlayerRow>();
+  return row ? toPlayer(row) : null;
+}
+
+export async function findPlayerByKey(db: D1Database, nameKey: string): Promise<PlayerRecord | null> {
+  const row = await db.prepare("SELECT * FROM players WHERE name_key = ?").bind(nameKey).first<PlayerRow>();
+  return row ? toPlayer(row) : null;
+}
+
+export async function createPlayer(db: D1Database, p: { id: string; name: string; nameKey: string; now: string }): Promise<void> {
+  await db
+    .prepare("INSERT INTO players (id, name, name_key, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?)")
+    .bind(p.id, p.name, p.nameKey, p.now, p.now)
+    .run();
+}
+
+export async function touchPlayer(db: D1Database, id: string, now: string): Promise<void> {
+  await db.prepare("UPDATE players SET last_seen_at = ? WHERE id = ?").bind(now, id).run();
+}
+
+export async function renamePlayer(db: D1Database, id: string, name: string, nameKey: string): Promise<void> {
+  await db.prepare("UPDATE players SET name = ?, name_key = ? WHERE id = ?").bind(name, nameKey, id).run();
+}
+
+export async function deletePlayer(db: D1Database, id: string): Promise<void> {
+  await db.batch([
+    db.prepare("DELETE FROM picks WHERE player_id = ?").bind(id),
+    db.prepare("DELETE FROM players WHERE id = ?").bind(id),
+  ]);
+}
+
+export interface PlayerStats {
+  playerId: string;
+  picksCount: number;
+  weeksPlayed: number;
+}
+
+export async function playerStats(db: D1Database): Promise<Map<string, PlayerStats>> {
+  const { results } = await db
+    .prepare("SELECT player_id, COUNT(*) AS picks_count, COUNT(DISTINCT week) AS weeks_played FROM picks GROUP BY player_id")
+    .all<{ player_id: string; picks_count: number; weeks_played: number }>();
+  return new Map(results.map((r) => [r.player_id, { playerId: r.player_id, picksCount: r.picks_count, weeksPlayed: r.weeks_played }]));
+}
+
+// ---- picks ----
+
+export async function listPicks(db: D1Database, playerId: string, week: number): Promise<Pick[]> {
+  const { results } = await db
+    .prepare("SELECT * FROM picks WHERE player_id = ? AND week = ? ORDER BY rank")
+    .bind(playerId, week)
+    .all<PickRow>();
+  return results.map((r) => ({ gameId: r.game_id, team: r.team as Abbr, rank: r.rank }));
+}
+
+export async function listWeekPicks(db: D1Database, week: number): Promise<PlayerPick[]> {
+  const { results } = await db.prepare("SELECT * FROM picks WHERE week = ? ORDER BY rank").bind(week).all<PickRow>();
+  return results.map(toPick);
+}
+
+export async function listAllPicks(db: D1Database): Promise<PlayerPick[]> {
+  const { results } = await db.prepare("SELECT * FROM picks ORDER BY week, rank").all<PickRow>();
+  return results.map(toPick);
+}
+
+/**
+ * Replaces a player's picks for a week atomically. Unless `ignoreLocks`, only picks on games that
+ * have not kicked off (`kickoff_at > now`) are deleted, so a locked pick can never be removed here.
+ */
+export async function replacePicks(
+  db: D1Database,
+  playerId: string,
+  week: number,
+  picks: Pick[],
+  now: string,
+  ignoreLocks = false,
+): Promise<void> {
+  const del = ignoreLocks
+    ? db.prepare("DELETE FROM picks WHERE player_id = ?1 AND week = ?2").bind(playerId, week)
+    : db
+        .prepare(
+          `DELETE FROM picks WHERE player_id = ?1 AND week = ?2
+           AND game_id IN (SELECT id FROM games WHERE week = ?2 AND kickoff_at > ?3)`,
+        )
+        .bind(playerId, week, now);
+  const ins = db.prepare(
+    "INSERT INTO picks (player_id, game_id, week, team, rank, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+  );
+  await db.batch([del, ...picks.map((p) => ins.bind(playerId, p.gameId, week, p.team, p.rank, now, now))]);
+}
+
+// ---- meta ----
+
+export async function getMeta(db: D1Database, key: string): Promise<string | null> {
+  const row = await db.prepare("SELECT value FROM meta WHERE key = ?").bind(key).first<{ value: string }>();
+  return row?.value ?? null;
+}
+
+export async function setMeta(db: D1Database, key: string, value: string): Promise<void> {
+  await db
+    .prepare("INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value")
+    .bind(key, value)
+    .run();
+}

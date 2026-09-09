@@ -1,0 +1,17 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="139.8 61.1 291.2 268.9" preserveAspectRatio="xMidYMid meet"><g class="outline">
+  <path d="M155 215 A115 115 0 1 1 385 200 L385 252 L335 252 L335 315 L245 315 A90 90 0 0 1 155 225 Z" fill="#FF3C00" stroke="#fff" stroke-width="18" stroke-linejoin="round" stroke-linecap="round" opacity="1"/>
+  <path d="M182 128 A115 115 0 0 1 372 138" fill="none" stroke="#fff" stroke-width="18" stroke-linejoin="round" stroke-linecap="round" opacity="1"/>
+  <path d="M172 138 A115 115 0 0 1 381 149" fill="none" stroke="#fff" stroke-width="18" stroke-linejoin="round" stroke-linecap="round" opacity="1"/>
+  <circle cx="262" cy="242" r="13" fill="#311D00" stroke="#fff" stroke-width="18" stroke-linejoin="round" stroke-linecap="round" opacity="1"/>
+  <path d="M335 264 H404 A12 12 0 0 1 416 276 V292 A12 12 0 0 1 404 304 H335" fill="none" stroke="#fff" stroke-width="18" stroke-linejoin="round" stroke-linecap="round" opacity="1"/>
+  <path d="M338 284 H416" fill="none" stroke="#fff" stroke-width="18" stroke-linejoin="round" stroke-linecap="round" opacity="1"/>
+  <path d="M385 252 V304" fill="none" stroke="#fff" stroke-width="18" stroke-linejoin="round" stroke-linecap="round" opacity="1"/>
+</g><g class="art">
+  <path d="M155 215 A115 115 0 1 1 385 200 L385 252 L335 252 L335 315 L245 315 A90 90 0 0 1 155 225 Z" fill="#FF3C00"/>
+  <path d="M182 128 A115 115 0 0 1 372 138" fill="none" stroke="#311D00" stroke-width="16" stroke-linecap="round"/>
+  <path d="M172 138 A115 115 0 0 1 381 149" fill="none" stroke="#FFFFFF" stroke-width="5" stroke-linecap="round"/>
+  <circle cx="262" cy="242" r="13" fill="#311D00"/>
+  <path d="M335 264 H404 A12 12 0 0 1 416 276 V292 A12 12 0 0 1 404 304 H335" fill="none" stroke="#E9E9E9" stroke-width="10" stroke-linecap="round"/>
+  <path d="M338 284 H416" fill="none" stroke="#E9E9E9" stroke-width="10"/>
+  <path d="M385 252 V304" fill="none" stroke="#E9E9E9" stroke-width="10" stroke-linecap="round"/>
+</g></svg>
