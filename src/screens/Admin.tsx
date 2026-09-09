@@ -93,7 +93,7 @@ function AdminPanel({ pin, onSignOut }: { pin: string; onSignOut: () => void }) 
   const [week, setWeek] = useState<number | null>(null);
   const activeWeek = week ?? boot.data?.boardWeek ?? 1;
   return (
-    <div>
+    <div className="mx-auto w-full max-w-[860px]">
       <Segmented
         value={tab}
         options={[

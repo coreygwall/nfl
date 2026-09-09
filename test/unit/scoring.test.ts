@@ -100,6 +100,21 @@ describe("buildWeekBoard", () => {
   });
 });
 
+describe("late joiner", () => {
+  it("scores two late picks at full value (5 + 4 = 9)", () => {
+    const games = WEEK1.map((g) => ({ ...g }));
+    games.find((g) => g.id === "g5")!.winner = "GB";
+    games.find((g) => g.id === "g6")!.winner = "SF";
+    const picks = [
+      { playerId: "p1", gameId: "g5", team: "GB" as const, rank: 1 },
+      { playerId: "p1", gameId: "g6", team: "SF" as const, rank: 2 },
+    ];
+    const board = buildWeekBoard({ week: 1, players, picks, games, now: "2026-09-16T12:00:00.000Z" });
+    const row = board.rows.find((r) => r.name === "Corey")!;
+    expect(row).toMatchObject({ points: 9, correct: 2, fives: 1, picksMade: 2, possible: 9 });
+  });
+});
+
 describe("buildSeasonBoard", () => {
   it("sums weeks and tracks best week and weeks played", () => {
     const games = [...WEEK1, ...WEEK2].map((g) => ({ ...g }));

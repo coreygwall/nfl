@@ -283,3 +283,33 @@ describe("admin", () => {
     expect(week.body.pickCounts["2026_01_NE_SEA"]).toBeDefined();
   });
 });
+
+describe("late joiner", () => {
+  // Sunday evening: every Week 1 game has kicked off except Sunday night and Monday night.
+  const SUNDAY_NIGHT = "2026-09-13T22:00:00.000Z";
+
+  it("can still pick the remaining games and score them at full value", async () => {
+    const p = await newPlayer("Latecomer");
+    const week = (await api("/weeks/1", { now: SUNDAY_NIGHT })).body;
+    const open = week.games.filter((g: any) => !g.locked);
+    expect(open).toHaveLength(2); // SNF + MNF
+
+    const picks = open.map((g: any, i: number) => ({ gameId: g.id, team: g.home, rank: i + 1 }));
+    const saved = await api("/weeks/1/picks", { method: "PUT", body: { picks }, player: p.id, now: SUNDAY_NIGHT });
+    expect(saved.status).toBe(200);
+    expect(saved.body.picks).toEqual(picks);
+
+    for (const g of open) {
+      await api(`/admin/games/${g.id}/result`, { method: "PUT", body: { winner: g.home }, pin: "1234" });
+    }
+    const board = await api("/board/week/1", { player: p.id, now: "2026-09-16T12:00:00.000Z" });
+    const row = board.body.rows.find((r: any) => r.playerId === p.id);
+    // Rank 1 and rank 2, both correct: 5 + 4.
+    expect(row).toMatchObject({ points: 9, correct: 2, fives: 1, picksMade: 2 });
+
+    // Clean up so the shared week-1 fixtures stay result-free for other assertions.
+    for (const g of open) {
+      await api(`/admin/games/${g.id}/result`, { method: "PUT", body: { winner: null }, pin: "1234" });
+    }
+  });
+});

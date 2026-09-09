@@ -10,7 +10,7 @@ results entered by the commissioner in about a minute a week.
 
 | Rule | Detail |
 |---|---|
-| Picks | Any 5 games in the week (fewer is allowed, e.g. if you join late in the week). Rank them 1–5. |
+| Picks | Any 5 games in the week. Rank them 1–5. |
 | Scoring | Rank 1 = 5 pts … rank 5 = 1 pt, only if your team wins. A tie scores 0. No picks = 0. |
 | Locking | Each game locks at its kickoff. Until then you can change anything. A locked pick is frozen: team *and* rank. |
 | Reveal | Other people's picks for a game are hidden until that game kicks off. Your own are always visible. |

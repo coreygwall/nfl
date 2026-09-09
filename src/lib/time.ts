@@ -20,6 +20,10 @@ export const formatDay = (iso: string): string => dayFmt.format(new Date(iso));
 export const formatShortDay = (iso: string): string => shortDayFmt.format(new Date(iso));
 export const formatTime = (iso: string): string => timeFmt.format(new Date(iso));
 export const formatTimeTz = (iso: string): string => timeTzFmt.format(new Date(iso));
+const slotFmt = new Intl.DateTimeFormat(undefined, { weekday: "short" });
+/** Compact kickoff for dense cards: "Sun 10:00 AM". */
+export const formatSlot = (iso: string): string => `${slotFmt.format(new Date(iso))} ${timeFmt.format(new Date(iso))}`;
+
 export const formatKickoff = (iso: string): string => `${shortDayFmt.format(new Date(iso))} · ${timeFmt.format(new Date(iso))}`;
 
 /** Local calendar day key for grouping. */

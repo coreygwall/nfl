@@ -18,7 +18,7 @@ export function Board({ tab }: { tab: "week" | "season" }) {
   if (tab === "week" && (!Number.isInteger(week) || week! < 1 || week! > WEEKS)) return <Navigate to="/board" replace />;
   const boardWeek = boot.data?.boardWeek ?? 1;
   return (
-    <div>
+    <div className="mx-auto w-full max-w-[760px]">
       <Segmented
         value={tab}
         options={[

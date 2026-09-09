@@ -78,6 +78,7 @@ body {
     box-shadow: var(--shadow-hard-sm);
     transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
     user-select: none;
+    touch-action: manipulation;
     -webkit-tap-highlight-color: transparent;
   }
   .btn:active {
@@ -165,6 +166,13 @@ body {
 input,
 button {
   font: inherit;
+}
+
+/* Buttons never accumulate a text selection, which otherwise flashes mid-drag. */
+button {
+  -webkit-user-select: none;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
 }
 
 ::selection {

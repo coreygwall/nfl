@@ -5,7 +5,7 @@ import confetti from "canvas-confetti";
 import { useBootstrap, usePutPicks, useWeek } from "../api/queries.ts";
 import { ApiClientError } from "../api/client.ts";
 import { usePlayer } from "../lib/player.tsx";
-import { useNow, formatCountdown, formatDay, formatTime, dayKey } from "../lib/time.ts";
+import { useNow, formatCountdown, formatSlot, formatTime } from "../lib/time.ts";
 import { clearDraft, emptyDraft, loadDraft, moveInOrder, removeSelection, saveDraft, toggleSelection, type Draft } from "../lib/draft.ts";
 import { TEAMS, type Abbr } from "../../shared/teams.ts";
 import type { GameDTO } from "../../shared/api.ts";
@@ -157,24 +157,27 @@ function PickFlowInner({ week }: { week: number }) {
   if (wk.isPending || boot.isPending) return <Spinner label="Loading the slate…" />;
   if (wk.error) return <ErrorState message={wk.error.message} onRetry={() => wk.refetch()} />;
 
-  const nextKick = games.filter((g) => !lockedNow(g)).map((g) => g.kickoffAt).sort()[0];
+  const openGames = games.filter((g) => !lockedNow(g));
+  // Slots only go as high as this player can actually still fill — a late joiner with two
+  // games left sees two slots, not five empty ones.
+  const slotCount = Math.min(MAX_PICKS, frozen.length + openGames.length);
   const status = allLocked
     ? hasSaved
       ? { label: "Locked", tone: "bg-paper-2" }
-      : { label: "Missed", tone: "bg-danger-soft" }
+      : { label: "No picks", tone: "bg-paper-2" }
     : hasSaved && !dirty
       ? { label: "Picks in ✓", tone: "bg-turf-soft" }
-      : nextKick
-        ? { label: `Locks in ${formatCountdown(nextKick, Date.parse(now))}`, tone: "bg-flag-soft" }
-        : { label: "", tone: "" };
+      : { label: "", tone: "" };
 
   return (
     <div>
-      <WeekNav
-        week={week}
-        onChange={(w) => nav(`/week/${w}`)}
-        suffix={status.label ? <span className={`chip ${status.tone}`}>{status.label}</span> : null}
-      />
+      <div className="mx-auto w-full max-w-[760px]">
+        <WeekNav
+          week={week}
+          onChange={(w) => nav(`/week/${w}`)}
+          suffix={status.label ? <span className={`chip ${status.tone}`}>{status.label}</span> : null}
+        />
+      </div>
 
       <AnimatePresence mode="wait" initial={false}>
         {step === "review" ? (
@@ -182,9 +185,9 @@ function PickFlowInner({ week }: { week: number }) {
             <ReviewStep week={week} games={games} myPicks={myPicks} pickCounts={wk.data!.pickCounts} lockedNow={lockedNow} anyUnlocked={anyUnlocked} onEdit={() => setStep("select")} submitted={wk.data!.submitted} />
           </StepWrap>
         ) : step === "select" ? (
-          <StepWrap key="select">
-            <SelectStep games={games} draft={draft} frozen={frozen} lockedNow={lockedNow} onPick={onPick} pickCounts={wk.data!.pickCounts} allLocked={allLocked} hasSaved={hasSaved} currentWeek={boot.data!.currentWeek} week={week} />
-            <PickTray merged={merged} frozen={frozen} shake={shakeTray} onRemove={(gameId) => setDraft((d) => removeSelection(d, gameId))} onNext={() => setStep("rank")} disabled={!anyUnlocked} />
+          <StepWrap key="select" wide>
+            <SelectStep games={games} draft={draft} frozen={frozen} lockedNow={lockedNow} onPick={onPick} pickCounts={wk.data!.pickCounts} allLocked={allLocked} hasSaved={hasSaved} currentWeek={boot.data!.currentWeek} week={week} now={now} openCount={openGames.length} picked={merged.length} slotCount={slotCount} />
+            <PickTray merged={merged} frozen={frozen} shake={shakeTray} slots={slotCount} onRemove={(gameId) => setDraft((d) => removeSelection(d, gameId))} onNext={() => setStep("rank")} disabled={!anyUnlocked} />
           </StepWrap>
         ) : step === "rank" ? (
           <StepWrap key="rank">
@@ -204,14 +207,14 @@ function PickFlowInner({ week }: { week: number }) {
   );
 }
 
-function StepWrap({ children }: { children: React.ReactNode }) {
+function StepWrap({ children, wide = false }: { children: React.ReactNode; wide?: boolean }) {
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -6 }}
       transition={{ duration: 0.18 }}
-      className="mt-4"
+      className={`mt-4 ${wide ? "" : "mx-auto w-full max-w-[760px]"}`}
     >
       {children}
     </motion.div>
@@ -221,7 +224,7 @@ function StepWrap({ children }: { children: React.ReactNode }) {
 // ---------- Select ----------
 
 function SelectStep({
-  games, draft, frozen, lockedNow, onPick, pickCounts, allLocked, hasSaved, currentWeek, week,
+  games, draft, frozen, lockedNow, onPick, pickCounts, allLocked, hasSaved, currentWeek, week, now, openCount, picked, slotCount,
 }: {
   games: GameDTO[];
   draft: Draft;
@@ -233,22 +236,34 @@ function SelectStep({
   hasSaved: boolean;
   currentWeek: number;
   week: number;
+  now: string;
+  openCount: number;
+  picked: number;
+  slotCount: number;
 }) {
   const frozenByGame = new Map(frozen.map((p) => [p.gameId, p]));
-  const groups = useMemo(() => {
-    const map = new Map<string, GameDTO[]>();
-    for (const g of games) {
-      const k = dayKey(g.kickoffAt);
-      map.set(k, [...(map.get(k) ?? []), g]);
-    }
-    return [...map.values()];
-  }, [games]);
+  const open = games.filter((g) => !lockedNow(g));
+  const started = games.filter((g) => lockedNow(g));
+  const [showStarted, setShowStarted] = useState(frozen.length > 0);
+
+  const card = (g: GameDTO) => (
+    <GameCard
+      key={g.id}
+      game={g}
+      locked={lockedNow(g)}
+      now={now}
+      selection={draft.selections[g.id] ?? frozenByGame.get(g.id)?.team}
+      frozenPick={frozenByGame.get(g.id)}
+      counts={pickCounts[g.id]}
+      onPick={(team) => onPick(g, team)}
+    />
+  );
 
   return (
     <div>
       {allLocked ? (
-        <div className="card-flat mb-4 bg-paper-2 px-4 py-3 text-sm">
-          <b>Week {week} is locked.</b> {hasSaved ? "Your picks are in the books." : "No picks this week."}{" "}
+        <div className="card-flat mx-auto mb-4 max-w-[760px] bg-paper-2 px-4 py-3 text-sm">
+          <b>Every Week {week} game has kicked off.</b> {hasSaved ? "Your picks are in the books." : "No picks this week."}{" "}
           {currentWeek !== week && (
             <Link className="font-bold underline" to={`/week/${currentWeek}`}>
               Pick Week {currentWeek} →
@@ -256,49 +271,65 @@ function SelectStep({
           )}
         </div>
       ) : (
-        <p className="mb-3 text-sm text-ink-2">
-          Tap the team you think wins. <b>Pick {MAX_PICKS}.</b> You can change anything until that game kicks off.
-        </p>
+        <header className="mx-auto mb-4 max-w-[760px]">
+          <h2 className="font-display text-[1.9rem] font-extrabold leading-none tracking-tight">
+            Pick {slotCount} winner{slotCount === 1 ? "" : "s"}
+            {picked > 0 && (
+              <span className="ml-2 align-middle text-base font-bold text-ink-3">
+                {picked}/{slotCount} in
+              </span>
+            )}
+          </h2>
+          <p className="mt-1.5 text-[14px] leading-snug text-ink-2">
+            Tap who you think wins. You'll rank them next — surest pick <b>5 pts</b>, least sure <b>1</b>.
+          </p>
+          <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ink-3">
+            <span className="chip bg-white py-0 text-[10px] font-bold">
+              <Lock size={10} /> No weekly deadline
+            </span>
+            <span>Games lock one by one at kickoff · {openCount} open</span>
+          </p>
+        </header>
       )}
-      <div className="space-y-5">
-        {groups.map((group) => (
-          <section key={group[0]!.id}>
-            <h3 className="font-display sticky top-[54px] z-10 -mx-1 mb-2 bg-paper px-1 py-1 text-sm font-extrabold uppercase tracking-wider text-ink-2">
-              {formatDay(group[0]!.kickoffAt)}
-            </h3>
-            <ul className="space-y-3">
-              {group.map((g) => (
-                <GameCard
-                  key={g.id}
-                  game={g}
-                  locked={lockedNow(g)}
-                  selection={draft.selections[g.id] ?? frozenByGame.get(g.id)?.team}
-                  frozenPick={frozenByGame.get(g.id)}
-                  counts={pickCounts[g.id]}
-                  onPick={(team) => onPick(g, team)}
-                />
-              ))}
-            </ul>
-          </section>
-        ))}
-      </div>
+
+      <ul className="grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">{open.map(card)}</ul>
+
+      {started.length > 0 && (
+        <section className="mt-8">
+          <button
+            className="flex w-full select-none items-center gap-2 border-t-2 border-dashed border-line pt-4 text-left"
+            onClick={() => setShowStarted((v) => !v)}
+            aria-expanded={showStarted}
+          >
+            <span className="font-display text-sm font-extrabold uppercase tracking-wider text-ink-3">
+              Already kicked off ({started.length})
+            </span>
+            <ChevronDown className={`ml-auto text-ink-3 transition-transform ${showStarted ? "rotate-180" : ""}`} />
+          </button>
+          {showStarted && (
+            <ul className="mt-3 grid grid-cols-1 gap-2.5 sm:grid-cols-2 xl:grid-cols-3">{started.map(card)}</ul>
+          )}
+        </section>
+      )}
     </div>
   );
 }
 
 function GameCard({
-  game, locked, selection, frozenPick, counts, onPick,
+  game, locked, now, selection, frozenPick, counts, onPick,
 }: {
   game: GameDTO;
   locked: boolean;
+  now: string;
   selection?: Abbr;
   frozenPick?: Pick;
   counts?: { away: number; home: number };
   onPick: (team: Abbr) => void;
 }) {
-  const away = TEAMS[game.away];
-  const home = TEAMS[game.home];
   const chosen = selection ?? null;
+  const msToKick = Date.parse(game.kickoffAt) - Date.parse(now);
+  const imminent = !locked && msToKick > 0 && msToKick < 60 * 60 * 1000;
+
   const side = (abbr: Abbr, label: "away" | "home") => {
     const t = TEAMS[abbr];
     const sel = chosen === abbr;
@@ -312,67 +343,64 @@ function GameCard({
         whileTap={locked ? undefined : { scale: 0.96 }}
         aria-pressed={sel}
         aria-label={`Pick ${t.city} ${t.nickname}`}
-        className={`relative flex flex-1 flex-col items-center gap-1.5 rounded-2xl px-2 py-3 text-center transition-colors ${
+        className={`relative flex flex-1 select-none flex-col items-center gap-1 rounded-2xl px-1.5 py-2.5 text-center transition-colors ${
           locked ? "cursor-default" : "cursor-pointer"
         }`}
         style={sel ? { background: `${t.primary}14` } : undefined}
       >
-        <TeamSticker abbr={abbr} size={68} selected={sel} dimmed={dim} />
-        <span className={`font-display text-[15px] font-extrabold leading-tight ${dim ? "text-ink-3" : ""}`}>{t.nickname}</span>
-        <span className="text-[11px] font-semibold uppercase tracking-wider text-ink-3">
-          {t.display}
-          {won && <span className="ml-1 text-turf">W</span>}
+        <TeamSticker abbr={abbr} size={50} selected={sel} dimmed={dim} />
+        <span className={`font-display text-[13.5px] font-extrabold leading-tight ${dim ? "text-ink-3" : ""}`}>
+          {t.nickname}
         </span>
-        {counts && (
-          <span className="text-[11px] font-semibold text-ink-2">
-            {label === "away" ? counts.away : counts.home} picked
-          </span>
-        )}
+        {won ? (
+          <span className="text-[10px] font-bold uppercase tracking-wider text-turf">Won</span>
+        ) : counts ? (
+          <span className="text-[10px] font-semibold text-ink-2">{label === "away" ? counts.away : counts.home} picked</span>
+        ) : null}
         {sel && frozenPick && (
-          <span className="absolute left-2 top-2">
+          <span className="absolute left-1 top-1">
             <RankBadge rank={frozenPick.rank} size="sm" />
           </span>
         )}
       </motion.button>
     );
   };
+
   return (
     <motion.li
       layout
-      className={`card-flat relative overflow-hidden ${locked ? "bg-paper-2/70" : "bg-white"}`}
+      className={`card-flat relative select-none overflow-hidden ${locked ? "bg-paper-2/70" : "bg-white"}`}
       animate={chosen && !locked ? { boxShadow: "4px 4px 0 0 #14120f", y: -1 } : { boxShadow: "0px 0px 0 0 #14120f", y: 0 }}
       transition={{ type: "spring", stiffness: 500, damping: 30 }}
     >
       <div className="flex items-stretch">
         {side(game.away, "away")}
-        <div className="flex w-12 shrink-0 flex-col items-center justify-center gap-1 text-ink-3">
-          <span className="font-display text-lg font-extrabold">{game.neutral ? "vs" : "@"}</span>
+        <div className="flex w-[78px] shrink-0 flex-col items-center justify-center gap-0.5 px-0.5 text-center">
+          <span className="font-display text-base font-extrabold leading-none text-ink-3">{game.neutral ? "vs" : "@"}</span>
+          {locked ? (
+            <span className="flex items-center gap-0.5 text-[10px] font-bold leading-tight text-ink-3">
+              <Lock size={10} />
+              {game.status === "final" ? "Final" : "Live"}
+            </span>
+          ) : (
+            <span className={`text-[10px] font-semibold leading-tight ${imminent ? "text-danger" : "text-ink-3"}`}>
+              {imminent ? `locks in ${formatCountdown(game.kickoffAt, Date.parse(now))}` : formatSlot(game.kickoffAt)}
+            </span>
+          )}
         </div>
         {side(game.home, "home")}
-      </div>
-      <div className="flex items-center justify-between border-t-2 border-dashed border-line px-3 py-1.5 text-[12px] font-semibold text-ink-2">
-        <span className="truncate">
-          {formatTime(game.kickoffAt)}
-          {game.neutral && game.venue ? ` · ${game.venue}` : ""}
-        </span>
-        {locked ? (
-          <span className={`chip py-0 text-[11px] ${game.status === "final" ? "bg-paper-2" : "bg-danger-soft"}`}>
-            <Lock size={12} /> {game.status === "final" ? "Final" : "Started"}
-          </span>
-        ) : (
-          <span className="text-ink-3">{`${away.display} at ${home.display}`}</span>
-        )}
       </div>
     </motion.li>
   );
 }
 
 function PickTray({
-  merged, frozen, shake, onRemove, onNext, disabled,
+  merged, frozen, shake, slots, onRemove, onNext, disabled,
 }: {
   merged: Pick[];
   frozen: Pick[];
   shake: number;
+  slots: number;
   onRemove: (gameId: string) => void;
   onNext: () => void;
   disabled: boolean;
@@ -380,10 +408,11 @@ function PickTray({
   const frozenIds = new Set(frozen.map((p) => p.gameId));
   const count = merged.length;
   const editable = merged.filter((p) => !frozenIds.has(p.gameId)).length;
-  const label = count === 0 ? "Pick 5" : count === MAX_PICKS ? "Rank them →" : `Rank ${count} →`;
+  const full = count >= slots;
+  const label = count === 0 ? `Pick ${slots}` : full ? "Rank them →" : `Rank ${count} →`;
   return (
     <div className="fixed inset-x-0 bottom-0 z-40">
-      <div className="mx-auto max-w-[720px] px-4 pb-[max(env(safe-area-inset-bottom),12px)]">
+      <div className="mx-auto max-w-[560px] px-4 pb-[max(env(safe-area-inset-bottom),12px)]">
         <motion.div
           key={shake}
           animate={shake ? { x: [-8, 8, -6, 6, 0] } : { x: 0 }}
@@ -391,7 +420,7 @@ function PickTray({
           className="card flex items-center gap-2 p-2"
         >
           <div className="flex flex-1 items-center gap-1.5">
-            {ALL_RANKS.map((i) => {
+            {Array.from({ length: slots }, (_, i) => i + 1).map((i) => {
               const p = merged[i - 1];
               const isFrozen = p ? frozenIds.has(p.gameId) : false;
               return (
@@ -426,10 +455,10 @@ function PickTray({
             })}
           </div>
           <motion.button
-            className={`btn btn-sm ${count === MAX_PICKS ? "btn-turf" : "btn-primary"} shrink-0 whitespace-nowrap px-3`}
+            className={`btn btn-sm ${full ? "btn-turf" : "btn-primary"} shrink-0 whitespace-nowrap px-3`}
             disabled={count === 0 || disabled || editable === 0}
             onClick={onNext}
-            animate={count === MAX_PICKS ? { scale: [1, 1.06, 1] } : { scale: 1 }}
+            animate={full ? { scale: [1, 1.06, 1] } : { scale: 1 }}
             transition={{ duration: 0.4 }}
           >
             {label}
@@ -465,7 +494,7 @@ function RankStep({
           <h3 className="mb-2 text-xs font-bold uppercase tracking-wider text-ink-3">Locked in</h3>
           <ul className="space-y-2">
             {frozen.map((p) => (
-              <li key={p.gameId} className="card-flat flex items-center gap-3 bg-paper-2/70 p-2.5">
+              <li key={p.gameId} className="card-flat flex select-none items-center gap-3 bg-paper-2/70 p-2.5">
                 <RankBadge rank={p.rank} muted />
                 <TeamSticker abbr={p.team} size={44} flat />
                 <MatchupText pick={p} game={gamesById.get(p.gameId)} compact />
@@ -522,7 +551,7 @@ function RankRow({
       dragControls={controls}
       layout
       whileDrag={{ scale: 1.03, boxShadow: "6px 6px 0 0 #14120f", zIndex: 10 }}
-      className="card-flat relative flex items-center gap-3 bg-white p-2.5"
+      className="card-flat relative flex touch-pan-y select-none items-center gap-3 bg-white p-2.5"
     >
       <motion.div key={rank} initial={{ scale: 0.7 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 600, damping: 20 }}>
         <RankBadge rank={rank} />
@@ -539,7 +568,7 @@ function RankRow({
           </button>
         </div>
         <div
-          className="cursor-grab touch-none rounded-lg p-2 text-ink-3 active:cursor-grabbing"
+          className="-m-1 cursor-grab touch-none rounded-lg p-3 text-ink-3 active:cursor-grabbing"
           onPointerDown={(e) => controls.start(e)}
           aria-label="Drag to reorder"
           role="button"

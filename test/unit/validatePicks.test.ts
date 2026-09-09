@@ -115,6 +115,26 @@ describe("validatePicks", () => {
     expect(r.final).toEqual([{ gameId: "g2", team: "HOU", rank: 5 }]);
   });
 
+  it("lets a player who missed most of the week use the ranks that are left", () => {
+    // Sunday night: g1-g4 have kicked off, only g5 and g6 remain.
+    const late = "2026-09-14T12:00:00.000Z";
+    const r = run(
+      [
+        { gameId: "g5", team: "GB", rank: 1 },
+        { gameId: "g6", team: "SF", rank: 2 },
+      ],
+      [],
+      late,
+    );
+    expect(r.ok).toBe(true);
+    if (!r.ok) return;
+    expect(r.frozen).toEqual([]);
+    expect(r.final).toEqual([
+      { gameId: "g5", team: "GB", rank: 1 },
+      { gameId: "g6", team: "SF", rank: 2 },
+    ]);
+  });
+
   it("ignores locks when asked (admin backfill)", () => {
     const r = run([{ gameId: "g1", team: "NE", rank: 1 }], [{ gameId: "g1", team: "SEA", rank: 3 }], NOW, true);
     expect(r.ok).toBe(true);

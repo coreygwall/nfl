@@ -37,7 +37,7 @@ export function AppShell() {
   ];
 
   return (
-    <div className="relative mx-auto flex min-h-dvh w-full max-w-[720px] flex-col">
+    <div className="relative mx-auto flex min-h-dvh w-full max-w-[1180px] flex-col">
       <header className="sticky top-0 z-30 border-b-2 border-ink bg-paper/90 backdrop-blur">
         <div className="flex items-center justify-between gap-3 px-4 py-2.5">
           <Link to="/" className="font-display text-[1.65rem] font-extrabold leading-none tracking-tight">
@@ -58,7 +58,7 @@ export function AppShell() {
 
       {!onWelcome && !navHidden && (
         <nav className="fixed inset-x-0 bottom-0 z-30">
-          <div className="mx-auto max-w-[720px] px-4 pb-[max(env(safe-area-inset-bottom),12px)]">
+          <div className="mx-auto max-w-[560px] px-4 pb-[max(env(safe-area-inset-bottom),12px)]">
             <div className="card flex p-1.5">
               {tabs.map((t) => {
                 const active = loc.pathname.startsWith(t.match);

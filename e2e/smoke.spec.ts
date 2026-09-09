@@ -11,7 +11,8 @@ test.describe.serial("pool flow", () => {
     await page.getByPlaceholder("Your name").fill("Corey");
     await page.getByRole("button", { name: "Let's go" }).click();
     await expect(page).toHaveURL(/\/week\/1$/);
-    await expect(page.getByText("Locks in")).toBeVisible();
+    await expect(page.getByText("No weekly deadline")).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Pick 5 winners" })).toBeVisible();
 
     for (const t of ["Seattle Seahawks", "San Francisco 49ers", "Buffalo Bills", "Cincinnati Bengals", "Detroit Lions"]) {
       await pick(page, t);
@@ -107,4 +108,28 @@ test.describe.serial("pool flow", () => {
     await page.getByRole("tab", { name: "Season" }).click();
     await expect(page.getByText("through Week 1")).toBeVisible();
   });
+});
+
+test("a player who shows up Sunday night can still pick what's left", async ({ page }) => {
+  // Only the Sunday night and Monday night games have yet to kick off.
+  const SUNDAY_NIGHT = "2026-09-13T22:00:00Z";
+  await page.goto(`/welcome?now=${SUNDAY_NIGHT}`);
+  await page.getByRole("button", { name: "Add my name" }).click();
+  await page.getByPlaceholder("Your name").fill("Sunday Nighter");
+  await page.getByRole("button", { name: "Let's go" }).click();
+
+  // The ask scales to what is actually still available — no dead five-slot tray.
+  await expect(page.getByRole("heading", { name: "Pick 2 winners" })).toBeVisible();
+  await expect(page.getByText("2 open")).toBeVisible();
+  await expect(page.getByText("Already kicked off (14)")).toBeVisible();
+
+  await page.getByRole("button", { name: "Pick New York Giants" }).click();
+  await page.getByRole("button", { name: "Pick Kansas City Chiefs" }).click();
+  await page.getByRole("button", { name: "Rank them" }).click();
+  await expect(page.getByText("How sure are you?")).toBeVisible();
+  await page.getByRole("button", { name: "Looks right" }).click();
+  // Two picks are still worth the top two rank values: 5 + 4.
+  await expect(page.getByText("up to 9 points")).toBeVisible();
+  await page.getByRole("button", { name: "Lock it in" }).click();
+  await expect(page.getByText("Locked in")).toBeVisible();
 });
