@@ -20,8 +20,10 @@ results entered by the commissioner in about a minute a week.
 
 ## Deploying (one-time, ~5 minutes)
 
-The D1 database `nfl-pool` already exists in the Cloudflare account and its id is in `wrangler.jsonc`.
-The Worker creates its own tables and loads the schedule the first time it runs, so there is no migration step.
+The D1 database `nfl-pool` already exists in the Cloudflare account, its id is in `wrangler.jsonc`, and it is
+**already seeded**: schema applied and all 272 regular-season games loaded. There is no migration step to run.
+(The Worker also applies the schema and upserts the schedule itself on its first request, so a fresh or wiped
+database heals on its own.)
 
 1. Cloudflare dashboard → **Workers & Pages** → **Create** → **Import a repository** → pick `coreygwall/nfl`.
 2. Worker name **`nfl-pool`** (must match `name` in `wrangler.jsonc`). Build command `npm run build`. Deploy command `npx wrangler deploy` (the default). Root directory `/`.
