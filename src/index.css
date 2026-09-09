@@ -1,0 +1,172 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Bricolage Grotesque Variable", ui-sans-serif, system-ui, sans-serif;
+  --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;
+
+  --color-paper: #f6f1e8;
+  --color-paper-2: #ede5d6;
+  --color-paper-3: #e3d9c6;
+  --color-ink: #14120f;
+  --color-ink-2: #5b554b;
+  --color-ink-3: #8a8377;
+  --color-line: #d9d0c0;
+  --color-turf: #0b7a3b;
+  --color-turf-2: #0f9a4c;
+  --color-turf-soft: #dff2e6;
+  --color-flag: #ffd23f;
+  --color-flag-soft: #fff3c4;
+  --color-danger: #d7263d;
+  --color-danger-soft: #fde2e6;
+  --color-sky: #2f80ed;
+  --color-sky-soft: #e1ecfc;
+
+  --shadow-hard: 4px 4px 0 0 #14120f;
+  --shadow-hard-sm: 2px 2px 0 0 #14120f;
+  --shadow-hard-lg: 6px 6px 0 0 #14120f;
+  --shadow-lift: 0 10px 24px -8px rgb(20 18 15 / 0.35);
+
+  --radius-card: 20px;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+  overscroll-behavior-y: none;
+}
+
+body {
+  background: var(--color-paper);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "cv11", "ss01";
+  min-height: 100dvh;
+  background-image: radial-gradient(rgb(20 18 15 / 0.06) 1px, transparent 1px);
+  background-size: 18px 18px;
+}
+
+@layer utilities {
+  .font-display {
+    font-family: var(--font-display);
+    font-variation-settings: "wdth" 96, "opsz" 32;
+  }
+  .card {
+    background: #fff;
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-card);
+    box-shadow: var(--shadow-hard);
+  }
+  .card-flat {
+    background: #fff;
+    border: 2px solid var(--color-ink);
+    border-radius: var(--radius-card);
+  }
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    min-height: 48px;
+    padding: 0 1.25rem;
+    border: 2px solid var(--color-ink);
+    border-radius: 999px;
+    font-family: var(--font-display);
+    font-weight: 700;
+    font-size: 1.05rem;
+    letter-spacing: 0.01em;
+    background: #fff;
+    color: var(--color-ink);
+    box-shadow: var(--shadow-hard-sm);
+    transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
+    user-select: none;
+    -webkit-tap-highlight-color: transparent;
+  }
+  .btn:active {
+    transform: translate(2px, 2px);
+    box-shadow: 0 0 0 0 var(--color-ink);
+  }
+  .btn:disabled {
+    opacity: 0.45;
+    pointer-events: none;
+  }
+  .btn-primary {
+    background: var(--color-ink);
+    color: var(--color-paper);
+  }
+  .btn-turf {
+    background: var(--color-turf);
+    color: #fff;
+  }
+  .btn-flag {
+    background: var(--color-flag);
+    color: var(--color-ink);
+  }
+  .btn-ghost {
+    border-color: transparent;
+    box-shadow: none;
+    background: transparent;
+  }
+  .btn-sm {
+    min-height: 38px;
+    padding: 0 0.9rem;
+    font-size: 0.92rem;
+  }
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.65rem;
+    border-radius: 999px;
+    border: 2px solid var(--color-ink);
+    background: #fff;
+    font-size: 0.8rem;
+    font-weight: 700;
+    line-height: 1.4;
+  }
+  .sticker-img {
+    display: block;
+    width: 100%;
+    height: 100%;
+    object-fit: contain;
+    pointer-events: none;
+    user-select: none;
+    -webkit-user-drag: none;
+  }
+  .sticker-raster {
+    filter: drop-shadow(1.5px 0 0 #fff) drop-shadow(-1.5px 0 0 #fff) drop-shadow(0 1.5px 0 #fff) drop-shadow(0 -1.5px 0 #fff);
+  }
+  .sticker-shadow {
+    filter: drop-shadow(0 6px 6px rgb(20 18 15 / 0.22));
+  }
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom);
+  }
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+  .stamp {
+    font-family: var(--font-display);
+    font-variation-settings: "wdth" 80;
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    border: 4px solid currentColor;
+    border-radius: 12px;
+    padding: 0.35rem 0.9rem;
+    display: inline-block;
+  }
+}
+
+input,
+button {
+  font: inherit;
+}
+
+::selection {
+  background: var(--color-flag);
+}

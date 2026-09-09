@@ -1,0 +1,60 @@
+import { Navigate, Route, Routes, useLocation } from "react-router";
+import type { ReactNode } from "react";
+import { useBootstrap } from "./api/queries.ts";
+import { usePlayer } from "./lib/player.tsx";
+import { AppShell } from "./components/AppShell.tsx";
+import { ChromeProvider } from "./components/Chrome.tsx";
+import { ErrorState, Spinner } from "./components/Common.tsx";
+import { Welcome } from "./screens/Welcome.tsx";
+import { PickFlow } from "./screens/PickFlow.tsx";
+import { Board } from "./screens/Board.tsx";
+import { Admin } from "./screens/Admin.tsx";
+
+function Home() {
+  const { player } = usePlayer();
+  const boot = useBootstrap();
+  if (!player) return <Navigate to="/welcome" replace />;
+  if (boot.isPending) return <Spinner />;
+  if (boot.error) return <ErrorState message={boot.error.message} onRetry={() => boot.refetch()} />;
+  return <Navigate to={`/week/${boot.data.currentWeek}`} replace />;
+}
+
+function BoardIndex() {
+  const boot = useBootstrap();
+  if (boot.isPending) return <Spinner />;
+  if (boot.error) return <ErrorState message={boot.error.message} onRetry={() => boot.refetch()} />;
+  return <Navigate to={`/board/week/${boot.data.boardWeek}`} replace />;
+}
+
+function RequirePlayer({ children }: { children: ReactNode }) {
+  const { player } = usePlayer();
+  const loc = useLocation();
+  if (!player) return <Navigate to={`/welcome?next=${encodeURIComponent(loc.pathname + loc.search)}`} replace />;
+  return children;
+}
+
+export default function App() {
+  return (
+    <ChromeProvider>
+      <Routes>
+        <Route element={<AppShell />}>
+          <Route index element={<Home />} />
+          <Route path="welcome" element={<Welcome />} />
+          <Route
+            path="week/:week"
+            element={
+              <RequirePlayer>
+                <PickFlow />
+              </RequirePlayer>
+            }
+          />
+          <Route path="board" element={<BoardIndex />} />
+          <Route path="board/week/:week" element={<Board tab="week" />} />
+          <Route path="board/season" element={<Board tab="season" />} />
+          <Route path="admin" element={<Admin />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Route>
+      </Routes>
+    </ChromeProvider>
+  );
+}

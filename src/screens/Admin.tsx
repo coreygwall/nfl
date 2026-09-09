@@ -1,0 +1,282 @@
+import { useState, type FormEvent } from "react";
+import { motion } from "motion/react";
+import { api, ApiClientError } from "../api/client.ts";
+import { useAdminPlayerMutation, useAdminPlayers, useAdminSetResult, useAdminSync, useAdminWeek, useBootstrap } from "../api/queries.ts";
+import { TEAMS, type Abbr } from "../../shared/teams.ts";
+import type { AdminGameDTO } from "../../shared/api.ts";
+import { formatKickoff, formatShortDay } from "../lib/time.ts";
+import { ErrorState, Segmented, Spinner, WeekNav } from "../components/Common.tsx";
+import { TeamSticker } from "../components/TeamSticker.tsx";
+import { useToast } from "../components/Toast.tsx";
+
+const PIN_KEY = "nflpool.admin.pin";
+
+export function Admin() {
+  const [pin, setPin] = useState<string | null>(() => {
+    try {
+      return sessionStorage.getItem(PIN_KEY);
+    } catch {
+      return null;
+    }
+  });
+  if (!pin)
+    return (
+      <PinGate
+        onOk={(p) => {
+          try {
+            sessionStorage.setItem(PIN_KEY, p);
+          } catch {
+            /* ignore */
+          }
+          setPin(p);
+        }}
+      />
+    );
+  return (
+    <AdminPanel
+      pin={pin}
+      onSignOut={() => {
+        sessionStorage.removeItem(PIN_KEY);
+        setPin(null);
+      }}
+    />
+  );
+}
+
+function PinGate({ onOk }: { onOk: (pin: string) => void }) {
+  const [pin, setPin] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [shake, setShake] = useState(0);
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      await api("/admin/verify", { method: "POST", body: {}, pin });
+      onOk(pin);
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : "Couldn't verify.");
+      setShake((s) => s + 1);
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <form onSubmit={submit} className="card mx-auto mt-6 max-w-sm p-5">
+      <h1 className="font-display text-2xl font-extrabold">Commissioner's office</h1>
+      <p className="mb-3 text-sm text-ink-2">Enter the admin PIN to record results.</p>
+      <motion.div key={shake} animate={shake ? { x: [-8, 8, -5, 5, 0] } : { x: 0 }} transition={{ duration: 0.35 }}>
+        <input
+          autoFocus
+          type="password"
+          inputMode="numeric"
+          autoComplete="off"
+          value={pin}
+          onChange={(e) => setPin(e.target.value)}
+          placeholder="PIN"
+          aria-label="Admin PIN"
+          className="card-flat w-full px-4 py-3 text-lg tracking-[0.3em] outline-none focus:shadow-hard"
+        />
+      </motion.div>
+      {error && <p className="mt-2 text-sm font-semibold text-danger">{error}</p>}
+      <button className="btn btn-primary mt-4 w-full" disabled={busy || !pin}>
+        {busy ? "Checking…" : "Open up"}
+      </button>
+    </form>
+  );
+}
+
+function AdminPanel({ pin, onSignOut }: { pin: string; onSignOut: () => void }) {
+  const boot = useBootstrap();
+  const [tab, setTab] = useState<"results" | "players" | "tools">("results");
+  const [week, setWeek] = useState<number | null>(null);
+  const activeWeek = week ?? boot.data?.boardWeek ?? 1;
+  return (
+    <div>
+      <Segmented
+        value={tab}
+        options={[
+          { value: "results", label: "Results" },
+          { value: "players", label: "Players" },
+          { value: "tools", label: "Tools" },
+        ]}
+        onChange={setTab}
+      />
+      <div className="mt-4">
+        {tab === "results" && <Results pin={pin} week={activeWeek} onWeek={setWeek} />}
+        {tab === "players" && <Players pin={pin} />}
+        {tab === "tools" && <Tools pin={pin} onSignOut={onSignOut} />}
+      </div>
+    </div>
+  );
+}
+
+function Results({ pin, week, onWeek }: { pin: string; week: number; onWeek: (w: number) => void }) {
+  const data = useAdminWeek(week, pin);
+  const set = useAdminSetResult(pin);
+  const toast = useToast();
+  const save = async (game: AdminGameDTO, winner: Abbr | "TIE" | null) => {
+    try {
+      await set.mutateAsync({ gameId: game.id, winner });
+      toast(winner === null ? "Result cleared" : winner === "TIE" ? "Recorded as a tie" : `${TEAMS[winner].nickname} win recorded`, "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Couldn't save", "error");
+    }
+  };
+  return (
+    <div>
+      <WeekNav week={week} onChange={onWeek} />
+      {data.isPending ? (
+        <Spinner />
+      ) : data.error ? (
+        <ErrorState message={data.error.message} onRetry={() => data.refetch()} />
+      ) : (
+        <div className="mt-4">
+          <p className="mb-3 text-sm text-ink-2">
+            {data.data.games.filter((g) => g.winner).length} of {data.data.games.length} final · tap the winner. Tap again to clear.
+          </p>
+          <ul className="space-y-2">
+            {data.data.games.map((g) => (
+              <ResultRow key={g.id} game={g} onSet={(w) => save(g, w)} busy={set.isPending} />
+            ))}
+          </ul>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function ResultRow({ game, onSet, busy }: { game: AdminGameDTO; onSet: (w: Abbr | "TIE" | null) => void; busy: boolean }) {
+  const count = (abbr: Abbr) => game.picks.filter((p) => p.team === abbr).length;
+  const teamBtn = (abbr: Abbr) => {
+    const t = TEAMS[abbr];
+    const on = game.winner === abbr;
+    return (
+      <button
+        disabled={busy}
+        onClick={() => onSet(on ? null : abbr)}
+        aria-pressed={on}
+        className={`flex flex-1 items-center gap-2 rounded-xl border-2 px-2 py-1.5 text-left transition-colors ${on ? "border-ink text-white" : "border-line bg-white"}`}
+        style={on ? { background: t.primary } : undefined}
+      >
+        <TeamSticker abbr={abbr} size={32} flat />
+        <span className="min-w-0">
+          <span className="font-display block truncate text-sm font-extrabold">{t.nickname}</span>
+          <span className={`block text-[11px] ${on ? "text-white/80" : "text-ink-3"}`}>{count(abbr)} picked</span>
+        </span>
+      </button>
+    );
+  };
+  return (
+    <li className="card-flat bg-white p-2.5">
+      <div className="mb-2 flex items-center justify-between text-[11px] font-semibold text-ink-2">
+        <span>
+          {formatShortDay(game.kickoffAt)} · {formatKickoff(game.kickoffAt).split("·")[1]}
+          {!game.locked && <span className="ml-2 chip bg-flag-soft py-0 text-[10px]">Not started</span>}
+        </span>
+        <span>{game.picks.length} picks</span>
+      </div>
+      <div className="flex items-stretch gap-2">
+        {teamBtn(game.away)}
+        <button
+          disabled={busy}
+          onClick={() => onSet(game.winner === "TIE" ? null : "TIE")}
+          aria-pressed={game.winner === "TIE"}
+          className={`rounded-xl border-2 px-2 text-xs font-bold ${game.winner === "TIE" ? "border-ink bg-ink text-paper" : "border-line bg-white text-ink-2"}`}
+        >
+          Tie
+        </button>
+        {teamBtn(game.home)}
+      </div>
+    </li>
+  );
+}
+
+function Players({ pin }: { pin: string }) {
+  const data = useAdminPlayers(pin);
+  const mut = useAdminPlayerMutation(pin);
+  const toast = useToast();
+  if (data.isPending) return <Spinner />;
+  if (data.error) return <ErrorState message={data.error.message} onRetry={() => data.refetch()} />;
+  const act = async (input: Parameters<typeof mut.mutateAsync>[0]) => {
+    try {
+      await mut.mutateAsync(input);
+      toast(input.action === "delete" ? "Player removed" : "Renamed", "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Couldn't save", "error");
+    }
+  };
+  return (
+    <ul className="space-y-2">
+      {data.data.players.length === 0 && <p className="text-sm text-ink-2">No players yet.</p>}
+      {data.data.players.map((p) => (
+        <li key={p.id} className="card-flat flex items-center gap-3 bg-white p-3">
+          <div className="min-w-0 flex-1">
+            <div className="font-display truncate font-extrabold">{p.name}</div>
+            <div className="text-xs text-ink-2">
+              {p.picksCount} picks · {p.weeksPlayed} wk{p.weeksPlayed === 1 ? "" : "s"} · last seen {formatShortDay(p.lastSeenAt)}
+            </div>
+          </div>
+          <button
+            className="btn btn-sm"
+            onClick={() => {
+              const name = window.prompt("New name", p.name);
+              if (name && name !== p.name) void act({ id: p.id, action: "rename", name });
+            }}
+          >
+            Rename
+          </button>
+          <button
+            className="btn btn-sm text-danger"
+            onClick={() => {
+              if (window.confirm(`Remove ${p.name} and all their picks?`)) void act({ id: p.id, action: "delete" });
+            }}
+          >
+            Remove
+          </button>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+function Tools({ pin, onSignOut }: { pin: string; onSignOut: () => void }) {
+  const sync = useAdminSync(pin);
+  const toast = useToast();
+  return (
+    <div className="space-y-3">
+      <div className="card-flat bg-white p-4">
+        <h3 className="font-display font-extrabold">Schedule</h3>
+        <p className="mb-3 text-sm text-ink-2">
+          Kickoff times come from the schedule bundled with the app. Re-run <code>npm run schedule:build</code>, deploy, and the app updates
+          itself. This button forces a refresh from the bundled copy.
+        </p>
+        <button
+          className="btn btn-sm"
+          disabled={sync.isPending}
+          onClick={async () => {
+            try {
+              const r = await sync.mutateAsync();
+              toast(`Schedule synced (${r.upserted} games, ${r.version})`, "success");
+            } catch (err) {
+              toast(err instanceof Error ? err.message : "Sync failed", "error");
+            }
+          }}
+        >
+          {sync.isPending ? "Syncing…" : "Sync schedule"}
+        </button>
+      </div>
+      <div className="card-flat bg-white p-4">
+        <h3 className="font-display font-extrabold">Late picks</h3>
+        <p className="text-sm text-ink-2">
+          Someone texted their picks after kickoff? Their picks can be backfilled through the API (see the README) — locks are bypassed for
+          the commissioner only.
+        </p>
+      </div>
+      <button className="btn btn-sm" onClick={onSignOut}>
+        Sign out of admin
+      </button>
+    </div>
+  );
+}
