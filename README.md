@@ -26,10 +26,10 @@ The D1 database `nfl-pool` already exists in the Cloudflare account, its id is i
 database heals on its own.)
 
 1. Cloudflare dashboard → **Workers & Pages** → **Create** → **Import a repository** → pick `coreygwall/nfl`.
-2. Worker name **`nfl-pool`** (must match `name` in `wrangler.jsonc`). Build command `npm run build`. Deploy command `npx wrangler deploy` (the default). Root directory `/`.
+2. Worker name **`nfl`** (must match `name` in `wrangler.jsonc`, and Cloudflare defaults it to the repo name). Build command `npm run build`. Deploy command `npx wrangler deploy` (the default). Root directory `/`.
 3. After the first deploy: Worker → **Settings** → **Variables and Secrets** → add a **secret** `ADMIN_PIN` (the commissioner PIN). Redeploy or push again.
 4. Optional: **Settings → Builds** → enable non-production branch builds to get a preview URL on every pull request.
-5. Share `https://nfl-pool.<your-subdomain>.workers.dev`. Pool name is `POOL_NAME` in `wrangler.jsonc`.
+5. Share `https://nfl.<your-subdomain>.workers.dev`. Pool name is `POOL_NAME` in `wrangler.jsonc`.
 
 From a laptop instead: `npx wrangler login && npm run deploy && npx wrangler secret put ADMIN_PIN`.
 
