@@ -30,7 +30,7 @@ export const TEAMS: Record<Abbr, Team> = {
   CAR: t("CAR", "Carolina", "Panthers", "#0085CA", "#101820", "NFC", "South"),
   CHI: t("CHI", "Chicago", "Bears", "#0B162A", "#C83803", "NFC", "North"),
   CIN: t("CIN", "Cincinnati", "Bengals", "#FB4F14", "#000000", "AFC", "North"),
-  CLE: t("CLE", "Cleveland", "Browns", "#FF3C00", "#311D00", "AFC", "North"),
+  CLE: t("CLE", "Cleveland", "Browns", "#FF3C00", "#311D00", "AFC", "North", "CLE", "/logos/CLE.png"),
   DAL: t("DAL", "Dallas", "Cowboys", "#003594", "#869397", "NFC", "East"),
   DEN: t("DEN", "Denver", "Broncos", "#FB4F14", "#002244", "AFC", "West"),
   DET: t("DET", "Detroit", "Lions", "#0076B6", "#B0B7BC", "NFC", "North"),

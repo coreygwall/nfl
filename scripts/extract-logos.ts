@@ -15,7 +15,8 @@ const CUSTOM = path.join(ROOT, "scripts/custom-logos");
 const PKG = "react-nfl-logos@1.0.3";
 const OUTLINE_WIDTH = 18; // in 560x400 viewBox units
 const PAD = OUTLINE_WIDTH / 2 + 6;
-const STRIPPED = new Set(["WAS"]); // stale marks in the package; replaced by custom art
+const STRIPPED = new Set(["WAS", "CLE"]); // stale/poor marks in the package; replaced by custom art
+const RASTER_WIDTH = 360; // px for logos shipped as PNG
 const RASTER = new Set(["TEN"]); // embeds a bitmap; shipped as PNG
 const RENAME: Record<string, string> = { LAR: "LA" }; // package → nflverse abbreviation
 const SVG_KEEP = new Set(["viewBox", "preserveAspectRatio", "gradientUnits", "gradientTransform", "patternUnits", "patternTransform", "patternContentUnits", "spreadMethod", "clipPathUnits", "maskUnits", "maskContentUnits", "markerUnits", "refX", "refY", "markerWidth", "markerHeight", "stdDeviation", "filterUnits", "primitiveUnits", "startOffset", "textLength"]);
@@ -44,7 +45,11 @@ for (const f of readdirSync(path.join(work, "package", "dist", "Icons"))) {
   const mod = req(path.join(work, "package", "dist", "Icons", f));
   raw[abbr] = (mod.default ?? mod)({ size: 400 });
 }
-for (const f of readdirSync(CUSTOM)) raw[f.replace(/\.svg$/, "")] = readFileSync(path.join(CUSTOM, f), "utf8");
+const customPng: string[] = [];
+for (const f of readdirSync(CUSTOM)) {
+  if (f.endsWith(".png")) customPng.push(f);
+  else raw[f.replace(/\.svg$/, "")] = readFileSync(path.join(CUSTOM, f), "utf8");
+}
 
 // 2. Normalise the root element and split into inner markup.
 const inner: Record<string, string> = {};
@@ -104,6 +109,23 @@ for (const [abbr, body] of Object.entries(inner)) {
   writeFileSync(path.join(OUT, `${abbr}.svg`), svg);
   manifest[abbr] = `${abbr}.svg`;
 }
+for (const f of customPng) {
+  const abbr = f.replace(/\.png$/, "");
+  const src = readFileSync(path.join(CUSTOM, f)).toString("base64");
+  await page.setContent(
+    `<html><body style="margin:0;background:transparent">` +
+      `<img id="l" src="data:image/png;base64,${src}" style="display:block;width:${RASTER_WIDTH}px">` +
+      `</body></html>`,
+  );
+  await page.waitForFunction(() => {
+    const img = document.getElementById("l") as HTMLImageElement | null;
+    return !!img && img.complete && img.naturalWidth > 0;
+  });
+  const el = await page.$("#l");
+  writeFileSync(path.join(OUT, `${abbr}.png`), await el!.screenshot({ omitBackground: true, type: "png" }));
+  manifest[abbr] = `${abbr}.png`;
+}
+
 await browser.close();
 const names = Object.keys(manifest).sort();
 console.log(`Wrote ${names.length} logos → ${OUT}`);

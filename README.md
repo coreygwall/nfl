@@ -63,7 +63,7 @@ Time travel in dev: add `?now=2026-09-13T20:00:00Z` to any URL. The client forwa
 | `npm run test:e2e` | Playwright smoke test: two players, picks, ranking, admin results, frozen picks after kickoff |
 | `npm run typecheck` | Type-checks the client and the Worker |
 | `npm run schedule:build` | Regenerates the schedule JSON from nflverse (`games.csv`) |
-| `npm run logos:extract` | Rebuilds `public/logos` (tight-cropped SVGs with a baked die-cut outline) |
+| `npm run logos:extract` | Rebuilds `public/logos` from the npm package plus `scripts/custom-logos/` (tight-cropped, with a baked die-cut outline) |
 | `npm run deploy` | `vite build` + `wrangler deploy` |
 
 ## How it's put together
@@ -74,7 +74,7 @@ worker/     Hono API on Cloudflare Workers + D1; self-bootstraps schema + schedu
 src/        React 19 + Vite + Tailwind 4 + motion; TanStack Query for data; react-router
 migrations/ D1 schema (players, games, picks, meta)
 scripts/    schedule builder, logo extractor
-public/logos  32 team stickers (31 from react-nfl-logos, Commanders + Browns drawn here, Titans as PNG)
+public/logos  32 team stickers (30 vectors from react-nfl-logos, Browns + Titans as PNG, Commanders drawn here)
 ```
 
 API (all JSON, under `/api`): `GET /bootstrap`, `POST /players`, `GET /weeks/:w`, `PUT /weeks/:w/picks`,
