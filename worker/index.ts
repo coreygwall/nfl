@@ -1,12 +1,15 @@
 import { Hono } from "hono";
 import type { Context } from "hono";
-import type { AppEnv } from "./env.ts";
+import type { AppEnv, Env } from "./env.ts";
 import { isDev } from "./env.ts";
 import { ApiError } from "./errors.ts";
 import { getPlayer, publicPlayer } from "./db.ts";
-import { ensureReady, SCHEDULE_VERSION } from "./ready.ts";
+import { ensureReady, SCHEDULE_VERSION, syncScheduleFromSource } from "./ready.ts";
 import { publicRoutes } from "./routes/public.ts";
 import { adminRoutes } from "./routes/admin.ts";
+
+/** Injected by Vite at build time (git sha); "dev" when running under the test runner. */
+export const BUILD_ID: string = typeof __BUILD_ID__ === "string" ? __BUILD_ID__ : "dev";
 
 function resolveNow(c: Context<AppEnv>): string {
   if (isDev(c.env)) {
@@ -30,7 +33,7 @@ app.use("/api/*", async (c, next) => {
   await next();
 });
 
-app.get("/api/health", (c) => c.json({ ok: true, now: c.get("now"), schedule: SCHEDULE_VERSION }));
+app.get("/api/health", (c) => c.json({ ok: true, now: c.get("now"), schedule: SCHEDULE_VERSION, build: BUILD_ID }));
 app.route("/api", publicRoutes);
 app.route("/api/admin", adminRoutes);
 
@@ -46,8 +49,28 @@ app.onError((err, c) => {
   if (err instanceof ApiError) {
     return c.json({ error: { code: err.code, message: err.message, ...(err.details !== undefined ? { details: err.details } : {}) } }, err.status as 400);
   }
+  const text = err instanceof Error ? err.message : String(err);
+  // Two submissions racing for the same player, or a name registered a beat earlier: the
+  // database refused to double-write. Tell the client to refresh rather than reporting a crash.
+  if (/constraint failed|SQLITE_CONSTRAINT/i.test(text)) {
+    return c.json({ error: { code: "CONFLICT", message: "That changed a moment ago. Refresh and try again." } }, 409);
+  }
   console.error(err);
   return c.json({ error: { code: "INTERNAL", message: "Something went wrong" } }, 500);
 });
 
-export default app;
+const handler: ExportedHandler<Env> = {
+  fetch: app.fetch,
+  // Daily: pull flexed kickoff times from nflverse so locks stay accurate all season.
+  scheduled(_event, env, ctx) {
+    ctx.waitUntil(
+      (async () => {
+        await ensureReady(env);
+        const result = await syncScheduleFromSource(env.DB);
+        console.log("schedule sync", JSON.stringify(result));
+      })(),
+    );
+  },
+};
+
+export default handler;

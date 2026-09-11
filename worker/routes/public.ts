@@ -29,6 +29,7 @@ import {
   touchPlayer,
 } from "../db.ts";
 import { SEASON } from "../ready.ts";
+import { BUILD_ID } from "../index.ts";
 
 export const toGameDTO = (g: Game, now: string): GameDTO => ({ ...g, locked: isLocked(g, now), status: gameStatus(g, now) });
 
@@ -47,6 +48,7 @@ publicRoutes.get("/bootstrap", async (c) => {
   if (me) c.executionCtx.waitUntil(touchPlayer(c.env.DB, me.id, now));
   const body: BootstrapResponse = {
     now,
+    build: BUILD_ID,
     season: SEASON,
     poolName: c.env.POOL_NAME || "High Five",
     currentWeek: pickWeek(games, now),

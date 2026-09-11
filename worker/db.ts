@@ -118,6 +118,17 @@ export async function upsertGames(db: D1Database, season: number, games: Schedul
   return games.length;
 }
 
+/** Moves kickoff/venue only. Week and teams stay put because picks reference them; results are never touched. */
+export async function updateKickoffs(
+  db: D1Database,
+  rows: { id: string; kickoff: string; venue: string | null; neutral: boolean }[],
+): Promise<void> {
+  const stmt = db.prepare("UPDATE games SET kickoff_at = ?, venue = ?, neutral = ? WHERE id = ?");
+  for (let i = 0; i < rows.length; i += 40) {
+    await db.batch(rows.slice(i, i + 40).map((r) => stmt.bind(r.kickoff, r.venue, r.neutral ? 1 : 0, r.id)));
+  }
+}
+
 export async function setResult(
   db: D1Database,
   id: string,

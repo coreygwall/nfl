@@ -17,6 +17,7 @@
       "migrations_dir": "migrations"
     }
   ],
+  "triggers": { "crons": ["0 10 * * *"] },
   "vars": {
     "ENVIRONMENT": "production",
     "POOL_NAME": "High Five"

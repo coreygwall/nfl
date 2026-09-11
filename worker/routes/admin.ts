@@ -10,7 +10,10 @@ import {
   deletePlayer,
   findPlayerByKey,
   getGame,
+  getMeta,
   getPlayer,
+  listAllPicks,
+  listGames,
   listPicks,
   listPlayers,
   listWeekGames,
@@ -21,7 +24,8 @@ import {
   replacePicks,
   setResult,
 } from "../db.ts";
-import { SEASON, syncSchedule } from "../ready.ts";
+import { SCHEDULE_VERSION, SEASON, syncSchedule, syncScheduleFromSource } from "../ready.ts";
+import { BUILD_ID } from "../index.ts";
 import { parseWeek, toGameDTO } from "./public.ts";
 
 export const adminRoutes = new Hono<AppEnv>();
@@ -123,6 +127,49 @@ adminRoutes.delete("/players/:id", async (c) => {
 });
 
 adminRoutes.post("/sync-schedule", async (c) => {
-  const result = await syncSchedule(c.env.DB, true);
-  return c.json(result);
+  const body = (await c.req.json().catch(() => ({}))) as { source?: unknown };
+  // Only reach out to nflverse when explicitly asked; the bundled copy is the safe default.
+  if (body.source === "remote") return c.json(await syncScheduleFromSource(c.env.DB));
+  return c.json(await syncSchedule(c.env.DB, true));
+});
+
+adminRoutes.get("/status", async (c) => {
+  const db = c.env.DB;
+  const [syncedAt, lastChanges, syncError] = await Promise.all([
+    getMeta(db, "schedule_synced_at"),
+    getMeta(db, "schedule_last_changes"),
+    getMeta(db, "schedule_sync_error"),
+  ]);
+  return c.json({
+    now: c.get("now"),
+    build: BUILD_ID,
+    scheduleVersion: SCHEDULE_VERSION,
+    scheduleSyncedAt: syncedAt,
+    scheduleLastChanges: lastChanges ? Number(lastChanges) : null,
+    scheduleSyncError: syncError || null,
+  });
+});
+
+/** Every pick with its game and result — the commissioner's backup and the tiebreak referee. */
+adminRoutes.get("/export.csv", async (c) => {
+  const [games, players, picks] = await Promise.all([listGames(c.env.DB, SEASON), listPlayers(c.env.DB), listAllPicks(c.env.DB)]);
+  const gamesById = new Map(games.map((g) => [g.id, g]));
+  const names = new Map(players.map((p) => [p.id, p.name]));
+  const esc = (v: unknown) => {
+    const s = v === null || v === undefined ? "" : String(v);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+  };
+  const lines = ["week,game_id,kickoff_utc,away,home,winner,player,pick,rank,points"];
+  for (const p of picks) {
+    const g = gamesById.get(p.gameId);
+    if (!g) continue;
+    const points = g.winner && g.winner === p.team ? 6 - p.rank : 0;
+    lines.push([g.week, g.id, g.kickoffAt, g.away, g.home, g.winner ?? "", names.get(p.playerId) ?? p.playerId, p.team, p.rank, g.winner ? points : ""].map(esc).join(","));
+  }
+  return new Response(lines.join("\n") + "\n", {
+    headers: {
+      "content-type": "text/csv; charset=utf-8",
+      "content-disposition": `attachment; filename="high-five-picks-${SEASON}.csv"`,
+    },
+  });
 });

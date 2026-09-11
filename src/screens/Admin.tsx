@@ -1,7 +1,7 @@
 import { useState, type FormEvent } from "react";
 import { motion } from "motion/react";
 import { api, ApiClientError } from "../api/client.ts";
-import { useAdminPlayerMutation, useAdminPlayers, useAdminSetResult, useAdminSync, useAdminWeek, useBootstrap } from "../api/queries.ts";
+import { useAdminPlayerMutation, useAdminPlayers, useAdminSetResult, useAdminStatus, useAdminSync, useAdminWeek, useBootstrap } from "../api/queries.ts";
 import { TEAMS, type Abbr } from "../../shared/teams.ts";
 import type { AdminGameDTO } from "../../shared/api.ts";
 import { formatKickoff, formatShortDay } from "../lib/time.ts";
@@ -243,28 +243,75 @@ function Players({ pin }: { pin: string }) {
 
 function Tools({ pin, onSignOut }: { pin: string; onSignOut: () => void }) {
   const sync = useAdminSync(pin);
+  const status = useAdminStatus(pin);
   const toast = useToast();
+  const [exporting, setExporting] = useState(false);
+
+  const runSync = async (source: "remote" | "bundled") => {
+    try {
+      const r = await sync.mutateAsync(source);
+      if ("ok" in r) {
+        toast(r.ok ? `Checked nflverse: ${r.updated} kickoff${r.updated === 1 ? "" : "s"} updated` : `Not applied: ${r.reason}`, r.ok ? "success" : "error");
+      } else {
+        toast(`Reloaded bundled schedule (${r.upserted} games)`, "success");
+      }
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Sync failed", "error");
+    }
+  };
+
+  const exportCsv = async () => {
+    setExporting(true);
+    try {
+      const res = await fetch("/api/admin/export.csv", { headers: { "x-admin-pin": pin } });
+      if (!res.ok) throw new Error(`Export failed (${res.status})`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = res.headers.get("content-disposition")?.match(/filename="([^"]+)"/)?.[1] ?? "picks.csv";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Export failed", "error");
+    } finally {
+      setExporting(false);
+    }
+  };
+
+  const st = status.data;
   return (
     <div className="space-y-3">
       <div className="card-flat bg-white p-4">
         <h3 className="font-display font-extrabold">Schedule</h3>
-        <p className="mb-3 text-sm text-ink-2">
-          Kickoff times come from the schedule bundled with the app. Re-run <code>npm run schedule:build</code>, deploy, and the app updates
-          itself. This button forces a refresh from the bundled copy.
+        <p className="mb-2 text-sm text-ink-2">
+          Every morning the app checks nflverse for flexed kickoff times and moves them. It never touches picks or results.
         </p>
-        <button
-          className="btn btn-sm"
-          disabled={sync.isPending}
-          onClick={async () => {
-            try {
-              const r = await sync.mutateAsync();
-              toast(`Schedule synced (${r.upserted} games, ${r.version})`, "success");
-            } catch (err) {
-              toast(err instanceof Error ? err.message : "Sync failed", "error");
-            }
-          }}
-        >
-          {sync.isPending ? "Syncing…" : "Sync schedule"}
+        {st && (
+          <p className="mb-3 text-xs text-ink-3">
+            {st.scheduleSyncedAt ? `Last checked ${formatKickoff(st.scheduleSyncedAt)} · ${st.scheduleLastChanges ?? 0} changed` : "Not checked yet"}
+            {st.scheduleSyncError ? ` · last error: ${st.scheduleSyncError}` : ""}
+            {` · build ${st.build}`}
+          </p>
+        )}
+        <div className="flex flex-wrap gap-2">
+          <button className="btn btn-sm btn-primary" disabled={sync.isPending} onClick={() => runSync("remote")}>
+            {sync.isPending ? "Checking…" : "Check nflverse now"}
+          </button>
+          <button className="btn btn-sm" disabled={sync.isPending} onClick={() => runSync("bundled")}>
+            Reload bundled copy
+          </button>
+        </div>
+      </div>
+      <div className="card-flat bg-white p-4">
+        <h3 className="font-display font-extrabold">Backup</h3>
+        <p className="mb-3 text-sm text-ink-2">
+          Every pick with its game, result and points, as a spreadsheet. Grab one whenever you like; it settles arguments.
+        </p>
+        <button className="btn btn-sm" disabled={exporting} onClick={exportCsv}>
+          {exporting ? "Preparing…" : "Download picks CSV"}
         </button>
       </div>
       <div className="card-flat bg-white p-4">

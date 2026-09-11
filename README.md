@@ -44,7 +44,8 @@ From a laptop instead: `npx wrangler login && npm run deploy && npx wrangler sec
   ```
   Player ids are listed at `GET /api/bootstrap`; game ids look like `2026_03_AWAY_HOME`.
 - **Rename / remove a player:** `/admin` → Players.
-- **Flexed kickoff times:** `npm run schedule:build` refreshes `shared/schedule-2026.json` from nflverse. Commit and push; the deployed Worker upserts kickoff times on its next request without touching results or picks.
+- **Flexed kickoff times:** handled for you. A Cron Trigger checks nflverse every morning (10:00 UTC) and moves any kickoff the NFL has flexed. It only ever changes kickoff time and venue, never picks, results, weeks or teams, and it refuses to apply a feed that doesn't cover the games it already knows. `/admin` → Tools shows when it last ran and has a "Check nflverse now" button.
+- **Backup:** `/admin` → Tools → "Download picks CSV" gives every pick with its game, result and points.
 - **From Claude:** with the Cloudflare MCP connected, results can also be recorded straight into D1, e.g. `UPDATE games SET winner = 'KC' WHERE id = '2026_03_KC_BUF'`.
 
 ## Development
@@ -59,7 +60,7 @@ Time travel in dev: add `?now=2026-09-13T20:00:00Z` to any URL. The client forwa
 
 | Command | What it does |
 |---|---|
-| `npm test` | Unit tests (pick validation, scoring, week logic, DST) and API tests running inside `workerd` against real D1 |
+| `npm test` | Unit tests (pick validation, scoring, week logic, DST, CSV parsing) and API tests running inside `workerd` against real D1, including the schedule-sync guards |
 | `npm run test:e2e` | Playwright smoke test: two players, picks, ranking, admin results, frozen picks after kickoff |
 | `npm run typecheck` | Type-checks the client and the Worker |
 | `npm run schedule:build` | Regenerates the schedule JSON from nflverse (`games.csv`) |
@@ -79,4 +80,10 @@ public/logos  32 team stickers (30 vectors from react-nfl-logos, Browns + Titans
 
 API (all JSON, under `/api`): `GET /bootstrap`, `POST /players`, `GET /weeks/:w`, `PUT /weeks/:w/picks`,
 `GET /board/week/:w`, `GET /board/season`, and `x-admin-pin` guarded `/admin/*` routes for results, players,
-backfill and schedule sync. Player identity is the `x-player-id` header the client sends from localStorage.
+backfill, schedule sync, status and `export.csv`. Player identity is the `x-player-id` header the client sends
+from localStorage.
+
+Resilience notes: the client reloads itself if a redeploy invalidates a cached chunk and shows an "update ready"
+bar when the server's build id changes; drafts live in localStorage so a killed tab loses nothing; the Worker
+maps database constraint races to a 409 the client recovers from; and a broken logo image degrades to a
+team-colour monogram rather than a broken-image icon.

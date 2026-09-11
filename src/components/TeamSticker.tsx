@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { motion } from "motion/react";
 import { TEAMS, type Abbr } from "../../shared/teams.ts";
 import { Check } from "./Icons.tsx";
@@ -23,6 +24,7 @@ export function TeamSticker({ abbr, size = 72, selected = false, dimmed = false,
   const team = TEAMS[abbr];
   const raster = team.logo.endsWith(".png");
   const tilt = flat ? 0 : tiltFor(abbr);
+  const [failed, setFailed] = useState(false);
   return (
     <motion.div
       className={`relative shrink-0 ${className}`}
@@ -36,13 +38,26 @@ export function TeamSticker({ abbr, size = 72, selected = false, dimmed = false,
       }}
       transition={{ type: "spring", stiffness: 520, damping: 24 }}
     >
-      <img
-        src={team.logo}
-        alt={`${team.city} ${team.nickname}`}
-        draggable={false}
-        loading="lazy"
-        className={`sticker-img ${raster ? "sticker-raster" : ""} ${selected ? "sticker-shadow" : ""}`}
-      />
+      {failed ? (
+        <div
+          role="img"
+          aria-label={`${team.city} ${team.nickname}`}
+          className="flex h-full w-full items-center justify-center rounded-2xl border-2 border-white font-display font-extrabold text-white shadow-hard-sm"
+          style={{ background: team.primary, fontSize: size * 0.34 }}
+        >
+          {team.display}
+        </div>
+      ) : (
+        <img
+          src={team.logo}
+          alt={`${team.city} ${team.nickname}`}
+          draggable={false}
+          loading="lazy"
+          decoding="async"
+          onError={() => setFailed(true)}
+          className={`sticker-img ${raster ? "sticker-raster" : ""} ${selected ? "sticker-shadow" : ""}`}
+        />
+      )}
       {selected && (
         <motion.span
           initial={{ scale: 0, rotate: -30 }}

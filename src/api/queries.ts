@@ -121,10 +121,36 @@ export function useAdminPlayerMutation(pin: string | null) {
   });
 }
 
+export interface AdminStatus {
+  now: string;
+  build: string;
+  scheduleVersion: string;
+  scheduleSyncedAt: string | null;
+  scheduleLastChanges: number | null;
+  scheduleSyncError: string | null;
+}
+
+export function useAdminStatus(pin: string | null) {
+  return useQuery({
+    queryKey: ["admin", "status", pin],
+    queryFn: () => api<AdminStatus>("/admin/status", { pin: pin! }),
+    enabled: !!pin,
+  });
+}
+
+export interface RemoteSyncResult {
+  ok: boolean;
+  reason?: string;
+  fetched: number;
+  updated: number;
+  syncedAt: string;
+}
+
 export function useAdminSync(pin: string | null) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => api<{ upserted: number; version: string }>("/admin/sync-schedule", { method: "POST", body: {}, pin: pin! }),
+    mutationFn: (source: "remote" | "bundled") =>
+      api<RemoteSyncResult | { upserted: number; version: string }>("/admin/sync-schedule", { method: "POST", body: { source }, pin: pin! }),
     onSuccess: () => void qc.invalidateQueries(),
   });
 }

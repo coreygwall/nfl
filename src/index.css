@@ -178,3 +178,9 @@ button {
 ::selection {
   background: var(--color-flag);
 }
+
+:where(button, a, input, select, [role="button"]):focus-visible {
+  outline: 3px solid var(--color-sky);
+  outline-offset: 2px;
+  border-radius: 12px;
+}

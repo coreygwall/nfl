@@ -5,6 +5,7 @@ import confetti from "canvas-confetti";
 import { useBootstrap, usePutPicks, useWeek } from "../api/queries.ts";
 import { ApiClientError } from "../api/client.ts";
 import { usePlayer } from "../lib/player.tsx";
+import { useOnline } from "../lib/online.ts";
 import { useNow, formatCountdown, formatSlot, formatTime } from "../lib/time.ts";
 import { clearDraft, emptyDraft, loadDraft, moveInOrder, removeSelection, saveDraft, toggleSelection, type Draft } from "../lib/draft.ts";
 import { TEAMS, type Abbr } from "../../shared/teams.ts";
@@ -14,7 +15,7 @@ import { MAX_PICKS } from "../../shared/picks.ts";
 import { isLocked, WEEKS } from "../../shared/week.ts";
 import { ErrorState, RankBadge, Spinner, WeekNav } from "../components/Common.tsx";
 import { useHideNav } from "../components/Chrome.tsx";
-import { ChevronDown, ChevronUp, Grip, Lock } from "../components/Icons.tsx";
+import { ChevronDown, ChevronUp, Grip, Lock, Share } from "../components/Icons.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
 import { useToast } from "../components/Toast.tsx";
 
@@ -40,6 +41,8 @@ function PickFlowInner({ week }: { week: number }) {
   const [params, setParams] = useSearchParams();
   const stepParam = params.get("step") as Step | null;
 
+  const online = useOnline();
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [draft, setDraft] = useState<Draft>(() => loadDraft(playerId, week) ?? emptyDraft());
   const seeded = useRef(loadDraft(playerId, week) !== null);
   const [shakeTray, setShakeTray] = useState(0);
@@ -132,7 +135,23 @@ function PickFlowInner({ week }: { week: number }) {
     setDraft((d) => toggleSelection(d, game.id, team));
   };
 
+  const share = async () => {
+    const url = window.location.origin;
+    const title = boot.data?.poolName ?? "High Five";
+    try {
+      if (navigator.share) {
+        await navigator.share({ title, text: `Join our NFL pool — pick five, rank them, talk trash.`, url });
+        return;
+      }
+      await navigator.clipboard.writeText(url);
+      toast("Link copied — send it to the group.", "success");
+    } catch {
+      /* user dismissed the share sheet */
+    }
+  };
+
   const submit = async () => {
+    setSaveError(null);
     try {
       const res = await put.mutateAsync({ picks: merged });
       clearDraft(playerId, week);
@@ -149,7 +168,13 @@ function PickFlowInner({ week }: { week: number }) {
         await wk.refetch();
         setStep("select");
       } else {
-        toast(err instanceof Error ? err.message : "Couldn't save your picks.", "error");
+        setSaveError(
+          !navigator.onLine
+            ? "You're offline. Your picks are saved on this phone — try again when you're back."
+            : err instanceof Error
+              ? err.message
+              : "Couldn't save your picks.",
+        );
       }
     }
   };
@@ -195,11 +220,11 @@ function PickFlowInner({ week }: { week: number }) {
           </StepWrap>
         ) : step === "confirm" ? (
           <StepWrap key="confirm">
-            <ConfirmStep name={player!.name} week={week} merged={merged} gamesById={gamesById} frozenRanks={frozenRanks} pending={put.isPending} onBack={() => setStep("rank")} onSubmit={submit} />
+            <ConfirmStep name={player!.name} week={week} merged={merged} gamesById={gamesById} frozenRanks={frozenRanks} pending={put.isPending} error={saveError} offline={!online} onBack={() => setStep("rank")} onSubmit={submit} />
           </StepWrap>
         ) : (
           <StepWrap key="done">
-            <DoneStep name={player!.name} week={week} picks={myPicks.length ? myPicks : merged} gamesById={gamesById} onReview={() => setStep(null)} />
+            <DoneStep name={player!.name} week={week} picks={myPicks.length ? myPicks : merged} gamesById={gamesById} onReview={() => setStep(null)} onShare={share} />
           </StepWrap>
         )}
       </AnimatePresence>
@@ -603,7 +628,7 @@ function contrastColor(home: Abbr, away: Abbr): string {
 // ---------- Confirm ----------
 
 function ConfirmStep({
-  name, week, merged, gamesById, frozenRanks, pending, onBack, onSubmit,
+  name, week, merged, gamesById, frozenRanks, pending, error, offline, onBack, onSubmit,
 }: {
   name: string;
   week: number;
@@ -611,6 +636,8 @@ function ConfirmStep({
   gamesById: Map<string, GameDTO>;
   frozenRanks: Set<number>;
   pending: boolean;
+  error: string | null;
+  offline: boolean;
   onBack: () => void;
   onSubmit: () => void;
 }) {
@@ -635,11 +662,28 @@ function ConfirmStep({
         </ul>
         <p className="mt-4 text-xs text-ink-3">You can still change a pick until that game kicks off.</p>
       </div>
+      {(error || offline) && (
+        <div role="alert" className="card-flat mt-4 flex items-start gap-3 border-danger bg-danger-soft px-4 py-3 text-sm">
+          <span className="min-w-0 flex-1 font-semibold">
+            {offline ? "You're offline. Your picks are saved on this phone — lock them in once you're back." : error}
+          </span>
+          {!offline && (
+            <button className="btn btn-sm shrink-0" onClick={onSubmit} disabled={pending}>
+              Try again
+            </button>
+          )}
+        </div>
+      )}
       <div className="mt-4 flex gap-2">
         <button className="btn" onClick={onBack} disabled={pending}>
           Back
         </button>
-        <motion.button className="btn btn-turf flex-1 text-lg" onClick={onSubmit} disabled={pending} whileTap={{ scale: 0.97 }}>
+        <motion.button
+          className="btn btn-turf flex-1 text-lg"
+          onClick={onSubmit}
+          disabled={pending || offline}
+          whileTap={{ scale: 0.97 }}
+        >
           {pending ? "Saving…" : "Lock it in 🔒"}
         </motion.button>
       </div>
@@ -656,13 +700,14 @@ function fireConfetti(team?: { primary: string; secondary: string }) {
 }
 
 function DoneStep({
-  name, week, picks, gamesById, onReview,
+  name, week, picks, gamesById, onReview, onShare,
 }: {
   name: string;
   week: number;
   picks: Pick[];
   gamesById: Map<string, GameDTO>;
   onReview: () => void;
+  onShare: () => void;
 }) {
   const sorted = [...picks].sort((a, b) => a.rank - b.rank);
   return (
@@ -692,7 +737,7 @@ function DoneStep({
           </motion.li>
         ))}
       </ul>
-      <div className="mt-6 flex justify-center gap-2">
+      <div className="mt-6 flex flex-wrap justify-center gap-2">
         <button className="btn" onClick={onReview}>
           Done
         </button>
@@ -700,6 +745,9 @@ function DoneStep({
           See the board
         </Link>
       </div>
+      <button className="btn btn-ghost btn-sm mt-3 text-ink-2" onClick={onShare}>
+        <Share /> Invite someone to the pool
+      </button>
     </div>
   );
 }
@@ -732,6 +780,7 @@ function ReviewStep({
   });
   const finals = rows.filter((r) => r.outcome === "win" || r.outcome === "loss" || r.outcome === "tie").length;
   const started = games.filter(lockedNow);
+  const nextKick = games.filter((g) => !lockedNow(g)).map((g) => g.kickoffAt).sort()[0];
   return (
     <div>
       <div className="card p-4">
@@ -741,6 +790,11 @@ function ReviewStep({
             <p className="text-sm text-ink-2">
               {finals === 0 ? `${sorted.length} pick${sorted.length === 1 ? "" : "s"} in · ${submitted} player${submitted === 1 ? "" : "s"} submitted` : `${correct} of ${finals} right so far`}
             </p>
+            {nextKick && (
+              <p className="mt-0.5 flex items-center gap-1 text-xs text-ink-3">
+                <Lock size={11} /> Next game locks {formatSlot(nextKick)}
+              </p>
+            )}
           </div>
           <div className="text-right">
             <div className="font-display text-4xl font-extrabold leading-none tabular">{points}</div>

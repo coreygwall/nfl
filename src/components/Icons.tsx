@@ -93,3 +93,9 @@ export const Sparkle = ({ size = 16, ...p }: P) => (
     <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z" />
   </svg>
 );
+export const Share = ({ size = 16, ...p }: P) => (
+  <svg {...base(size, p)}>
+    <path d="M12 4v11M8 8l4-4 4 4" />
+    <path d="M5 13v5a2 2 0 002 2h10a2 2 0 002-2v-5" />
+  </svg>
+);

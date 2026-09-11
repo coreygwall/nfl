@@ -13,7 +13,7 @@ export const emptyDraft = (): Draft => ({ selections: {}, order: [] });
 
 export function loadDraft(playerId: string, week: number): Draft | null {
   try {
-    const raw = sessionStorage.getItem(key(playerId, week));
+    const raw = localStorage.getItem(key(playerId, week));
     if (!raw) return null;
     const d = JSON.parse(raw) as Draft;
     if (!d || typeof d !== "object" || !d.selections || !Array.isArray(d.order)) return null;
@@ -25,7 +25,7 @@ export function loadDraft(playerId: string, week: number): Draft | null {
 
 export function saveDraft(playerId: string, week: number, draft: Draft): void {
   try {
-    sessionStorage.setItem(key(playerId, week), JSON.stringify(draft));
+    localStorage.setItem(key(playerId, week), JSON.stringify(draft));
   } catch {
     /* ignore */
   }
@@ -33,7 +33,7 @@ export function saveDraft(playerId: string, week: number, draft: Draft): void {
 
 export function clearDraft(playerId: string, week: number): void {
   try {
-    sessionStorage.removeItem(key(playerId, week));
+    localStorage.removeItem(key(playerId, week));
   } catch {
     /* ignore */
   }

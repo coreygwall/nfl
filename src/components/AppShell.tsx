@@ -6,6 +6,7 @@ import { usePlayer } from "../lib/player.tsx";
 import { useChrome } from "./Chrome.tsx";
 import { Football, Swap, Trophy, X } from "./Icons.tsx";
 import { useToast } from "./Toast.tsx";
+import { useOnline } from "../lib/online.ts";
 
 export function AppShell() {
   const { player, setPlayer, signOut } = usePlayer();
@@ -16,6 +17,8 @@ export function AppShell() {
   const { navHidden } = useChrome();
   const [switching, setSwitching] = useState(false);
   const poolName = boot.data?.poolName ?? "High Five";
+  const online = useOnline();
+  const updateReady = !!boot.data && boot.data.build !== __BUILD_ID__ && __BUILD_ID__ !== "test";
 
   useEffect(() => {
     document.title = poolName;
@@ -50,6 +53,19 @@ export function AppShell() {
             </button>
           )}
         </div>
+        {!online && (
+          <div className="bg-ink px-4 py-1.5 text-center text-xs font-bold text-paper">
+            You're offline. You can browse, but picks won't save until you're back.
+          </div>
+        )}
+        {online && updateReady && (
+          <button
+            className="flex w-full items-center justify-center gap-2 bg-flag px-4 py-1.5 text-xs font-bold text-ink"
+            onClick={() => window.location.reload()}
+          >
+            A new version is ready · tap to refresh
+          </button>
+        )}
       </header>
 
       <main className={`flex-1 px-4 pt-4 ${navHidden ? "pb-40" : "pb-28"}`}>

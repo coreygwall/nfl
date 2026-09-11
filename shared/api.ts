@@ -10,6 +10,8 @@ export interface GameDTO extends Game {
 
 export interface BootstrapResponse {
   now: string;
+  /** Build id of the deployed Worker; the client reloads when its own differs. */
+  build: string;
   season: number;
   poolName: string;
   /** Week where picking should happen right now. */

@@ -2,6 +2,7 @@ import { defineConfig } from "vitest/config";
 import { cloudflareTest } from "@cloudflare/vitest-pool-workers";
 
 export default defineConfig({
+  define: { __BUILD_ID__: JSON.stringify("test") },
   test: {
     projects: [
       {
