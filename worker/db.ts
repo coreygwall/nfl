@@ -23,6 +23,9 @@ interface PlayerRow {
   name_key: string;
   created_at: string;
   last_seen_at: string;
+  claim_code: string | null;
+  claim_attempts: number | null;
+  claim_locked_until: string | null;
 }
 
 interface PickRow {
@@ -37,6 +40,10 @@ export interface PlayerRecord extends Player {
   nameKey: string;
   createdAt: string;
   lastSeenAt: string;
+  /** The code that claims this name on another device. Null for names created before codes existed. */
+  claimCode: string | null;
+  claimAttempts: number;
+  claimLockedUntil: string | null;
 }
 
 export interface ScheduleGame {
@@ -69,6 +76,9 @@ const toPlayer = (r: PlayerRow): PlayerRecord => ({
   nameKey: r.name_key,
   createdAt: r.created_at,
   lastSeenAt: r.last_seen_at,
+  claimCode: r.claim_code ?? null,
+  claimAttempts: r.claim_attempts ?? 0,
+  claimLockedUntil: r.claim_locked_until ?? null,
 });
 
 const toPick = (r: PickRow): PlayerPick => ({ playerId: r.player_id, gameId: r.game_id, team: r.team as Abbr, rank: r.rank });
@@ -182,11 +192,81 @@ export async function findPlayerByKey(db: D1Database, nameKey: string): Promise<
   return row ? toPlayer(row) : null;
 }
 
-export async function createPlayer(db: D1Database, p: { id: string; name: string; nameKey: string; now: string }): Promise<void> {
+export async function createPlayer(
+  db: D1Database,
+  p: { id: string; name: string; nameKey: string; now: string; claimCode: string },
+): Promise<void> {
   await db
-    .prepare("INSERT INTO players (id, name, name_key, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?)")
-    .bind(p.id, p.name, p.nameKey, p.now, p.now)
+    .prepare("INSERT INTO players (id, name, name_key, created_at, last_seen_at, claim_code) VALUES (?, ?, ?, ?, ?, ?)")
+    .bind(p.id, p.name, p.nameKey, p.now, p.now, p.claimCode)
     .run();
+}
+
+// ---- devices ----
+
+export interface DeviceRecord {
+  id: string;
+  playerId: string;
+  createdAt: string;
+  lastSeenAt: string;
+}
+
+/** The player this token belongs to, or null. Also stamps the device as seen. */
+export async function playerForToken(db: D1Database, tokenHash: string, now: string): Promise<PlayerRecord | null> {
+  const row = await db
+    .prepare(
+      `SELECT p.* FROM players p JOIN devices d ON d.player_id = p.id WHERE d.token_hash = ?`,
+    )
+    .bind(tokenHash)
+    .first<PlayerRow>();
+  if (!row) return null;
+  await db.prepare("UPDATE devices SET last_seen_at = ? WHERE token_hash = ?").bind(now, tokenHash).run();
+  return toPlayer(row);
+}
+
+export async function addDevice(
+  db: D1Database,
+  d: { id: string; playerId: string; tokenHash: string; now: string },
+): Promise<void> {
+  await db
+    .prepare("INSERT INTO devices (id, player_id, token_hash, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?)")
+    .bind(d.id, d.playerId, d.tokenHash, d.now, d.now)
+    .run();
+}
+
+export async function countDevices(db: D1Database, playerId: string): Promise<number> {
+  const row = await db.prepare("SELECT count(*) AS n FROM devices WHERE player_id = ?").bind(playerId).first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
+export async function deviceCounts(db: D1Database): Promise<Map<string, number>> {
+  const { results } = await db
+    .prepare("SELECT player_id, count(*) AS n FROM devices GROUP BY player_id")
+    .all<{ player_id: string; n: number }>();
+  return new Map(results.map((r) => [r.player_id, r.n]));
+}
+
+export async function revokeDevices(db: D1Database, playerId: string): Promise<void> {
+  await db.prepare("DELETE FROM devices WHERE player_id = ?").bind(playerId).run();
+}
+
+/** Sets a fresh claim code and clears any lockout. */
+export async function setClaimCode(db: D1Database, playerId: string, code: string): Promise<void> {
+  await db
+    .prepare("UPDATE players SET claim_code = ?, claim_attempts = 0, claim_locked_until = NULL WHERE id = ?")
+    .bind(code, playerId)
+    .run();
+}
+
+export async function noteClaimFailure(db: D1Database, playerId: string, attempts: number, lockedUntil: string | null): Promise<void> {
+  await db
+    .prepare("UPDATE players SET claim_attempts = ?, claim_locked_until = ? WHERE id = ?")
+    .bind(attempts, lockedUntil, playerId)
+    .run();
+}
+
+export async function clearClaimFailures(db: D1Database, playerId: string): Promise<void> {
+  await db.prepare("UPDATE players SET claim_attempts = 0, claim_locked_until = NULL WHERE id = ?").bind(playerId).run();
 }
 
 export async function touchPlayer(db: D1Database, id: string, now: string): Promise<void> {
@@ -200,6 +280,7 @@ export async function renamePlayer(db: D1Database, id: string, name: string, nam
 export async function deletePlayer(db: D1Database, id: string): Promise<void> {
   await db.batch([
     db.prepare("DELETE FROM picks WHERE player_id = ?").bind(id),
+    db.prepare("DELETE FROM devices WHERE player_id = ?").bind(id),
     db.prepare("DELETE FROM players WHERE id = ?").bind(id),
   ]);
 }

@@ -5,6 +5,9 @@ const AFTER_OPENER = "2026-09-10T03:00:00Z"; // NE @ SEA kicked off
 
 const pick = (page: Page, team: string) => page.getByRole("button", { name: `Pick ${team}` }).click();
 
+/** Alex's claim code, read off the first device in one test and typed into the next. */
+let alexCode = "";
+
 test.describe.serial("pool flow", () => {
   test("new player picks five, ranks, locks in", async ({ page }) => {
     await page.goto(`/welcome?now=${BEFORE}`);
@@ -76,6 +79,13 @@ test.describe.serial("pool flow", () => {
     await page.getByRole("button", { name: "Looks right" }).click();
     await page.getByRole("button", { name: "Lock it in" }).click();
     await expect(page.getByText("Locked in")).toBeVisible();
+    // The code that moves this name to another device lives under the name chip.
+    await page.getByRole("button", { name: "Switch player" }).click();
+    const sheet = page.getByRole("dialog", { name: "Your account" });
+    alexCode = (await sheet.getByText(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/).innerText()).trim();
+    expect(alexCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
+    await sheet.getByRole("button", { name: "Close" }).click();
+    await expect(sheet).toBeHidden();
     await page.getByRole("link", { name: "See the board" }).click();
 
     await expect(page).toHaveURL(/\/board\/week\/1$/);
@@ -103,6 +113,13 @@ test.describe.serial("pool flow", () => {
     await page.goto(`/welcome?now=${AFTER_OPENER}`);
     await page.getByRole("button", { name: "I already entered" }).click();
     await page.getByRole("button", { name: "Alex" }).click();
+    // A name someone already holds is not free to take: the code is the proof.
+    await expect(page.getByRole("heading", { name: "Prove you're Alex" })).toBeVisible();
+    await page.getByLabel("Your device code").fill("AAAA-2222");
+    await page.getByRole("button", { name: "Pick as Alex" }).click();
+    await expect(page.getByText("That code doesn't match")).toBeVisible();
+    await page.getByLabel("Your device code").fill(alexCode);
+    await page.getByRole("button", { name: "Pick as Alex" }).click();
     await expect(page).toHaveURL(/\/week\/1$/);
     await expect(page.getByText("0 of 1 right so far")).toBeVisible();
     await expect(page.getByText("Who picked whom")).toBeVisible();

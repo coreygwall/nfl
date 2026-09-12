@@ -3,7 +3,8 @@ import type { Context } from "hono";
 import type { AppEnv, Env } from "./env.ts";
 import { isDev } from "./env.ts";
 import { ApiError } from "./errors.ts";
-import { getPlayer, publicPlayer } from "./db.ts";
+import { playerForToken, publicPlayer } from "./db.ts";
+import { hashToken } from "./auth.ts";
 import { ensureReady, SCHEDULE_VERSION, syncScheduleFromSource } from "./ready.ts";
 import { publicRoutes } from "./routes/public.ts";
 import { adminRoutes } from "./routes/admin.ts";
@@ -27,8 +28,9 @@ const app = new Hono<AppEnv>();
 app.use("/api/*", async (c, next) => {
   await ensureReady(c.env);
   c.set("now", resolveNow(c));
-  const playerId = c.req.header("x-player-id");
-  const player = playerId ? await getPlayer(c.env.DB, playerId) : null;
+  // Identity is the device token alone: a player id is public (it is on the board), a token is not.
+  const token = c.req.header("x-player-token");
+  const player = token ? await playerForToken(c.env.DB, await hashToken(token), c.get("now")) : null;
   c.set("player", player ? publicPlayer(player) : null);
   await next();
 });

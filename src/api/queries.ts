@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   AdminPlayersResponse,
   AdminPullResultsResponse,
+  AdminResetAccessResponse,
+  ClaimResponse,
   AdminSetResultRequest,
   AdminWeekResponse,
   BootstrapResponse,
@@ -72,6 +74,16 @@ export function useCreatePlayer() {
   return useMutation({
     mutationFn: (name: string) => api<CreatePlayerResponse>("/players", { body: { name } }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["bootstrap"] }),
+  });
+}
+
+/** Claims a name for this device. Omit the code for a name nobody holds yet. */
+export function useClaimPlayer() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, code }: { id: string; code?: string }) =>
+      api<ClaimResponse>(`/players/${id}/claim`, { body: code ? { code } : {} }),
+    onSuccess: () => void qc.invalidateQueries(),
   });
 }
 
@@ -164,5 +176,13 @@ export function useAdminPullResults(pin: string | null) {
     mutationFn: (week?: number) =>
       api<AdminPullResultsResponse>("/admin/pull-results", { method: "POST", body: week ? { week } : {}, pin: pin! }),
     onSuccess: () => void qc.invalidateQueries(),
+  });
+}
+
+export function useAdminResetAccess(pin: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<AdminResetAccessResponse>(`/admin/players/${id}/reset-access`, { method: "POST", body: {}, pin: pin! }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["admin"] }),
   });
 }

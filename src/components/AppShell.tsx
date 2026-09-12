@@ -1,12 +1,13 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, Outlet, useLocation, useNavigate } from "react-router";
 import { AnimatePresence, motion } from "motion/react";
-import { useBootstrap } from "../api/queries.ts";
+import { useBootstrap, useClaimPlayer } from "../api/queries.ts";
 import { usePlayer } from "../lib/player.tsx";
 import { useChrome } from "./Chrome.tsx";
 import { ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Football, Swap, Trophy, X } from "./Icons.tsx";
 import { useToast } from "./Toast.tsx";
 import { useOnline } from "../lib/online.ts";
+import { formatCode } from "../../shared/codes.ts";
 
 export function AppShell() {
   const { player, setPlayer, signOut } = usePlayer();
@@ -24,13 +25,37 @@ export function AppShell() {
     document.title = poolName;
   }, [poolName]);
 
+  // Devices that signed in before codes existed hold a name but no token. Claim one silently
+  // if the name is still free; otherwise send them to the code screen.
+  const claim = useClaimPlayer();
+  const upgrading = useRef(false);
   useEffect(() => {
-    if (player && boot.data && boot.data.me === null) {
+    if (!player || player.token || upgrading.current) return;
+    upgrading.current = true;
+    claim
+      .mutateAsync({ id: player.id })
+      .then((r) => setPlayer({ ...r.player, token: r.token }))
+      .catch(() => {
+        const id = player.id;
+        signOut();
+        toast(`${player.name} is already claimed. Enter the code to pick here.`, "error");
+        nav(`/welcome?claim=${id}`, { replace: true });
+      });
+  }, [player, claim, setPlayer, signOut, toast, nav]);
+
+  // A bootstrap that finished *before* this device adopted its token still says "me: null".
+  // Only a fresher one means the token was really revoked.
+  const tokenSeenAt = useRef(0);
+  useEffect(() => {
+    tokenSeenAt.current = Date.now();
+  }, [player?.token]);
+  useEffect(() => {
+    if (player?.token && boot.data && boot.data.me === null && boot.dataUpdatedAt > tokenSeenAt.current) {
       signOut();
-      toast("That name isn't in the pool anymore. Pick your name again.", "error");
+      toast("This device was signed out. Tap your name and enter your code.", "error");
       nav("/welcome", { replace: true });
     }
-  }, [player, boot.data, signOut, toast, nav]);
+  }, [player, boot.data, boot.dataUpdatedAt, signOut, toast, nav]);
 
   const onWelcome = loc.pathname.startsWith("/welcome");
   const currentWeek = boot.data?.currentWeek ?? 1;
@@ -142,21 +167,26 @@ export function AppShell() {
 
       <AnimatePresence>
         {switching && (
-          <Sheet title="Who's picking?" onClose={() => setSwitching(false)}>
+          <Sheet title="Your account" onClose={() => setSwitching(false)}>
+            {boot.data?.myCode && <DeviceCode code={boot.data.myCode} name={player?.name ?? ""} />}
+            <h3 className="font-display mb-2 mt-5 text-sm font-extrabold uppercase tracking-wider text-ink-3">
+              Someone else picking?
+            </h3>
             <div className="flex flex-wrap gap-2">
-              {(boot.data?.players ?? []).map((p) => (
-                <button
-                  key={p.id}
-                  className={`chip px-3 py-1.5 text-sm ${p.id === player?.id ? "bg-flag" : ""}`}
-                  onClick={() => {
-                    setPlayer(p);
-                    setSwitching(false);
-                    nav("/");
-                  }}
-                >
-                  {p.name}
-                </button>
-              ))}
+              {(boot.data?.players ?? [])
+                .filter((p) => p.id !== player?.id)
+                .map((p) => (
+                  <button
+                    key={p.id}
+                    className="chip px-3 py-1.5 text-sm"
+                    onClick={() => {
+                      setSwitching(false);
+                      nav(`/welcome?claim=${p.id}`);
+                    }}
+                  >
+                    {p.name}
+                  </button>
+                ))}
             </div>
             <button
               className="btn btn-sm mt-4"
@@ -170,6 +200,36 @@ export function AppShell() {
           </Sheet>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/** Your claim code, for putting this name on another device. */
+function DeviceCode({ code, name }: { code: string; name: string }) {
+  const [copied, setCopied] = useState(false);
+  const toast = useToast();
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(formatCode(code));
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      toast("Couldn't copy — write it down instead.", "error");
+    }
+  };
+  return (
+    <div className="card-flat bg-flag-soft p-3">
+      <h3 className="font-display text-sm font-extrabold uppercase tracking-wider text-ink-3">Your device code</h3>
+      <div className="mt-1 flex items-center gap-2">
+        <span className="font-display flex-1 text-2xl font-extrabold tracking-[0.12em]">{formatCode(code)}</span>
+        <button className="btn btn-sm shrink-0" onClick={() => void copy()}>
+          {copied ? "Copied" : "Copy"}
+        </button>
+      </div>
+      <p className="mt-1.5 text-xs text-ink-2">
+        Enter this on another phone or laptop to pick as <b>{name}</b> there. Anyone with it can pick as you, so keep it to
+        yourself.
+      </p>
     </div>
   );
 }

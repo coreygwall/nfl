@@ -6,6 +6,7 @@ const AFTER_OPENER = "2026-09-10T03:00:00.000Z"; // NE @ SEA has kicked off, not
 const AFTER_WEEK1 = "2026-09-16T12:00:00.000Z"; // week 1 done
 
 interface Opts {
+  /** Device token, as returned when the player was created or claimed. */
   player?: string;
   pin?: string;
   now?: string;
@@ -17,7 +18,7 @@ async function api<T = any>(path: string, opts: Opts = {}): Promise<{ status: nu
   const url = new URL(`http://pool.test/api${path}`);
   if (opts.now) url.searchParams.set("now", opts.now);
   const headers: Record<string, string> = { "content-type": "application/json" };
-  if (opts.player) headers["x-player-id"] = opts.player;
+  if (opts.player) headers["x-player-token"] = opts.player;
   if (opts.pin) headers["x-admin-pin"] = opts.pin;
   const res = await SELF.fetch(url, {
     method: opts.method ?? (opts.body !== undefined ? "POST" : "GET"),
@@ -28,11 +29,12 @@ async function api<T = any>(path: string, opts: Opts = {}): Promise<{ status: nu
 }
 
 let seq = 0;
-async function newPlayer(prefix = "Player"): Promise<{ id: string; name: string }> {
+/** A player plus the token their first device holds; `id` stays for board assertions. */
+async function newPlayer(prefix = "Player"): Promise<{ id: string; name: string; token: string; code: string }> {
   const name = `${prefix} ${Date.now().toString(36)}${(seq++).toString(36)}`;
   const { status, body } = await api("/players", { body: { name } });
   expect(status).toBe(201);
-  return body.player;
+  return { ...body.player, token: body.token, code: body.code };
 }
 
 describe("bootstrap & players", () => {
@@ -64,9 +66,13 @@ describe("bootstrap & players", () => {
     const bad = await api("/players", { body: { name: "x" } });
     expect(bad.status).toBe(400);
     expect(bad.body.error.code).toBe("INVALID_NAME");
-    const boot = await api("/bootstrap", { player: first.body.player.id });
+    // The id alone proves nothing; the token this device was handed does.
+    const anon = await api("/bootstrap", { player: first.body.player.id });
+    expect(anon.body.me).toBeNull();
+    const boot = await api("/bootstrap", { player: first.body.token });
     expect(boot.body.me).toEqual(first.body.player);
-    expect(boot.body.players.some((p: any) => p.id === first.body.player.id)).toBe(true);
+    expect(boot.body.myCode).toBe(first.body.code);
+    expect(boot.body.players.some((p: any) => p.id === first.body.player.id && p.claimed)).toBe(true);
   });
 });
 
@@ -97,17 +103,17 @@ describe("weeks & picks", () => {
       { gameId: "2026_01_TB_CIN", team: "CIN", rank: 4 },
       { gameId: "2026_01_NO_DET", team: "DET", rank: 5 },
     ];
-    const saved = await api("/weeks/1/picks", { method: "PUT", body: { picks }, player: corey.id, now: BEFORE });
+    const saved = await api("/weeks/1/picks", { method: "PUT", body: { picks }, player: corey.token, now: BEFORE });
     expect(saved.status).toBe(200);
     expect(saved.body.picks).toEqual(picks);
 
-    const mine = await api("/weeks/1", { player: corey.id, now: BEFORE });
+    const mine = await api("/weeks/1", { player: corey.token, now: BEFORE });
     expect(mine.body.myPicks).toEqual(picks);
     expect(mine.body.submitted).toBeGreaterThanOrEqual(1);
     expect(mine.body.pickCounts).toEqual({}); // nothing kicked off -> no tallies
 
     // Alex can't see Corey's picks before kickoff, but sees that 5 were made.
-    const boardBefore = await api("/board/week/1", { player: alex.id, now: BEFORE });
+    const boardBefore = await api("/board/week/1", { player: alex.token, now: BEFORE });
     const coreyRow = boardBefore.body.rows.find((r: any) => r.playerId === corey.id);
     expect(coreyRow).toMatchObject({ picksMade: 5, points: 0, possible: 15, picks: [] });
 
@@ -115,7 +121,7 @@ describe("weeks & picks", () => {
     const replaced = await api("/weeks/1/picks", {
       method: "PUT",
       body: { picks: [{ gameId: "2026_01_NE_SEA", team: "SEA", rank: 1 }, { gameId: "2026_01_CHI_CAR", team: "CHI", rank: 2 }] },
-      player: corey.id,
+      player: corey.token,
       now: BEFORE,
     });
     expect(replaced.status).toBe(200);
@@ -125,7 +131,7 @@ describe("weeks & picks", () => {
     const reRank = await api("/weeks/1/picks", {
       method: "PUT",
       body: { picks: [{ gameId: "2026_01_NE_SEA", team: "SEA", rank: 2 }, { gameId: "2026_01_CHI_CAR", team: "CHI", rank: 1 }] },
-      player: corey.id,
+      player: corey.token,
       now: AFTER_OPENER,
     });
     expect(reRank.status).toBe(409);
@@ -135,7 +141,7 @@ describe("weeks & picks", () => {
     const stealRank = await api("/weeks/1/picks", {
       method: "PUT",
       body: { picks: [{ gameId: "2026_01_CHI_CAR", team: "CHI", rank: 1 }] },
-      player: corey.id,
+      player: corey.token,
       now: AFTER_OPENER,
     });
     expect(stealRank.status).toBe(409);
@@ -145,7 +151,7 @@ describe("weeks & picks", () => {
     const edited = await api("/weeks/1/picks", {
       method: "PUT",
       body: { picks: [{ gameId: "2026_01_BUF_HOU", team: "HOU", rank: 2 }, { gameId: "2026_01_TB_CIN", team: "TB", rank: 3 }] },
-      player: corey.id,
+      player: corey.token,
       now: AFTER_OPENER,
     });
     expect(edited.status).toBe(200);
@@ -159,13 +165,13 @@ describe("weeks & picks", () => {
     const late = await api("/weeks/1/picks", {
       method: "PUT",
       body: { picks: [{ gameId: "2026_01_NE_SEA", team: "NE", rank: 1 }] },
-      player: alex.id,
+      player: alex.token,
       now: AFTER_OPENER,
     });
     expect(late.status).toBe(409);
 
     // Reveal: only the started game's pick is visible to others; tallies appear for it.
-    const boardAfter = await api("/board/week/1", { player: alex.id, now: AFTER_OPENER });
+    const boardAfter = await api("/board/week/1", { player: alex.token, now: AFTER_OPENER });
     const coreyAfter = boardAfter.body.rows.find((r: any) => r.playerId === corey.id);
     expect(coreyAfter.picks.map((p: any) => p.gameId)).toEqual(["2026_01_NE_SEA"]);
     const week = await api("/weeks/1", { now: AFTER_OPENER });
@@ -173,7 +179,7 @@ describe("weeks & picks", () => {
     expect(week.body.pickCounts["2026_01_BUF_HOU"]).toBeUndefined();
 
     // Corey always sees their own picks.
-    const own = await api("/board/week/1", { player: corey.id, now: AFTER_OPENER });
+    const own = await api("/board/week/1", { player: corey.token, now: AFTER_OPENER });
     expect(own.body.rows.find((r: any) => r.playerId === corey.id).picks).toHaveLength(3);
   });
 
@@ -186,7 +192,7 @@ describe("weeks & picks", () => {
       ["nope", "VALIDATION"],
     ];
     for (const [picks, code] of cases) {
-      const { status, body } = await api("/weeks/1/picks", { method: "PUT", body: { picks }, player: p.id, now: BEFORE });
+      const { status, body } = await api("/weeks/1/picks", { method: "PUT", body: { picks }, player: p.token, now: BEFORE });
       expect(status).toBe(400);
       expect(body.error.code).toBe(code);
     }
@@ -217,7 +223,7 @@ describe("admin", () => {
           { gameId: g3.id, team: g3.away, rank: 5 },
         ],
       },
-      player: p.id,
+      player: p.token,
       now: BEFORE,
     });
     const outsider = ["KC", "SEA", "DAL"].find((t) => t !== g1.away && t !== g1.home)!;
@@ -233,13 +239,13 @@ describe("admin", () => {
     await api(`/admin/games/${g3.id}/result`, { method: "PUT", body: { winner: "TIE" }, pin });
 
     const done = "2026-09-23T12:00:00.000Z";
-    const board = await api("/board/week/2", { player: p.id, now: done });
+    const board = await api("/board/week/2", { player: p.token, now: done });
     const row = board.body.rows.find((r: any) => r.playerId === p.id);
     expect(row).toMatchObject({ points: 5, correct: 1, fives: 1, possible: 5, picksMade: 3 });
     expect(row.picks.map((x: any) => x.outcome)).toEqual(["win", "loss", "tie"]);
     expect(board.body.finalCount).toBe(3);
 
-    const season = await api("/board/season", { player: p.id, now: done });
+    const season = await api("/board/season", { player: p.token, now: done });
     const srow = season.body.rows.find((r: any) => r.playerId === p.id);
     expect(srow).toMatchObject({ points: 5, weeksPlayed: 1, bestWeek: { week: 2, points: 5 }, isMe: true });
     expect(srow.byWeek).toEqual({ 2: 5 });
@@ -279,7 +285,7 @@ describe("admin", () => {
 
     expect((await api(`/admin/players/${p.id}`, { method: "DELETE", pin })).status).toBe(200);
     expect((await api(`/admin/players/${p.id}`, { method: "DELETE", pin })).status).toBe(404);
-    const boot = await api("/bootstrap", { player: p.id });
+    const boot = await api("/bootstrap", { player: p.token });
     expect(boot.body.me).toBeNull();
     const week = await api("/weeks/1", { now: AFTER_WEEK1 });
     expect(week.body.pickCounts["2026_01_NE_SEA"]).toBeDefined();
@@ -297,14 +303,14 @@ describe("late joiner", () => {
     expect(open).toHaveLength(2); // SNF + MNF
 
     const picks = open.map((g: any, i: number) => ({ gameId: g.id, team: g.home, rank: i + 1 }));
-    const saved = await api("/weeks/1/picks", { method: "PUT", body: { picks }, player: p.id, now: SUNDAY_NIGHT });
+    const saved = await api("/weeks/1/picks", { method: "PUT", body: { picks }, player: p.token, now: SUNDAY_NIGHT });
     expect(saved.status).toBe(200);
     expect(saved.body.picks).toEqual(picks);
 
     for (const g of open) {
       await api(`/admin/games/${g.id}/result`, { method: "PUT", body: { winner: g.home }, pin: "1234" });
     }
-    const board = await api("/board/week/1", { player: p.id, now: "2026-09-16T12:00:00.000Z" });
+    const board = await api("/board/week/1", { player: p.token, now: "2026-09-16T12:00:00.000Z" });
     const row = board.body.rows.find((r: any) => r.playerId === p.id);
     // Rank 1 and rank 2, both correct: 5 + 4.
     expect(row).toMatchObject({ points: 9, correct: 2, fives: 1, picksMade: 2 });

@@ -1,4 +1,5 @@
 import schema from "../migrations/0001_init.sql?raw";
+import devicesSchema from "../migrations/0002_devices.sql?raw";
 import schedule from "../shared/schedule-2026.json";
 import { finalsFromCsv, gamesFromCsv, NFLVERSE_GAMES_CSV } from "../shared/nflverse.ts";
 import { applyResults, getMeta, listGames, setMeta, updateKickoffs, upsertGames } from "./db.ts";
@@ -8,13 +9,25 @@ import type { Winner } from "../shared/types.ts";
 export const SEASON = schedule.season;
 export const SCHEDULE_VERSION = schedule.version;
 
-const statements = schema
-  .split(/;\s*\n/)
-  .map((s) => s.replace(/^\s*--.*$/gm, "").trim())
-  .filter(Boolean);
+const split = (sql: string) =>
+  sql
+    .split(/;\s*\n/)
+    .map((s) => s.replace(/^\s*--.*$/gm, "").trim())
+    .filter(Boolean);
+
+const statements = split(schema);
+const deviceStatements = split(devicesSchema);
 
 async function applySchema(db: D1Database): Promise<void> {
   await db.batch(statements.map((s) => db.prepare(s)));
+  // ALTER TABLE has no IF NOT EXISTS, so run these singly and let a second run no-op.
+  for (const statement of deviceStatements) {
+    try {
+      await db.prepare(statement).run();
+    } catch (err) {
+      if (!/duplicate column name/i.test(err instanceof Error ? err.message : String(err))) throw err;
+    }
+  }
 }
 
 /** Seeds/refreshes games from the schedule bundled at build time. */

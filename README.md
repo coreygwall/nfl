@@ -16,7 +16,7 @@ results entered by the commissioner in about a minute a week.
 | Reveal | Other people's picks for a game are hidden until that game kicks off. Your own are always visible. |
 | Standings | Points, then correct picks, then 5-point hits, then name. Ties share a place. |
 | Weeks | Regular season, weeks 1–18. The Picks tab opens to the earliest week that still has an unstarted game. |
-| Identity | Type your name on first visit; it is remembered on the device. Joining from a second device? Tap **I already entered** and pick your name. A name already in the pool cannot be taken by accident — you either continue as that player or pick a name that differs. Switch with the chip in the header. No passwords. |
+| Identity | Type your name on first visit; the device is handed a token (stored in `localStorage`) and a short **device code**. The token is what every request proves; the code is what claims the same name on a second device. Tap your name in the header to see your code. A name already claimed cannot be taken without it, and a name nobody holds is claimed by the first device that asks — which is how everyone who joined before codes existed keeps their place. |
 
 ## Deploying (one-time, ~5 minutes)
 
@@ -52,6 +52,7 @@ with the rules in three steps and a full `/rules` page one tap away. The roster 
   ```
   Player ids are listed at `GET /api/bootstrap`; game ids look like `2026_03_AWAY_HOME`.
 - **Rename / remove a player:** `/admin` → Players.
+- **Lost code / locked out / wrong person claimed a name:** `/admin` → Players → **Reset access**. It issues a new code and signs out that player's devices; send them the code and the next device to use it becomes them. Eight wrong codes locks claiming for 15 minutes; a reset clears the lock.
 - **Flexed kickoff times:** handled for you. A Cron Trigger checks nflverse every morning (10:00 UTC) and moves any kickoff the NFL has flexed. It only ever changes kickoff time and venue, never picks, results, weeks or teams, and it refuses to apply a feed that doesn't cover the games it already knows. `/admin` → Tools shows when it last ran and has a "Check nflverse now" button.
 - **Backup:** `/admin` → Tools → "Download picks CSV" gives every pick with its game, result and points.
 - **From Claude:** with the Cloudflare MCP connected, results can also be recorded straight into D1, e.g. `UPDATE games SET winner = 'KC' WHERE id = '2026_03_KC_BUF'`.

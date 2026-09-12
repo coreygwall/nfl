@@ -5,9 +5,11 @@ import { nameKey, validateName } from "../../shared/names.ts";
 import { validatePicks } from "../../shared/picks.ts";
 import { isAbbr } from "../../shared/teams.ts";
 import type { Winner } from "../../shared/types.ts";
-import type { AdminPlayersResponse, AdminWeekResponse } from "../../shared/api.ts";
+import type { AdminPlayersResponse, AdminResetAccessResponse, AdminWeekResponse } from "../../shared/api.ts";
+import { generateCode } from "../../shared/codes.ts";
 import {
   deletePlayer,
+  deviceCounts,
   findPlayerByKey,
   getGame,
   getMeta,
@@ -22,6 +24,8 @@ import {
   publicPlayer,
   renamePlayer,
   replacePicks,
+  revokeDevices,
+  setClaimCode,
   setResult,
 } from "../db.ts";
 import { SCHEDULE_VERSION, SEASON, syncResultsFromSource, syncSchedule, syncScheduleFromSource } from "../ready.ts";
@@ -92,7 +96,7 @@ adminRoutes.put("/players/:id/weeks/:week/picks", async (c) => {
 });
 
 adminRoutes.get("/players", async (c) => {
-  const [players, stats] = await Promise.all([listPlayers(c.env.DB), playerStats(c.env.DB)]);
+  const [players, stats, devices] = await Promise.all([listPlayers(c.env.DB), playerStats(c.env.DB), deviceCounts(c.env.DB)]);
   const body: AdminPlayersResponse = {
     players: players.map((p) => ({
       id: p.id,
@@ -101,9 +105,26 @@ adminRoutes.get("/players", async (c) => {
       lastSeenAt: p.lastSeenAt,
       picksCount: stats.get(p.id)?.picksCount ?? 0,
       weeksPlayed: stats.get(p.id)?.weeksPlayed ?? 0,
+      devices: devices.get(p.id) ?? 0,
+      code: p.claimCode,
     })),
   };
   return c.json(body);
+});
+
+/**
+ * Locked out, lost the phone, or someone else claimed the name first: a new code, and every
+ * device signed out. The next device to use the code becomes the player again.
+ */
+adminRoutes.post("/players/:id/reset-access", async (c) => {
+  const player = await getPlayer(c.env.DB, c.req.param("id"));
+  if (!player) throw notFound("NO_PLAYER", "No such player");
+  const body = (await c.req.json().catch(() => ({}))) as { revokeDevices?: unknown };
+  const code = generateCode();
+  await setClaimCode(c.env.DB, player.id, code);
+  if (body.revokeDevices !== false) await revokeDevices(c.env.DB, player.id);
+  const res: AdminResetAccessResponse = { player: { id: player.id, name: player.name }, code };
+  return c.json(res);
 });
 
 adminRoutes.patch("/players/:id", async (c) => {

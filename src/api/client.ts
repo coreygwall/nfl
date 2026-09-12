@@ -25,7 +25,7 @@ export async function api<T>(path: string, init: ApiInit = {}): Promise<T> {
   const headers: Record<string, string> = { accept: "application/json" };
   if (init.body !== undefined) headers["content-type"] = "application/json";
   const player = loadPlayer();
-  if (player) headers["x-player-id"] = player.id;
+  if (player?.token) headers["x-player-token"] = player.token;
   if (init.pin) headers["x-admin-pin"] = init.pin;
   let res: Response;
   try {

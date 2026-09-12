@@ -8,6 +8,11 @@ export interface GameDTO extends Game {
   status: GameStatus;
 }
 
+/** A player as everyone sees them, plus whether a device has claimed the name. */
+export interface RosterPlayer extends Player {
+  claimed: boolean;
+}
+
 export interface BootstrapResponse {
   now: string;
   /** Build id of the deployed Worker; the client reloads when its own differs. */
@@ -19,8 +24,10 @@ export interface BootstrapResponse {
   /** Latest week with started games — the results view default. */
   boardWeek: number;
   weeks: WeekSummary[];
-  players: Player[];
+  players: RosterPlayer[];
   me: Player | null;
+  /** Your own claim code, for adding another device. Only sent to an authenticated device. */
+  myCode?: string;
 }
 
 export interface CreatePlayerRequest {
@@ -29,6 +36,21 @@ export interface CreatePlayerRequest {
 export interface CreatePlayerResponse {
   player: Player;
   created: boolean;
+  /** Present when this request earned the device its identity; store it, it is not shown again. */
+  token?: string;
+  /** The code that claims this name on another device. */
+  code?: string;
+}
+
+export interface ClaimRequest {
+  /** Omitted for a name nobody has claimed yet. */
+  code?: string;
+}
+
+export interface ClaimResponse {
+  player: Player;
+  token: string;
+  code: string;
 }
 
 export interface WeekResponse {
@@ -80,6 +102,15 @@ export interface AdminPlayerDTO extends Player {
   lastSeenAt: string;
   picksCount: number;
   weeksPlayed: number;
+  /** How many devices are signed in as this player. */
+  devices: number;
+  /** The code that claims this name on a new device; null for names created before codes. */
+  code: string | null;
+}
+
+export interface AdminResetAccessResponse {
+  player: Player;
+  code: string;
 }
 export interface AdminPlayersResponse {
   players: AdminPlayerDTO[];

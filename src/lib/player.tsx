@@ -1,18 +1,17 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import type { Player } from "../../shared/types.ts";
-import { clearPlayer, loadPlayer, savePlayer } from "./identity.ts";
+import { clearPlayer, loadPlayer, savePlayer, type Identity } from "./identity.ts";
 
 interface PlayerContextValue {
-  player: Player | null;
-  setPlayer: (p: Player) => void;
+  player: Identity | null;
+  setPlayer: (p: Identity) => void;
   signOut: () => void;
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
 
 export function PlayerProvider({ children }: { children: ReactNode }) {
-  const [player, setPlayerState] = useState<Player | null>(loadPlayer);
-  const setPlayer = useCallback((p: Player) => {
+  const [player, setPlayerState] = useState<Identity | null>(loadPlayer);
+  const setPlayer = useCallback((p: Identity) => {
     savePlayer(p);
     setPlayerState(p);
   }, []);

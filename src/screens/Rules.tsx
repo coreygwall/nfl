@@ -23,7 +23,10 @@ const notes: [string, string][] = [
   ["Showing up late is okay", "Pick from the games that are left. Your first remaining pick is still worth 5 points."],
   ["Picks stay private", "Other players' picks appear only after those games begin."],
   ["Season standings", "Most points wins. Ties break on correct picks, then 5-point hits."],
-  ["Using another device?", "Tap “I already entered” and choose your name. No password needed."],
+  [
+    "Using another device?",
+    "Tap “I already entered”, choose your name, and type your device code — tap your name at the top of this app to find it. It stops anyone else picking as you.",
+  ],
   ["What about an NFL tie?", "A tied game scores zero for everyone who picked it."],
 ];
 

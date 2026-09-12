@@ -1,10 +1,11 @@
 import { useState, type FormEvent } from "react";
 import { motion } from "motion/react";
 import { api, ApiClientError } from "../api/client.ts";
-import { useAdminPlayerMutation, useAdminPlayers, useAdminPullResults, useAdminSetResult, useAdminStatus, useAdminSync, useAdminWeek, useBootstrap } from "../api/queries.ts";
+import { useAdminPlayerMutation, useAdminPlayers, useAdminPullResults, useAdminResetAccess, useAdminSetResult, useAdminStatus, useAdminSync, useAdminWeek, useBootstrap } from "../api/queries.ts";
 import { TEAMS, type Abbr } from "../../shared/teams.ts";
 import type { AdminGameDTO, AdminPullResultsResponse } from "../../shared/api.ts";
 import { formatKickoff, formatShortDay } from "../lib/time.ts";
+import { formatCode } from "../../shared/codes.ts";
 import { ErrorState, Segmented, Spinner } from "../components/Common.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
 import { useToast } from "../components/Toast.tsx";
@@ -252,9 +253,18 @@ function ResultRow({ game, onSet, busy }: { game: AdminGameDTO; onSet: (w: Abbr 
 function Players({ pin }: { pin: string }) {
   const data = useAdminPlayers(pin);
   const mut = useAdminPlayerMutation(pin);
+  const reset = useAdminResetAccess(pin);
   const toast = useToast();
   if (data.isPending) return <Spinner />;
   if (data.error) return <ErrorState message={data.error.message} onRetry={() => data.refetch()} />;
+  const resetAccess = async (id: string, name: string) => {
+    try {
+      const r = await reset.mutateAsync(id);
+      toast(`${name}'s new code is ${formatCode(r.code)} — send it to them.`, "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Couldn't reset", "error");
+    }
+  };
   const act = async (input: Parameters<typeof mut.mutateAsync>[0]) => {
     try {
       await mut.mutateAsync(input);
@@ -267,30 +277,48 @@ function Players({ pin }: { pin: string }) {
     <ul className="grid gap-2 lg:grid-cols-2">
       {data.data.players.length === 0 && <p className="text-sm text-ink-2">No players yet.</p>}
       {data.data.players.map((p) => (
-        <li key={p.id} className="card-flat flex items-center gap-3 bg-white p-3">
-          <div className="min-w-0 flex-1">
-            <div className="font-display truncate font-extrabold">{p.name}</div>
-            <div className="text-xs text-ink-2">
-              {p.picksCount} picks · {p.weeksPlayed} wk{p.weeksPlayed === 1 ? "" : "s"} · last seen {formatShortDay(p.lastSeenAt)}
+        <li key={p.id} className="card-flat bg-white p-3">
+          <div className="flex items-center gap-3">
+            <div className="min-w-0 flex-1">
+              <div className="font-display truncate font-extrabold">{p.name}</div>
+              <div className="text-xs text-ink-2">
+                {p.picksCount} picks · {p.weeksPlayed} wk{p.weeksPlayed === 1 ? "" : "s"} · last seen {formatShortDay(p.lastSeenAt)}
+              </div>
             </div>
+            <button
+              className="btn btn-sm"
+              onClick={() => {
+                const name = window.prompt("New name", p.name);
+                if (name && name !== p.name) void act({ id: p.id, action: "rename", name });
+              }}
+            >
+              Rename
+            </button>
+            <button
+              className="btn btn-sm text-danger"
+              onClick={() => {
+                if (window.confirm(`Remove ${p.name} and all their picks?`)) void act({ id: p.id, action: "delete" });
+              }}
+            >
+              Remove
+            </button>
           </div>
-          <button
-            className="btn btn-sm"
-            onClick={() => {
-              const name = window.prompt("New name", p.name);
-              if (name && name !== p.name) void act({ id: p.id, action: "rename", name });
-            }}
-          >
-            Rename
-          </button>
-          <button
-            className="btn btn-sm text-danger"
-            onClick={() => {
-              if (window.confirm(`Remove ${p.name} and all their picks?`)) void act({ id: p.id, action: "delete" });
-            }}
-          >
-            Remove
-          </button>
+          <div className="mt-2 flex flex-wrap items-center gap-2 border-t-2 border-dashed border-line pt-2 text-xs text-ink-2">
+            <span className="chip bg-paper-2 py-0 text-[11px]">
+              {p.devices === 0 ? "No device yet" : `${p.devices} device${p.devices === 1 ? "" : "s"}`}
+            </span>
+            <span className="font-display tracking-[0.1em]">{p.code ? formatCode(p.code) : "no code"}</span>
+            <button
+              className="btn btn-sm ml-auto"
+              disabled={reset.isPending}
+              onClick={() => {
+                if (!window.confirm(`Give ${p.name} a new code and sign out their devices?`)) return;
+                void resetAccess(p.id, p.name);
+              }}
+            >
+              Reset access
+            </button>
+          </div>
         </li>
       ))}
     </ul>

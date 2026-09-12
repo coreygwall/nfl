@@ -1,11 +1,14 @@
 import { useEffect, useMemo, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { AnimatePresence, motion } from "motion/react";
-import { useBootstrap, useCreatePlayer } from "../api/queries.ts";
+import { useBootstrap, useClaimPlayer, useCreatePlayer } from "../api/queries.ts";
 import { ApiClientError } from "../api/client.ts";
 import { usePlayer } from "../lib/player.tsx";
+import type { Identity } from "../lib/identity.ts";
 import { nameKey, validateName } from "../../shared/names.ts";
+import { CODE_LENGTH, formatCode, normalizeCode } from "../../shared/codes.ts";
 import type { Player } from "../../shared/types.ts";
+import type { RosterPlayer } from "../../shared/api.ts";
 import type { Abbr } from "../../shared/teams.ts";
 import { ErrorState, Spinner } from "../components/Common.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
@@ -13,7 +16,7 @@ import { useToast } from "../components/Toast.tsx";
 
 const HERO_STICKERS: Abbr[] = ["SEA", "KC", "DET", "PHI", "BUF", "SF"];
 
-type Mode = "new" | "roster" | "claim" | "differentiate";
+type Mode = "new" | "roster" | "taken" | "differentiate" | "code";
 
 export function Welcome() {
   const boot = useBootstrap();
@@ -21,12 +24,15 @@ export function Welcome() {
   const nav = useNavigate();
   const [params] = useSearchParams();
   const next = params.get("next") || "/";
+  const claimId = params.get("claim");
   const toast = useToast();
   const create = useCreatePlayer();
+  const claim = useClaimPlayer();
   const [mode, setMode] = useState<Mode>("new");
   const [name, setName] = useState("");
   const [error, setError] = useState<string | null>(null);
-  const [claim, setClaim] = useState<Player | null>(null);
+  /** The roster entry we are claiming, or that a typed name collided with. */
+  const [target, setTarget] = useState<Player | null>(null);
   const [shake, setShake] = useState(0);
 
   const players = boot.data?.players ?? [];
@@ -34,17 +40,44 @@ export function Welcome() {
   /** The roster entry this typed name would collide with, if any. */
   const collision = name.trim().length >= 2 ? (taken.get(nameKey(name)) ?? null) : null;
 
+  // Arriving from "switch player" or a signed-out device: go straight to the code.
+  useEffect(() => {
+    if (!claimId || !boot.data) return;
+    const found = players.find((p) => p.id === claimId);
+    if (found) {
+      setTarget(found);
+      setMode("code");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [claimId, boot.data]);
+
   useEffect(() => {
     if (mode === "roster" && boot.data && players.length === 0) setMode("new");
   }, [mode, boot.data, players.length]);
 
-  const go = (p: Player, returning = false) => {
+  const go = (p: Identity, returning = false) => {
     setPlayer(p);
     if (returning) toast(`Picking as ${p.name}. Not you? Use the name chip up top to switch.`);
     nav(next, { replace: true });
   };
 
-  const submit = async (e: FormEvent) => {
+  /** Tapping a name on the roster: unclaimed names come free, claimed ones want the code. */
+  const tapRoster = async (p: RosterPlayer) => {
+    setError(null);
+    setTarget(p);
+    if (!p.claimed) {
+      try {
+        const r = await claim.mutateAsync({ id: p.id });
+        go({ ...r.player, token: r.token }, true);
+        return;
+      } catch {
+        /* Someone claimed it between the roster loading and this tap: fall through to the code. */
+      }
+    }
+    setMode("code");
+  };
+
+  const submitName = async (e: FormEvent) => {
     e.preventDefault();
     const check = validateName(name);
     if (!check.ok) {
@@ -54,21 +87,21 @@ export function Welcome() {
     }
     // Caught before the round trip: this name is already on the roster.
     if (collision) {
-      setClaim(collision);
-      setMode("claim");
+      setTarget(collision);
+      setMode("taken");
       setError(null);
       return;
     }
     setError(null);
     try {
       const res = await create.mutateAsync(check.name);
-      if (res.created) {
+      if (res.created && res.token) {
         toast(`Welcome to the pool, ${res.player.name}!`, "success");
-        go(res.player);
+        go({ ...res.player, token: res.token });
       } else {
         // Someone claimed it between our roster load and this submit.
-        setClaim(res.player);
-        setMode("claim");
+        setTarget(res.player);
+        setMode("taken");
       }
     } catch (err) {
       setError(err instanceof ApiClientError ? err.message : "Something went wrong.");
@@ -89,7 +122,7 @@ export function Welcome() {
             <ErrorState message={boot.error.message} onRetry={() => boot.refetch()} />
           ) : (
             <div className="card p-5">
-              {player && (
+              {player?.token && (
                 <div className="card-flat mb-4 flex flex-wrap items-center gap-2 bg-flag-soft px-3 py-2">
                   <span className="text-sm">
                     This device picks as <b>{player.name}</b>
@@ -100,33 +133,46 @@ export function Welcome() {
                 </div>
               )}
               <AnimatePresence mode="wait" initial={false}>
-                {mode === "claim" && claim ? (
-                  <Panel key="claim">
-                    <h2 className="font-display text-xl font-extrabold leading-tight">
-                      “{claim.name}” is already in the pool
-                    </h2>
+                {mode === "code" && target ? (
+                  <Panel key="code">
+                    <CodeForm
+                      player={target}
+                      pending={claim.isPending}
+                      onSubmit={async (code) => {
+                        const r = await claim.mutateAsync({ id: target.id, code });
+                        go({ ...r.player, token: r.token }, true);
+                      }}
+                      onBack={() => {
+                        setMode(players.length > 0 ? "roster" : "new");
+                        setTarget(null);
+                      }}
+                    />
+                  </Panel>
+                ) : mode === "taken" && target ? (
+                  <Panel key="taken">
+                    <h2 className="font-display text-xl font-extrabold leading-tight">“{target.name}” is already in the pool</h2>
                     <p className="mb-4 mt-1 text-sm text-ink-2">
-                      If that's you picking from another device, keep going as yourself — your picks and points come with you.
+                      If that's you picking from another device, your code will bring your picks and points with you.
                     </p>
                     <div className="flex flex-col gap-2">
-                      <button className="btn btn-turf w-full" onClick={() => go(claim, true)}>
-                        That's me — continue as {claim.name}
+                      <button className="btn btn-turf w-full" onClick={() => setMode("code")}>
+                        That's me — I have a code
                       </button>
                       <button
                         className="btn w-full"
                         onClick={() => {
                           setMode("differentiate");
-                          setName(`${claim.name} `);
+                          setName(`${target.name} `);
                           setError(null);
                         }}
                       >
-                        I'm a different {claim.name}
+                        I'm a different {target.name}
                       </button>
                     </div>
                     <button
                       className="mt-4 text-sm font-bold text-ink-2 underline"
                       onClick={() => {
-                        setClaim(null);
+                        setTarget(null);
                         setName("");
                         setMode("new");
                       }}
@@ -134,12 +180,12 @@ export function Welcome() {
                       Start over
                     </button>
                   </Panel>
-                ) : mode === "differentiate" && claim ? (
+                ) : mode === "differentiate" && target ? (
                   <Panel key="differentiate">
-                    <form onSubmit={submit}>
+                    <form onSubmit={submitName}>
                       <h2 className="font-display text-xl font-extrabold leading-tight">Make it yours</h2>
                       <p className="mb-3 mt-1 text-sm text-ink-2">
-                        Two {claim.name}s would be chaos on the board. Add a last initial or a nickname.
+                        Two {target.name}s would be chaos on the board. Add a last initial or a nickname.
                       </p>
                       <NameInput
                         autoFocus
@@ -149,7 +195,7 @@ export function Welcome() {
                           setError(null);
                         }}
                         shake={shake}
-                        placeholder={`${claim.name} W.`}
+                        placeholder={`${target.name} W.`}
                       />
                       <p className="mt-2 text-sm font-semibold">
                         {error ? (
@@ -159,7 +205,7 @@ export function Welcome() {
                         ) : name.trim().length >= 2 ? (
                           <span className="text-turf">Nice — “{name.trim()}” is free.</span>
                         ) : (
-                          <span className="text-ink-3">e.g. {claim.name} W. · Big {claim.name}</span>
+                          <span className="text-ink-3">e.g. {target.name} W. · Big {target.name}</span>
                         )}
                       </p>
                       <button
@@ -173,18 +219,18 @@ export function Welcome() {
                         type="button"
                         className="mt-3 text-sm font-bold text-ink-2 underline"
                         onClick={() => {
-                          setMode("claim");
-                          setName(claim.name);
+                          setMode("taken");
+                          setName(target.name);
                         }}
                       >
-                        Actually, that other {claim.name} is me
+                        Actually, that other {target.name} is me
                       </button>
                     </form>
                   </Panel>
                 ) : mode === "roster" ? (
                   <Panel key="roster">
                     <h2 className="font-display text-xl font-extrabold">Tap your name</h2>
-                    <p className="mb-3 text-sm text-ink-2">We'll remember you on this device.</p>
+                    <p className="mb-3 text-sm text-ink-2">We'll ask for your code, then remember you on this device.</p>
                     <div className="flex flex-wrap gap-2">
                       {players.map((p, i) => (
                         <motion.button
@@ -194,7 +240,7 @@ export function Welcome() {
                           animate={{ opacity: 1, scale: 1, y: 0 }}
                           transition={{ type: "spring", stiffness: 500, damping: 26, delay: Math.min(i * 0.03, 0.4) }}
                           whileTap={{ scale: 0.94 }}
-                          onClick={() => go(p, true)}
+                          onClick={() => void tapRoster(p)}
                         >
                           {p.name}
                         </motion.button>
@@ -214,7 +260,7 @@ export function Welcome() {
                   </Panel>
                 ) : (
                   <Panel key="new">
-                    <form onSubmit={submit}>
+                    <form onSubmit={submitName}>
                       <h2 className="font-display text-xl font-extrabold">What should we call you?</h2>
                       <p className="mb-3 text-sm text-ink-2">This is how you'll show up on the board.</p>
                       <NameInput
@@ -231,7 +277,14 @@ export function Welcome() {
                       {!error && collision && (
                         <p className="mt-2 text-sm font-semibold text-ink-2">
                           Someone's already picking as “{collision.name}.”{" "}
-                          <button type="button" className="font-bold text-ink underline" onClick={() => go(collision, true)}>
+                          <button
+                            type="button"
+                            className="font-bold text-ink underline"
+                            onClick={() => {
+                              setTarget(collision);
+                              setMode("code");
+                            }}
+                          >
                             That's me →
                           </button>
                         </p>
@@ -263,6 +316,71 @@ export function Welcome() {
         </div>
       </div>
     </div>
+  );
+}
+
+function CodeForm({
+  player,
+  pending,
+  onSubmit,
+  onBack,
+}: {
+  player: Player;
+  pending: boolean;
+  onSubmit: (code: string) => Promise<void>;
+  onBack: () => void;
+}) {
+  const [code, setCode] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [shake, setShake] = useState(0);
+  const ready = normalizeCode(code).length === CODE_LENGTH;
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    if (!ready) return;
+    setError(null);
+    try {
+      await onSubmit(normalizeCode(code));
+    } catch (err) {
+      setError(err instanceof ApiClientError ? err.message : "Couldn't check that code.");
+      setShake((s) => s + 1);
+    }
+  };
+
+  return (
+    <form onSubmit={submit}>
+      <h2 className="font-display text-xl font-extrabold leading-tight">Prove you're {player.name}</h2>
+      <p className="mb-3 mt-1 text-sm text-ink-2">
+        Open the pool on the device you already use and tap your name up top — your code is there.
+      </p>
+      <motion.div key={shake} animate={shake ? { x: [-8, 8, -5, 5, 0] } : { x: 0 }} transition={{ duration: 0.35 }}>
+        <input
+          autoFocus
+          value={code}
+          onChange={(e) => {
+            setCode(formatCode(e.target.value));
+            setError(null);
+          }}
+          placeholder="QRT4-9MKP"
+          inputMode="text"
+          autoCapitalize="characters"
+          autoComplete="one-time-code"
+          spellCheck={false}
+          aria-label="Your device code"
+          className="card-flat w-full px-4 py-3 text-center font-display text-2xl font-extrabold tracking-[0.15em] outline-none focus:shadow-hard"
+        />
+      </motion.div>
+      {error && <p className="mt-2 text-sm font-semibold text-danger">{error}</p>}
+      <button className="btn btn-turf mt-4 w-full" type="submit" disabled={pending || !ready}>
+        {pending ? "Checking…" : `Pick as ${player.name}`}
+      </button>
+      <p className="mt-4 border-t-2 border-dashed border-line pt-4 text-sm text-ink-2">
+        Lost it? The commissioner can issue a new one.{" "}
+        <button type="button" className="font-bold text-ink underline" onClick={onBack}>
+          Go back
+        </button>
+      </p>
+    </form>
   );
 }
 
