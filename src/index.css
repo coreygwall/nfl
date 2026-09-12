@@ -184,3 +184,31 @@ button {
   outline-offset: 2px;
   border-radius: 12px;
 }
+
+@layer utilities {
+  /* Team logos drifting past on the welcome page. The track holds two copies of the
+     list, so translating by half its width loops without a seam. */
+  .marquee-track {
+    animation: marquee 42s linear infinite;
+  }
+  .marquee:hover .marquee-track,
+  .marquee:focus-within .marquee-track {
+    animation-play-state: paused;
+  }
+  @keyframes marquee {
+    from {
+      transform: translate3d(0, 0, 0);
+    }
+    to {
+      transform: translate3d(-50%, 0, 0);
+    }
+  }
+  @media (prefers-reduced-motion: reduce) {
+    .marquee-track {
+      animation: none;
+    }
+    .marquee {
+      overflow-x: auto;
+    }
+  }
+}

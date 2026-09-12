@@ -14,7 +14,11 @@ import { ErrorState, Spinner } from "../components/Common.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
 import { useToast } from "../components/Toast.tsx";
 
-const HERO_STICKERS: Abbr[] = ["SEA", "KC", "DET", "PHI", "BUF", "SF"];
+/** Every team, in a fixed shuffle so the strip reads as a jumble rather than a division list. */
+const MARQUEE_TEAMS: Abbr[] = [
+  "SEA", "KC", "DET", "PHI", "BUF", "SF", "DAL", "GB", "BAL", "MIA", "NYJ", "CIN", "LAC", "MIN", "PIT", "HOU",
+  "NE", "TB", "CHI", "LV", "DEN", "ARI", "CLE", "NO", "JAX", "TEN", "ATL", "IND", "CAR", "WAS", "NYG", "LA",
+];
 
 type Mode = "new" | "roster" | "taken" | "differentiate" | "code";
 
@@ -126,7 +130,8 @@ export function Welcome() {
 
   return (
     <div className="mx-auto w-full max-w-[560px] lg:max-w-[1060px]">
-      <div className="lg:grid lg:min-h-[calc(100dvh-190px)] lg:grid-cols-[minmax(0,1fr)_400px] lg:items-center lg:gap-12">
+      <TeamMarquee />
+      <div className="lg:grid lg:min-h-[calc(100dvh-420px)] lg:grid-cols-[minmax(0,1fr)_400px] lg:items-center lg:gap-12">
         <Hero />
         <div>
           {boot.isPending ? (
@@ -439,6 +444,29 @@ const NameInput = ({
   </motion.div>
 );
 
+/** All 32 logos drifting past; hover or touch to hold one still. Decorative, so it is aria-hidden. */
+function TeamMarquee() {
+  const strip = [...MARQUEE_TEAMS, ...MARQUEE_TEAMS];
+  return (
+    <div
+      className="marquee mb-6 overflow-hidden"
+
+      style={{
+        marginInline: "calc(50% - 50vw)",
+        maskImage: "linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent)",
+        WebkitMaskImage: "linear-gradient(90deg, transparent, #000 6%, #000 94%, transparent)",
+      }}
+      aria-hidden
+    >
+      <div className="marquee-track flex w-max items-end gap-3 sm:gap-5">
+        {strip.map((abbr, i) => (
+          <TeamSticker key={`${abbr}-${i}`} abbr={abbr} size={56} className={i % 3 === 1 ? "mb-3" : i % 3 === 2 ? "mb-1" : ""} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
 function Hero() {
   return (
     <motion.section
@@ -447,18 +475,11 @@ function Hero() {
       transition={{ type: "spring", stiffness: 300, damping: 26 }}
       className="mb-6 lg:mb-0"
     >
-      <div className="mb-4 flex origin-left items-end gap-1 sm:gap-2 lg:scale-110">
-        {HERO_STICKERS.map((abbr, i) => (
-          <TeamSticker key={abbr} abbr={abbr} size={58} className={`${i % 2 ? "mb-2" : ""} ${i > 3 ? "hidden sm:block" : ""}`} />
-        ))}
-      </div>
       <span className="chip bg-flag">2026 season</span>
       <h1 className="font-display mt-3 text-[2.6rem] font-extrabold leading-[0.95] tracking-tight lg:text-[3.5rem]">
         Pick five.
         <br />
         Rank them.
-        <br />
-        Talk trash.
       </h1>
       <p className="mt-3 max-w-[42ch] text-[15px] leading-snug text-ink-2 lg:text-base">
         Every week, pick the winner of five games and rank them 1 to 5. Nail your #1 for 5 points, your #5 for 1. Most points

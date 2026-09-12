@@ -29,9 +29,8 @@ test.describe.serial("pool flow", () => {
     await expect(page.getByText("How sure are you?")).toBeVisible();
     // Move the Seahawks (top) down one: 49ers become the 5-pointer.
     await page.getByRole("button", { name: "Move down" }).first().click();
-    await page.getByRole("button", { name: "Looks right" }).click();
-    await expect(page.getByText("Locking in for")).toBeVisible();
-    await expect(page.getByText("up to 15 points")).toBeVisible();
+    // Ranking is the confirmation: there is no separate screen to click through.
+    await expect(page.getByText("Up to 15 this week")).toBeVisible();
     await page.getByRole("button", { name: "Lock it in" }).click();
     await expect(page.getByText("Locked in")).toBeVisible();
     await page.getByRole("button", { name: "Done" }).click();
@@ -76,7 +75,6 @@ test.describe.serial("pool flow", () => {
 
     for (const t of ["New England Patriots", "Los Angeles Rams", "Houston Texans"]) await pick(page, t);
     await page.getByRole("button", { name: "Rank 3" }).click();
-    await page.getByRole("button", { name: "Looks right" }).click();
     await page.getByRole("button", { name: "Lock it in" }).click();
     await expect(page.getByText("Locked in")).toBeVisible();
     // The code that moves this name to another device lives under the name chip.
@@ -132,7 +130,6 @@ test.describe.serial("pool flow", () => {
     await pick(page, "Miami Dolphins");
     await page.getByRole("button", { name: "Rank" }).first().click();
     await expect(page.getByText("Locked in")).toBeVisible(); // frozen section header
-    await page.getByRole("button", { name: "Looks right" }).click();
     await page.getByRole("button", { name: "Lock it in" }).click();
     await expect(page.getByText("Nice, Alex.")).toBeVisible();
 
@@ -189,9 +186,8 @@ test("a player who shows up Sunday night can still pick what's left", async ({ p
   await page.getByRole("button", { name: "Pick Kansas City Chiefs" }).click();
   await page.getByRole("button", { name: "Rank them" }).click();
   await expect(page.getByText("How sure are you?")).toBeVisible();
-  await page.getByRole("button", { name: "Looks right" }).click();
   // Two picks are still worth the top two rank values: 5 + 4.
-  await expect(page.getByText("up to 9 points")).toBeVisible();
+  await expect(page.getByText("Up to 9 this week")).toBeVisible();
   await page.getByRole("button", { name: "Lock it in" }).click();
   await expect(page.getByText("Locked in")).toBeVisible();
 });

@@ -19,7 +19,7 @@ import { ChevronDown, ChevronUp, Grip, Lock, Share } from "../components/Icons.t
 import { TeamSticker } from "../components/TeamSticker.tsx";
 import { useToast } from "../components/Toast.tsx";
 
-type Step = "select" | "rank" | "confirm" | "done";
+type Step = "select" | "rank" | "done";
 const ALL_RANKS = Array.from({ length: MAX_PICKS }, (_, i) => i + 1);
 
 export function PickFlow() {
@@ -39,7 +39,9 @@ function PickFlowInner({ week }: { week: number }) {
   const put = usePutPicks(week);
   const now = useNow(15_000);
   const [params, setParams] = useSearchParams();
-  const stepParam = params.get("step") as Step | null;
+  const raw = params.get("step");
+  // "confirm" was its own screen once; ranking is the confirmation now.
+  const stepParam = (raw === "confirm" ? "rank" : raw) as Step | null;
 
   const online = useOnline();
   const [saveError, setSaveError] = useState<string | null>(null);
@@ -116,7 +118,7 @@ function PickFlowInner({ week }: { week: number }) {
   const allLocked = games.length > 0 && !anyUnlocked;
 
   const step: Step | "review" = stepParam ?? (hasSaved && !dirty ? "review" : "select");
-  useHideNav(step === "select" || step === "rank" || step === "confirm");
+  useHideNav(step === "select" || step === "rank");
   useHeaderWeek(week, (w) => nav(`/week/${w}`));
 
   const setStep = (s: Step | null) => {
@@ -141,7 +143,7 @@ function PickFlowInner({ week }: { week: number }) {
     const title = boot.data?.poolName ?? "High Five";
     try {
       if (navigator.share) {
-        await navigator.share({ title, text: `Join our NFL pool — pick five, rank them, talk trash.`, url });
+        await navigator.share({ title, text: `Join our NFL pool — pick five games a week and rank them.`, url });
         return;
       }
       await navigator.clipboard.writeText(url);
@@ -208,16 +210,25 @@ function PickFlowInner({ week }: { week: number }) {
           </StepWrap>
         ) : step === "select" ? (
           <StepWrap key="select" wide>
-            <SelectStep games={games} draft={draft} frozen={frozen} lockedNow={lockedNow} onPick={onPick} pickCounts={wk.data!.pickCounts} allLocked={allLocked} hasSaved={hasSaved} currentWeek={boot.data!.currentWeek} week={week} now={now} openCount={openGames.length} picked={merged.length} slotCount={slotCount} status={status} />
+            <SelectStep games={games} draft={draft} frozen={frozen} lockedNow={lockedNow} onPick={onPick} pickCounts={wk.data!.pickCounts} allLocked={allLocked} hasSaved={hasSaved} currentWeek={boot.data!.currentWeek} week={week} now={now} openCount={openGames.length} picked={merged.length} slotCount={slotCount} status={status} onNext={() => setStep("rank")} canRank={anyUnlocked && unlockedPicks.length > 0} />
             <PickTray merged={merged} frozen={frozen} shake={shakeTray} slots={slotCount} onRemove={(gameId) => setDraft((d) => removeSelection(d, gameId))} onNext={() => setStep("rank")} disabled={!anyUnlocked} />
           </StepWrap>
         ) : step === "rank" ? (
           <StepWrap key="rank">
-            <RankStep frozen={frozen} order={draftOrder} availableRanks={availableRanks} selections={draft.selections} gamesById={gamesById} onOrder={(order) => setDraft((d) => ({ ...d, order }))} onBack={() => setStep("select")} onNext={() => setStep("confirm")} />
-          </StepWrap>
-        ) : step === "confirm" ? (
-          <StepWrap key="confirm">
-            <ConfirmStep name={player!.name} week={week} merged={merged} gamesById={gamesById} frozenRanks={frozenRanks} pending={put.isPending} error={saveError} offline={!online} onBack={() => setStep("rank")} onSubmit={submit} />
+            <RankStep
+              frozen={frozen}
+              order={draftOrder}
+              availableRanks={availableRanks}
+              selections={draft.selections}
+              gamesById={gamesById}
+              merged={merged}
+              pending={put.isPending}
+              error={saveError}
+              offline={!online}
+              onOrder={(order) => setDraft((d) => ({ ...d, order }))}
+              onBack={() => setStep("select")}
+              onSubmit={submit}
+            />
           </StepWrap>
         ) : (
           <StepWrap key="done">
@@ -246,7 +257,7 @@ function StepWrap({ children, wide = false }: { children: React.ReactNode; wide?
 // ---------- Select ----------
 
 function SelectStep({
-  games, draft, frozen, lockedNow, onPick, pickCounts, allLocked, hasSaved, currentWeek, week, now, openCount, picked, slotCount, status,
+  games, draft, frozen, lockedNow, onPick, pickCounts, allLocked, hasSaved, currentWeek, week, now, openCount, picked, slotCount, status, onNext, canRank,
 }: {
   games: GameDTO[];
   draft: Draft;
@@ -263,7 +274,10 @@ function SelectStep({
   picked: number;
   slotCount: number;
   status: { label: string; tone: string };
+  onNext: () => void;
+  canRank: boolean;
 }) {
+  const full = picked >= slotCount && slotCount > 0;
   const frozenByGame = new Map(frozen.map((p) => [p.gameId, p]));
   const open = games.filter((g) => !lockedNow(g));
   const started = games.filter((g) => lockedNow(g));
@@ -278,6 +292,7 @@ function SelectStep({
       selection={draft.selections[g.id] ?? frozenByGame.get(g.id)?.team}
       frozenPick={frozenByGame.get(g.id)}
       counts={pickCounts[g.id]}
+      muted={full && !draft.selections[g.id] && !frozenByGame.has(g.id)}
       onPick={(team) => onPick(g, team)}
     />
   );
@@ -294,25 +309,47 @@ function SelectStep({
           )}
         </div>
       ) : (
-        <header className="mb-4 max-w-[760px]">
-          <h2 className="font-display text-[1.9rem] font-extrabold leading-none tracking-tight">
-            Pick {slotCount} winner{slotCount === 1 ? "" : "s"}
-            {picked > 0 && (
-              <span className="ml-2 align-middle text-base font-bold text-ink-3">
-                {picked}/{slotCount} in
+        <header className="mb-4 flex max-w-[900px] flex-wrap items-start justify-between gap-4">
+          <div className="max-w-[560px]">
+            <h2 className="font-display text-[1.9rem] font-extrabold leading-none tracking-tight">
+              Pick {slotCount} winner{slotCount === 1 ? "" : "s"}
+              {picked > 0 && (
+                <span className="ml-2 align-middle text-base font-bold text-ink-3">
+                  {picked}/{slotCount} in
+                </span>
+              )}
+              {status.label && <span className={`chip ml-2 align-middle text-sm ${status.tone}`}>{status.label}</span>}
+            </h2>
+            <p className="mt-1.5 text-[14px] leading-snug text-ink-2">
+              {full
+                ? "That's your five. Rank them next — surest pick 5 pts, least sure 1."
+                : "Tap who you think wins. You'll rank them next — surest pick 5 pts, least sure 1."}
+            </p>
+            <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ink-3">
+              <span className="chip bg-white py-0 text-[10px] font-bold">
+                <Lock size={10} /> No weekly deadline
               </span>
-            )}
-            {status.label && <span className={`chip ml-2 align-middle text-sm ${status.tone}`}>{status.label}</span>}
-          </h2>
-          <p className="mt-1.5 text-[14px] leading-snug text-ink-2">
-            Tap who you think wins. You'll rank them next — surest pick <b>5 pts</b>, least sure <b>1</b>.
-          </p>
-          <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ink-3">
-            <span className="chip bg-white py-0 text-[10px] font-bold">
-              <Lock size={10} /> No weekly deadline
-            </span>
-            <span>Games lock one by one at kickoff · {openCount} open</span>
-          </p>
+              <span>Games lock one by one at kickoff · {openCount} open</span>
+            </p>
+          </div>
+          {/* Phones get the sticky tray instead; .btn sets display, so hide from a wrapper. */}
+          <span className="hidden sm:block">
+            <AnimatePresence>
+              {full && (
+                <motion.button
+                  initial={{ opacity: 0, scale: 0.9, y: -4 }}
+                  animate={{ opacity: 1, scale: 1, y: 0 }}
+                  exit={{ opacity: 0, scale: 0.9 }}
+                  transition={{ type: "spring", stiffness: 500, damping: 26 }}
+                  className="btn btn-turf text-lg"
+                  onClick={onNext}
+                  disabled={!canRank}
+                >
+                  Rank them →
+                </motion.button>
+              )}
+            </AnimatePresence>
+          </span>
         </header>
       )}
 
@@ -340,7 +377,7 @@ function SelectStep({
 }
 
 function GameCard({
-  game, locked, now, selection, frozenPick, counts, onPick,
+  game, locked, now, selection, frozenPick, counts, muted = false, onPick,
 }: {
   game: GameDTO;
   locked: boolean;
@@ -348,6 +385,8 @@ function GameCard({
   selection?: Abbr;
   frozenPick?: Pick;
   counts?: { away: number; home: number };
+  /** Five are already picked and this one is not among them. Still tappable, just quieter. */
+  muted?: boolean;
   onPick: (team: Abbr) => void;
 }) {
   const chosen = selection ?? null;
@@ -393,7 +432,9 @@ function GameCard({
   return (
     <motion.li
       layout
-      className={`card-flat relative select-none overflow-hidden ${locked ? "bg-paper-2/70" : "bg-white"}`}
+      className={`card-flat relative select-none overflow-hidden transition-opacity duration-200 ${
+        locked ? "bg-paper-2/70" : "bg-white"
+      } ${muted ? "opacity-45 hover:opacity-100 focus-within:opacity-100" : ""}`}
       animate={chosen && !locked ? { boxShadow: "4px 4px 0 0 #14120f", y: -1 } : { boxShadow: "0px 0px 0 0 #14120f", y: 0 }}
       transition={{ type: "spring", stiffness: 500, damping: 30 }}
     >
@@ -479,11 +520,11 @@ function PickTray({
             })}
           </div>
           <motion.button
-            className={`btn btn-sm ${full ? "btn-turf" : "btn-primary"} shrink-0 whitespace-nowrap px-3`}
+            className={`btn shrink-0 whitespace-nowrap ${full ? "btn-turf px-4 text-base" : "btn-sm btn-primary px-3"}`}
             disabled={count === 0 || disabled || editable === 0}
             onClick={onNext}
-            animate={full ? { scale: [1, 1.06, 1] } : { scale: 1 }}
-            transition={{ duration: 0.4 }}
+            animate={full ? { scale: [1, 1.08, 1, 1.05, 1] } : { scale: 1 }}
+            transition={{ duration: 0.7, times: [0, 0.25, 0.5, 0.75, 1] }}
           >
             {label}
           </motion.button>
@@ -496,22 +537,27 @@ function PickTray({
 // ---------- Rank ----------
 
 function RankStep({
-  frozen, order, availableRanks, selections, gamesById, onOrder, onBack, onNext,
+  frozen, order, availableRanks, selections, gamesById, merged, pending, error, offline, onOrder, onBack, onSubmit,
 }: {
   frozen: Pick[];
   order: string[];
   availableRanks: number[];
   selections: Record<string, Abbr>;
   gamesById: Map<string, GameDTO>;
+  merged: Pick[];
+  pending: boolean;
+  error: string | null;
+  offline: boolean;
   onOrder: (order: string[]) => void;
   onBack: () => void;
-  onNext: () => void;
+  onSubmit: () => void;
 }) {
+  const possible = merged.reduce((sum, p) => sum + (6 - p.rank), 0);
   return (
     <div>
       <h2 className="font-display text-2xl font-extrabold tracking-tight">How sure are you?</h2>
       <p className="mb-4 text-sm text-ink-2">
-        Drag to reorder. Your top pick is worth <b>5 points</b>, the bottom one <b>1</b>.
+        Drag to reorder — top pick <b>5 points</b>, bottom one <b>1</b>. Up to <b>{possible}</b> this week.
       </p>
       {frozen.length > 0 && (
         <div className="mb-4">
@@ -543,13 +589,37 @@ function RankStep({
           />
         ))}
       </Reorder.Group>
-      <div className="mt-6 flex gap-2">
-        <button className="btn" onClick={onBack}>
+      <p className="mt-4 text-xs text-ink-3">You can still change a pick until that game kicks off.</p>
+      {(error || offline) && (
+        <div role="alert" className="card-flat mt-4 flex items-start gap-3 border-danger bg-danger-soft px-4 py-3 text-sm">
+          <span className="min-w-0 flex-1 font-semibold">
+            {offline ? "You're offline. Your picks are saved on this phone — lock them in once you're back." : error}
+          </span>
+          {!offline && (
+            <button className="btn btn-sm shrink-0" onClick={onSubmit} disabled={pending}>
+              Try again
+            </button>
+          )}
+        </div>
+      )}
+      <div className="mt-4 flex gap-2">
+        <button className="btn" onClick={onBack} disabled={pending}>
           Back
         </button>
-        <button className="btn btn-primary flex-1" onClick={onNext} disabled={order.length === 0 && frozen.length === 0}>
-          Looks right →
-        </button>
+        <motion.button
+          className="btn btn-turf flex-1 text-lg"
+          onClick={onSubmit}
+          disabled={pending || offline || (order.length === 0 && frozen.length === 0)}
+          whileTap={{ scale: 0.97 }}
+        >
+          {pending ? (
+            "Saving…"
+          ) : (
+            <>
+              Lock it in <Lock size={20} />
+            </>
+          )}
+        </motion.button>
       </div>
     </div>
   );
@@ -622,78 +692,6 @@ function MatchupText({ pick, game, compact = false }: { pick: Pick; game?: GameD
 function contrastColor(home: Abbr, away: Abbr): string {
   const h = TEAMS[home];
   return h.primary.toLowerCase() === TEAMS[away].primary.toLowerCase() ? h.secondary : h.primary;
-}
-
-// ---------- Confirm ----------
-
-function ConfirmStep({
-  name, week, merged, gamesById, frozenRanks, pending, error, offline, onBack, onSubmit,
-}: {
-  name: string;
-  week: number;
-  merged: Pick[];
-  gamesById: Map<string, GameDTO>;
-  frozenRanks: Set<number>;
-  pending: boolean;
-  error: string | null;
-  offline: boolean;
-  onBack: () => void;
-  onSubmit: () => void;
-}) {
-  const possible = merged.reduce((s, p) => s + (6 - p.rank), 0);
-  return (
-    <div>
-      <div className="card p-5">
-        <p className="text-xs font-bold uppercase tracking-wider text-ink-3">Locking in for</p>
-        <h2 className="font-display text-3xl font-extrabold leading-tight tracking-tight">{name}</h2>
-        <p className="text-sm text-ink-2">
-          Week {week} · up to <b>{possible}</b> points
-        </p>
-        <ul className="mt-4 space-y-2">
-          {merged.map((p) => (
-            <li key={p.gameId} className="flex items-center gap-3">
-              <RankBadge rank={p.rank} muted={frozenRanks.has(p.rank)} />
-              <TeamSticker abbr={p.team} size={40} flat />
-              <MatchupText pick={p} game={gamesById.get(p.gameId)} />
-              {frozenRanks.has(p.rank) && <Lock className="ml-auto text-ink-3" />}
-            </li>
-          ))}
-        </ul>
-        <p className="mt-4 text-xs text-ink-3">You can still change a pick until that game kicks off.</p>
-      </div>
-      {(error || offline) && (
-        <div role="alert" className="card-flat mt-4 flex items-start gap-3 border-danger bg-danger-soft px-4 py-3 text-sm">
-          <span className="min-w-0 flex-1 font-semibold">
-            {offline ? "You're offline. Your picks are saved on this phone — lock them in once you're back." : error}
-          </span>
-          {!offline && (
-            <button className="btn btn-sm shrink-0" onClick={onSubmit} disabled={pending}>
-              Try again
-            </button>
-          )}
-        </div>
-      )}
-      <div className="mt-4 flex gap-2">
-        <button className="btn" onClick={onBack} disabled={pending}>
-          Back
-        </button>
-        <motion.button
-          className="btn btn-turf flex-1 text-lg"
-          onClick={onSubmit}
-          disabled={pending || offline}
-          whileTap={{ scale: 0.97 }}
-        >
-          {pending ? (
-            "Saving…"
-          ) : (
-            <>
-              Lock it in <Lock size={20} />
-            </>
-          )}
-        </motion.button>
-      </div>
-    </div>
-  );
 }
 
 function fireConfetti(team?: { primary: string; secondary: string }) {

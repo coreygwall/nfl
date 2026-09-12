@@ -16,8 +16,8 @@ const html = `<!doctype html><html><head><style>
 html,body{margin:0}
 body{width:1200px;height:630px;background:#F6F1E8;background-image:radial-gradient(rgba(20,18,15,.07) 1.5px,transparent 1.5px);background-size:26px 26px;font-family:InterV,system-ui,sans-serif;color:#14120F;position:relative;overflow:hidden}
 .chip{position:absolute;left:72px;top:64px;display:inline-flex;align-items:center;gap:10px;border:3px solid #14120F;border-radius:999px;background:#FFD23F;padding:8px 20px;font-family:Bricolage;font-weight:800;font-size:26px}
-h1{position:absolute;left:72px;top:130px;margin:0;font-family:Bricolage;font-weight:800;font-size:112px;line-height:.92;letter-spacing:-.02em;font-variation-settings:"wdth" 96}
-p{position:absolute;left:72px;top:470px;margin:0;width:640px;font-size:30px;line-height:1.25;color:#5B554B}
+h1{position:absolute;left:72px;top:150px;margin:0;font-family:Bricolage;font-weight:800;font-size:124px;line-height:.92;letter-spacing:-.02em;font-variation-settings:"wdth" 96}
+p{position:absolute;left:72px;top:420px;margin:0;width:640px;font-size:30px;line-height:1.25;color:#5B554B}
 .row{position:absolute;right:56px;top:96px;width:380px;display:flex;flex-wrap:wrap;gap:22px;justify-content:center;align-content:flex-start}
 .s{width:150px;height:150px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 10px 10px rgba(20,18,15,.22))}
 .s img{max-width:150px;max-height:150px}
@@ -25,7 +25,7 @@ p{position:absolute;left:72px;top:470px;margin:0;width:640px;font-size:30px;line
 </style></head><body>
 <div class="frame"></div>
 <div class="chip">🏈 High Five · NFL pool</div>
-<h1>Pick five.<br>Rank them.<br>Talk trash.</h1>
+<h1>Pick five.<br>Rank them.</h1>
 <p>Pick five winners a week and rank them 1–5. Nail your #1 for 5 points. No signup — just your name.</p>
 <div class="row">${stickers.map(([a, r]) => `<div class="s" style="transform:rotate(${r}deg)"><img src="${logo(a, existsSync(path.join(ROOT, "public/logos", a + ".svg")) ? "svg" : "png")}"></div>`).join("")}</div>
 </body></html>`;

@@ -13,8 +13,9 @@
     "test:unit": "vitest run --project unit",
     "test:worker": "vitest run --project worker",
     "test:e2e": "playwright test",
-    "schedule:build": "node scripts/build-schedule.mjs",
-    "logos:extract": "node scripts/extract-logos.mjs",
+    "schedule:build": "node scripts/build-schedule.ts",
+    "logos:extract": "node scripts/extract-logos.ts",
+    "og:build": "node scripts/build-og.ts",
     "db:migrate:local": "wrangler d1 migrations apply DB --local"
   },
   "dependencies": {
