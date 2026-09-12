@@ -17,6 +17,7 @@ results entered by the commissioner in about a minute a week.
 | Standings | Points, then correct picks, then 5-point hits, then name. Ties share a place. |
 | Weeks | Regular season, weeks 1–18. The Picks tab opens to the earliest week that still has an unstarted game. |
 | Identity | Type your name on first visit; the device is handed a token and a short **device code**. The token rides in `localStorage` *and* in a long-lived `HttpOnly` cookie, so a browser that clears one still knows you — you stay signed in indefinitely. The code claims the same name on a second device and stays hidden behind **Pick on another device** until you need it. A claimed name cannot be taken without the code; a name nobody holds is claimed by the first device that asks, which is how everyone who joined before codes existed keeps their place. |
+| Face ID / Touch ID | Optional, and offered rather than required: tap your name → **Turn on Face ID**. After that a new phone signs in from the **Sign in with Face ID** button with nothing typed — the passkey is discoverable, so the credential names the player. A passkey belongs to the domain it was created on (`worker/routes/passkeys.ts` takes the relying party from the request), so one made on `workers.dev` will not be offered on `playtally.app`; the device code covers that, and every browser without biometrics. |
 | Picking for others | The commissioner can add other players to their own phone (account sheet → **Add someone I pick for**, admin PIN once). Switching between them is one tap, no code, and each set of picks still obeys every kickoff lock. Those devices are marked admin-issued, so the CSV export's `entered_by` column reads `commissioner` rather than `player`. |
 
 ## Deploying (one-time, ~5 minutes)
@@ -81,7 +82,7 @@ but each person has to claim their name again. Two ways through it:
 - **Or let them do it:** open the new address, tap **I already entered**, pick their name, and type the
   code they can still read on the old address (or that you read to them from `/admin`).
 
-Do this *before* adding passkeys: a passkey is bound to the domain it was created on.
+Passkeys follow the same rule — one created on `workers.dev` will not work on `playtally.app`, and the person just adds another (or uses their code).
 
 ## Weekly ops
 

@@ -394,3 +394,104 @@ export async function setMeta(db: D1Database, key: string, value: string): Promi
     .bind(key, value)
     .run();
 }
+
+// ---- passkeys ----
+
+export interface PasskeyRecord {
+  id: string;
+  playerId: string;
+  publicKey: string;
+  counter: number;
+  transports: string[] | null;
+  rpId: string;
+  createdAt: string;
+  lastUsedAt: string | null;
+}
+
+interface PasskeyRow {
+  id: string;
+  player_id: string;
+  public_key: string;
+  counter: number;
+  transports: string | null;
+  rp_id: string;
+  created_at: string;
+  last_used_at: string | null;
+}
+
+const toPasskey = (r: PasskeyRow): PasskeyRecord => ({
+  id: r.id,
+  playerId: r.player_id,
+  publicKey: r.public_key,
+  counter: r.counter,
+  transports: r.transports ? (JSON.parse(r.transports) as string[]) : null,
+  rpId: r.rp_id,
+  createdAt: r.created_at,
+  lastUsedAt: r.last_used_at,
+});
+
+export async function listPasskeys(db: D1Database, playerId: string, rpId: string): Promise<PasskeyRecord[]> {
+  const { results } = await db
+    .prepare("SELECT * FROM passkeys WHERE player_id = ? AND rp_id = ? ORDER BY created_at")
+    .bind(playerId, rpId)
+    .all<PasskeyRow>();
+  return results.map(toPasskey);
+}
+
+export async function countPasskeys(db: D1Database, playerId: string, rpId: string): Promise<number> {
+  const row = await db
+    .prepare("SELECT count(*) AS n FROM passkeys WHERE player_id = ? AND rp_id = ?")
+    .bind(playerId, rpId)
+    .first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
+export async function getPasskey(db: D1Database, id: string, rpId: string): Promise<PasskeyRecord | null> {
+  const row = await db.prepare("SELECT * FROM passkeys WHERE id = ? AND rp_id = ?").bind(id, rpId).first<PasskeyRow>();
+  return row ? toPasskey(row) : null;
+}
+
+export async function addPasskey(
+  db: D1Database,
+  p: { id: string; playerId: string; publicKey: string; counter: number; transports: string[] | null; rpId: string; now: string },
+): Promise<void> {
+  await db
+    .prepare(
+      "INSERT INTO passkeys (id, player_id, public_key, counter, transports, rp_id, created_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    )
+    .bind(p.id, p.playerId, p.publicKey, p.counter, p.transports ? JSON.stringify(p.transports) : null, p.rpId, p.now)
+    .run();
+}
+
+export async function notePasskeyUse(db: D1Database, id: string, counter: number, now: string): Promise<void> {
+  await db.prepare("UPDATE passkeys SET counter = ?, last_used_at = ? WHERE id = ?").bind(counter, now, id).run();
+}
+
+export async function deletePasskeys(db: D1Database, playerId: string): Promise<void> {
+  await db.prepare("DELETE FROM passkeys WHERE player_id = ?").bind(playerId).run();
+}
+
+/** Challenges live for a couple of minutes and are burned on use. */
+export async function saveChallenge(
+  db: D1Database,
+  c: { id: string; playerId: string | null; challenge: string; expiresAt: string },
+): Promise<void> {
+  await db
+    .prepare("INSERT OR REPLACE INTO passkey_challenges (id, player_id, challenge, expires_at) VALUES (?, ?, ?, ?)")
+    .bind(c.id, c.playerId, c.challenge, c.expiresAt)
+    .run();
+}
+
+export async function takeChallenge(
+  db: D1Database,
+  id: string,
+  now: string,
+): Promise<{ challenge: string; playerId: string | null } | null> {
+  const row = await db
+    .prepare("SELECT player_id, challenge, expires_at FROM passkey_challenges WHERE id = ?")
+    .bind(id)
+    .first<{ player_id: string | null; challenge: string; expires_at: string }>();
+  await db.prepare("DELETE FROM passkey_challenges WHERE id = ? OR expires_at < ?").bind(id, now).run();
+  if (!row || row.expires_at < now) return null;
+  return { challenge: row.challenge, playerId: row.player_id };
+}

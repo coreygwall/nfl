@@ -28,6 +28,8 @@ export interface BootstrapResponse {
   me: Player | null;
   /** Your own claim code, for adding another device. Only sent to an authenticated device. */
   myCode?: string;
+  /** How many passkeys this identity has for this host — 0 means we can offer to add one. */
+  myPasskeys?: number;
 }
 
 export interface CreatePlayerRequest {
@@ -137,4 +139,15 @@ export interface AdminPullResultsResponse {
   pending: number;
   conflicts: { gameId: string; recorded: string; feed: string; awayScore: number; homeScore: number }[];
   syncedAt: string;
+}
+
+export interface PasskeyOptionsResponse {
+  challengeId: string;
+  /** Passed straight to the browser's WebAuthn call. */
+  options: Record<string, unknown>;
+}
+
+export interface PasskeyAuthResponse {
+  player: Player;
+  token: string;
 }

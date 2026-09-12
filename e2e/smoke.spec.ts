@@ -288,3 +288,51 @@ test("both links unfurl: the app at the root, the pool at its own path", async (
   await expect(page).toHaveURL(/\/welcome$/);
   await expect(page.getByText("Step 1")).toBeVisible();
 });
+
+test("Face ID: turn it on, lose the device's memory, and sign back in with no typing", async ({ page, context }) => {
+  // A virtual authenticator stands in for the phone's biometrics.
+  const cdp = await context.newCDPSession(page);
+  await cdp.send("WebAuthn.enable");
+  await cdp.send("WebAuthn.addVirtualAuthenticator", {
+    options: {
+      protocol: "ctap2",
+      transport: "internal",
+      hasResidentKey: true,
+      hasUserVerification: true,
+      isUserVerified: true,
+      automaticPresenceSimulation: true,
+    },
+  });
+
+  const name = `Face ${Date.now().toString(36)}`;
+  await page.goto(`/p/high-five/welcome?now=${BEFORE}`);
+  await page.getByPlaceholder("Your name").fill(name);
+  await page.getByRole("button", { name: "Let's go" }).click();
+  await expect(page.getByRole("button", { name: "Switch player" })).toContainText(name);
+
+  // Opt in — it is a button in the account sheet, never a wall in front of the app.
+  await page.getByRole("button", { name: "Switch player" }).click();
+  const sheet = page.getByRole("dialog", { name: "Your account" });
+  await sheet.getByRole("button", { name: "Turn on Face ID" }).click();
+  await expect(sheet.getByText("Face ID is on for this account.")).toBeVisible();
+  await sheet.getByRole("button", { name: "Close" }).click();
+
+  // Now forget everything this device knows: no token, no cookie, as if it were a new phone.
+  await context.clearCookies();
+  await page.evaluate(() => {
+    localStorage.clear();
+    sessionStorage.clear();
+  });
+  await page.goto(`/p/high-five/welcome?now=${BEFORE}`);
+  await expect(page.getByRole("heading", { name: "What should we call you?" })).toBeVisible();
+
+  await page.getByRole("button", { name: "Sign in with Face ID" }).click();
+  await expect(page).toHaveURL(/\/week\/1$/);
+  await expect(page.getByRole("button", { name: "Switch player" })).toContainText(name);
+
+  // And it is a real session: picks save.
+  await page.getByRole("button", { name: "Pick Seattle Seahawks" }).click();
+  await page.getByRole("button", { name: "Rank 1" }).click();
+  await page.getByRole("button", { name: "Lock it in" }).click();
+  await expect(page.getByText("Locked in")).toBeVisible();
+});

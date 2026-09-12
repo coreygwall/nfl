@@ -9,6 +9,7 @@ import { withAbsoluteUrls, withUnfurlTags } from "./unfurl.ts";
 import { ensureReady, SCHEDULE_VERSION, syncScheduleFromSource } from "./ready.ts";
 import { publicRoutes } from "./routes/public.ts";
 import { adminRoutes } from "./routes/admin.ts";
+import { passkeyRoutes } from "./routes/passkeys.ts";
 
 /** Injected by Vite at build time (git sha); "dev" when running under the test runner. */
 export const BUILD_ID: string = typeof __BUILD_ID__ === "string" ? __BUILD_ID__ : "dev";
@@ -40,6 +41,7 @@ app.use("/api/*", async (c, next) => {
 
 app.get("/api/health", (c) => c.json({ ok: true, now: c.get("now"), schedule: SCHEDULE_VERSION, build: BUILD_ID }));
 app.route("/api", publicRoutes);
+app.route("/api/passkeys", passkeyRoutes);
 app.route("/api/admin", adminRoutes);
 
 /** Page routes that used to live at the root, before the pool moved under /p/<slug>. */

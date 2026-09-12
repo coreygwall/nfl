@@ -21,6 +21,7 @@ import type {
 import {
   addDevice,
   clearClaimFailures,
+  countPasskeys,
   countDevices,
   countPlayers,
   createPlayer,
@@ -71,6 +72,7 @@ publicRoutes.get("/bootstrap", async (c) => {
   ]);
   if (me) c.executionCtx.waitUntil(touchPlayer(c.env.DB, me.id, now));
   const mine = me ? players.find((p) => p.id === me.id) : null;
+  const passkeys = me ? await countPasskeys(c.env.DB, me.id, new URL(c.req.url).hostname) : 0;
   const body: BootstrapResponse = {
     now,
     build: BUILD_ID,
@@ -82,6 +84,7 @@ publicRoutes.get("/bootstrap", async (c) => {
     players: players.map((p) => ({ ...publicPlayer(p), claimed: (devices.get(p.id) ?? 0) > 0 })),
     me,
     ...(mine?.claimCode ? { myCode: mine.claimCode } : {}),
+    myPasskeys: passkeys,
   };
   return c.json(body);
 });

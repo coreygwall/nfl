@@ -11,6 +11,9 @@ import { api } from "../api/client.ts";
 import type { Identity } from "../lib/identity.ts";
 import type { AdminDeviceResponse, RosterPlayer } from "../../shared/api.ts";
 import { formatCode } from "../../shared/codes.ts";
+import { addPasskey, passkeysSupported, wasCancelled } from "../lib/passkey.ts";
+import { useQueryClient } from "@tanstack/react-query";
+import { Check } from "./Icons.tsx";
 
 export function AppShell() {
   const { player, people, setPlayer, switchTo, forget } = usePlayer();
@@ -186,6 +189,7 @@ export function AppShell() {
               people={people}
               roster={boot.data?.players ?? []}
               myCode={boot.data?.myCode ?? null}
+              hasPasskey={(boot.data?.myPasskeys ?? 0) > 0}
               onSwitch={(id) => {
                 switchTo(id);
                 setSwitching(false);
@@ -222,6 +226,7 @@ function AccountSheet({
   people,
   roster,
   myCode,
+  hasPasskey,
   onSwitch,
   onAdded,
   onClaimElsewhere,
@@ -231,6 +236,7 @@ function AccountSheet({
   people: Identity[];
   roster: RosterPlayer[];
   myCode: string | null;
+  hasPasskey: boolean;
   onSwitch: (id: string) => void;
   onAdded: (p: Identity) => void;
   onClaimElsewhere: (id: string) => void;
@@ -261,6 +267,8 @@ function AccountSheet({
           </div>
         </>
       )}
+
+      <PasskeyRow hasPasskey={hasPasskey} />
 
       {adding ? (
         <AddPerson
@@ -388,6 +396,43 @@ function AddPerson({
       <button className="mt-4 text-sm font-bold text-ink-2 underline" onClick={onCancel}>
         Never mind
       </button>
+    </div>
+  );
+}
+
+/** Face ID / Touch ID: an offer, never a requirement. */
+function PasskeyRow({ hasPasskey }: { hasPasskey: boolean }) {
+  const [busy, setBusy] = useState(false);
+  const [done, setDone] = useState(hasPasskey);
+  const toast = useToast();
+  const qc = useQueryClient();
+  if (!passkeysSupported()) return null;
+  if (done) {
+    return (
+      <p className="mt-4 flex items-center gap-2 border-t-2 border-dashed border-line pt-4 text-sm text-ink-2">
+        <Check size={16} className="text-turf" /> Face ID is on for this account.
+      </p>
+    );
+  }
+  const turnOn = async () => {
+    setBusy(true);
+    try {
+      await addPasskey();
+      setDone(true);
+      toast("Face ID is on. Next device just needs your face.", "success");
+      void qc.invalidateQueries({ queryKey: ["bootstrap"] });
+    } catch (err) {
+      if (!wasCancelled(err)) toast(err instanceof Error ? err.message : "Couldn't set that up.", "error");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="mt-4 border-t-2 border-dashed border-line pt-4">
+      <button className="btn btn-sm" disabled={busy} onClick={() => void turnOn()}>
+        {busy ? "Waiting…" : "Turn on Face ID"}
+      </button>
+      <p className="mt-1.5 text-xs text-ink-2">Optional. Signs you in on a new phone without a code.</p>
     </div>
   );
 }

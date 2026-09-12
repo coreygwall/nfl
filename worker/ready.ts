@@ -2,6 +2,7 @@ import schema from "../migrations/0001_init.sql?raw";
 import devicesSchema from "../migrations/0002_devices.sql?raw";
 import householdSchema from "../migrations/0003_household.sql?raw";
 import readySchema from "../migrations/0004_ready.sql?raw";
+import passkeySchema from "../migrations/0005_passkeys.sql?raw";
 import schedule from "../shared/schedule-2026.json";
 import { finalsFromCsv, gamesFromCsv, NFLVERSE_GAMES_CSV } from "../shared/nflverse.ts";
 import { applyResults, getMeta, listGames, setMeta, updateKickoffs, upsertGames } from "./db.ts";
@@ -19,7 +20,7 @@ const split = (sql: string) =>
 
 const statements = split(schema);
 // Everything after the initial schema: additive, and safe to re-run.
-const alterStatements = [...split(devicesSchema), ...split(householdSchema), ...split(readySchema)];
+const alterStatements = [...split(devicesSchema), ...split(householdSchema), ...split(readySchema), ...split(passkeySchema)];
 
 async function applySchema(db: D1Database): Promise<void> {
   await db.batch(statements.map((s) => db.prepare(s)));

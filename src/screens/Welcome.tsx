@@ -13,6 +13,7 @@ import type { Abbr } from "../../shared/teams.ts";
 import { ErrorState, Spinner } from "../components/Common.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
 import { useToast } from "../components/Toast.tsx";
+import { passkeysSupported, signInWithPasskey, wasCancelled } from "../lib/passkey.ts";
 
 /** Every team, in a fixed shuffle so the strip reads as a jumble rather than a division list. */
 const MARQUEE_TEAMS: Abbr[] = [
@@ -152,6 +153,7 @@ export function Welcome() {
                   </button>
                 </div>
               )}
+              <PasskeySignIn onSignedIn={(p) => go(p, true)} />
               <AnimatePresence mode="wait" initial={false}>
                 {mode === "code" && target && linkCode && !linkTried ? (
                   <Panel key="link">
@@ -339,6 +341,33 @@ export function Welcome() {
           )}
         </div>
       </div>
+    </div>
+  );
+}
+
+/** Offered above the name form: a passkey knows who you are, so there is nothing to type. */
+function PasskeySignIn({ onSignedIn }: { onSignedIn: (p: Identity) => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  if (!passkeysSupported()) return null;
+  const go = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      onSignedIn(await signInWithPasskey());
+    } catch (err) {
+      // Cancelling the sheet is not a failure, and neither is having no passkey yet.
+      if (!wasCancelled(err)) setError("No passkey for this device yet — use your name below.");
+    } finally {
+      setBusy(false);
+    }
+  };
+  return (
+    <div className="mb-4 border-b-2 border-dashed border-line pb-4">
+      <button className="btn btn-sm w-full" disabled={busy} onClick={() => void go()}>
+        {busy ? "Waiting…" : "Sign in with Face ID"}
+      </button>
+      {error && <p className="mt-2 text-xs text-ink-2">{error}</p>}
     </div>
   );
 }
