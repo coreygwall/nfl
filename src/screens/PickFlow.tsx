@@ -15,6 +15,7 @@ import { MAX_PICKS } from "../../shared/picks.ts";
 import { isLocked, WEEKS } from "../../shared/week.ts";
 import { ErrorState, RankBadge, Spinner } from "../components/Common.tsx";
 import { useHeaderWeek, useHideNav } from "../components/Chrome.tsx";
+import { poolUrl } from "../lib/basename.ts";
 import { ChevronDown, ChevronUp, Grip, Lock, Share } from "../components/Icons.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
 import { useToast } from "../components/Toast.tsx";
@@ -139,7 +140,7 @@ function PickFlowInner({ week }: { week: number }) {
   };
 
   const share = async () => {
-    const url = window.location.origin;
+    const url = poolUrl();
     const title = boot.data?.poolName ?? "High Five";
     try {
       if (navigator.share) {

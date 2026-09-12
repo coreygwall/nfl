@@ -6,6 +6,7 @@ import { TEAMS, type Abbr } from "../../shared/teams.ts";
 import type { AdminGameDTO, AdminPullResultsResponse } from "../../shared/api.ts";
 import { formatKickoff, formatShortDay } from "../lib/time.ts";
 import { formatCode } from "../../shared/codes.ts";
+import { poolUrl } from "../lib/basename.ts";
 import { ErrorState, Segmented, Spinner } from "../components/Common.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
 import { Check } from "../components/Icons.tsx";
@@ -264,7 +265,7 @@ function Players({ pin }: { pin: string }) {
   if (data.error) return <ErrorState message={data.error.message} onRetry={() => data.refetch()} />;
   /** Signs someone in on the device they open it with — for a new domain, or a lost code. */
   const copySignIn = async (id: string, code: string, name: string) => {
-    const link = `${window.location.origin}/welcome?claim=${id}&code=${code}`;
+    const link = `${poolUrl("/welcome")}?claim=${id}&code=${code}`;
     try {
       await navigator.clipboard.writeText(link);
       toast(`Copied ${name}'s sign-in link. Send it to them and nobody else.`, "success");

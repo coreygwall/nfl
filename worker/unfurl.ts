@@ -4,8 +4,8 @@
  * og:/twitter: URLs are made absolute against the origin of the request that asked for them,
  * and nothing in the bundle ever names a host.
  */
-export function withUnfurlTags(res: Response, origin: string, poolName: string): Response {
-  const title = `${poolName} — NFL pool`;
+export function withUnfurlTags(res: Response, origin: string, poolName: string, appName = "Tally"): Response {
+  const title = `${poolName} — a ${appName} pool`;
   const absolute = (attr: string) => ({
     element(el: Element) {
       const v = el.getAttribute(attr);
@@ -23,9 +23,24 @@ export function withUnfurlTags(res: Response, origin: string, poolName: string):
         el.setInnerContent(poolName);
       },
     })
-    .on('meta[property="og:site_name"]', setContent(poolName))
+    .on('meta[property="og:site_name"]', setContent(appName))
     .on('meta[property="og:title"]', setContent(title))
     .on('meta[name="twitter:title"]', setContent(title))
+    .on('meta[property="og:url"]', absolute("content"))
+    .on('meta[property="og:image"]', absolute("content"))
+    .on('meta[name="twitter:image"]', absolute("content"))
+    .transform(res);
+}
+
+/** Same absolute-URL fix for a page that has its own copy, like the landing page. */
+export function withAbsoluteUrls(res: Response, origin: string): Response {
+  const absolute = (attr: string) => ({
+    element(el: Element) {
+      const v = el.getAttribute(attr);
+      if (v && v.startsWith("/")) el.setAttribute(attr, origin + v);
+    },
+  });
+  return new HTMLRewriter()
     .on('meta[property="og:url"]', absolute("content"))
     .on('meta[property="og:image"]', absolute("content"))
     .on('meta[name="twitter:image"]', absolute("content"))

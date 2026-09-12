@@ -1,0 +1,219 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <meta name="theme-color" content="#F6F1E8" />
+    <meta name="description" content="Tally is where you and your friends play simple, free pools. Pick a game, share a link, and everyone's in — no signup, no app to install." />
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Tally" />
+    <meta property="og:title" content="Tally — pools to play with your friends" />
+    <meta property="og:description" content="Simple, free, fun games to play with your friends. Pick a game, share a link, and everyone's in." />
+    <meta property="og:url" content="/" />
+    <meta property="og:image" content="/og-tally.jpg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Tally — pools to play with your friends" />
+    <meta name="twitter:description" content="Simple, free, fun games to play with your friends." />
+    <meta name="twitter:image" content="/og-tally.jpg" />
+    <link rel="icon" href="/icon.svg" type="image/svg+xml" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <title>Tally — pools to play with your friends</title>
+    <style>
+      @font-face {
+        font-family: "Bricolage";
+        src: url("/fonts/bricolage-grotesque-latin-wght-normal.woff2") format("woff2");
+        font-weight: 200 800;
+        font-display: swap;
+      }
+      :root {
+        --paper: #f6f1e8;
+        --paper-2: #efe8db;
+        --ink: #14120f;
+        --ink-2: #5b554b;
+        --ink-3: #8b8578;
+        --flag: #ffd23f;
+        --turf: #0b7a3b;
+        --line: #d9d1c2;
+        --radius: 20px;
+      }
+      * { box-sizing: border-box; }
+      html { -webkit-text-size-adjust: 100%; }
+      body {
+        margin: 0;
+        background: var(--paper);
+        background-image: radial-gradient(rgb(20 18 15 / 0.06) 1px, transparent 1px);
+        background-size: 18px 18px;
+        color: var(--ink);
+        font: 16px/1.5 ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      }
+      .wrap { max-width: 1060px; margin: 0 auto; padding: 0 20px; }
+      h1, h2, h3, .display { font-family: "Bricolage", ui-sans-serif, system-ui, sans-serif; font-weight: 800; letter-spacing: -0.02em; }
+      a { color: inherit; }
+
+      header { border-bottom: 2px solid var(--ink); background: rgb(246 241 232 / 0.9); }
+      header .wrap { display: flex; align-items: center; gap: 10px; padding-top: 14px; padding-bottom: 14px; }
+      header img { width: 34px; height: 34px; }
+      header .name { font-family: "Bricolage", sans-serif; font-weight: 800; font-size: 1.5rem; }
+      header .soon { margin-left: auto; font-size: 13px; font-weight: 700; color: var(--ink-2); }
+
+      .hero { padding: 56px 0 40px; }
+      .chip {
+        display: inline-flex; align-items: center; gap: 8px; border: 2px solid var(--ink);
+        border-radius: 999px; background: var(--flag); padding: 5px 14px;
+        font-family: "Bricolage", sans-serif; font-weight: 800; font-size: 13px;
+      }
+      .hero h1 { font-size: clamp(2.5rem, 6.4vw, 4rem); line-height: 0.98; margin: 18px 0 0; max-width: 19ch; }
+      .hero p.lede { font-size: clamp(1.05rem, 2.4vw, 1.3rem); color: var(--ink-2); max-width: 46ch; margin: 18px 0 0; }
+      .facts { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 0; }
+      .fact {
+        border: 2px solid var(--ink); border-radius: 999px; background: #fff;
+        padding: 6px 14px; font-size: 14px; font-weight: 700;
+      }
+
+      section { padding: 40px 0; border-top: 2px dashed var(--line); }
+      section h2 { font-size: clamp(1.5rem, 4vw, 2rem); margin: 0 0 6px; }
+      section p.sub { color: var(--ink-2); margin: 0 0 22px; max-width: 56ch; }
+
+      .steps { display: grid; gap: 14px; grid-template-columns: 1fr; }
+      .card {
+        border: 2px solid var(--ink); border-radius: var(--radius); background: #fff; padding: 18px 20px;
+      }
+      .card.raised { box-shadow: 5px 5px 0 0 var(--ink); }
+      .step-n { font-family: "Bricolage", sans-serif; font-weight: 800; font-size: 12px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--ink-3); }
+      .card h3 { font-size: 1.15rem; margin: 4px 0 4px; }
+      .card p { margin: 0; color: var(--ink-2); font-size: 15px; }
+
+      .pools { display: grid; gap: 14px; grid-template-columns: 1fr; }
+      .pool-head { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+      .tag {
+        border: 2px solid var(--ink); border-radius: 999px; padding: 2px 10px;
+        font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em;
+      }
+      .tag.live { background: var(--turf); color: #fff; border-color: var(--turf); }
+      .tag.soon { background: var(--paper-2); color: var(--ink-2); }
+      .pool.soon { opacity: 0.72; }
+      .sports { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 12px; }
+      .sport { font-size: 13px; color: var(--ink-2); border: 1px dashed var(--line); border-radius: 999px; padding: 3px 10px; }
+
+      footer { border-top: 2px solid var(--ink); padding: 28px 0 48px; margin-top: 24px; }
+      footer .wrap { display: flex; flex-wrap: wrap; gap: 10px 24px; align-items: baseline; }
+      footer .note { color: var(--ink-2); font-size: 14px; }
+
+      @media (min-width: 700px) {
+        .steps { grid-template-columns: repeat(3, 1fr); }
+        .pools { grid-template-columns: repeat(2, 1fr); }
+        .hero { padding-top: 88px; }
+      }
+    </style>
+  </head>
+  <body>
+    <header>
+      <div class="wrap">
+        <img src="/icon.svg" alt="" />
+        <span class="name">Tally</span>
+        <span class="soon">iOS app coming soon</span>
+      </div>
+    </header>
+
+    <main>
+      <div class="wrap hero">
+        <span class="chip">Free to play</span>
+        <h1>Simple, fun games to play with your friends.</h1>
+        <p class="lede">
+          Tally hosts the pools you already argue about — and a few you haven't tried yet. Pick a game, share one
+          link, and everyone's in. No accounts, no downloads, no spreadsheet.
+        </p>
+        <div class="facts">
+          <span class="fact">Set up in a minute</span>
+          <span class="fact">Just a name to join</span>
+          <span class="fact">Works on any phone</span>
+        </div>
+      </div>
+
+      <section class="wrap">
+        <h2>How it works</h2>
+        <p class="sub">You run it, your friends play it. That's the whole thing.</p>
+        <div class="steps">
+          <div class="card">
+            <span class="step-n">Step 1</span>
+            <h3>Pick a pool</h3>
+            <p>Choose the game you want to run and the season it follows. Everything else is set up for you.</p>
+          </div>
+          <div class="card">
+            <span class="step-n">Step 2</span>
+            <h3>Share the link</h3>
+            <p>One link to the group chat. Your friends type a name and they're playing — nothing to install.</p>
+          </div>
+          <div class="card">
+            <span class="step-n">Step 3</span>
+            <h3>Watch the board</h3>
+            <p>Scores land as games finish. Standings, bragging rights, and a running record of who called it.</p>
+          </div>
+        </div>
+      </section>
+
+      <section class="wrap">
+        <h2>Pools</h2>
+        <p class="sub">One is live today. More are on the way.</p>
+        <div class="pools">
+          <div class="card raised pool">
+            <div class="pool-head">
+              <h3>High Five</h3>
+              <span class="tag live">Live now</span>
+            </div>
+            <p>
+              Every week, pick the winners of five games and rank them 1 to 5. Your surest call is worth 5 points,
+              your shakiest 1. No weekly deadline — each game locks at kickoff, so late joiners still play.
+            </p>
+            <div class="sports"><span class="sport">NFL</span></div>
+          </div>
+
+          <div class="card pool soon">
+            <div class="pool-head">
+              <h3>Survivor</h3>
+              <span class="tag soon">Coming soon</span>
+            </div>
+            <p>One pick a week, one life, no repeats. Last one standing takes it.</p>
+            <div class="sports"><span class="sport">NFL</span><span class="sport">Soccer</span></div>
+          </div>
+
+          <div class="card pool soon">
+            <div class="pool-head">
+              <h3>Brackets</h3>
+              <span class="tag soon">Coming soon</span>
+            </div>
+            <p>Fill it in, watch it burn by the second round, argue about it until next spring.</p>
+            <div class="sports"><span class="sport">College basketball</span><span class="sport">World Cup</span></div>
+          </div>
+
+          <div class="card pool soon">
+            <div class="pool-head">
+              <h3>Majors</h3>
+              <span class="tag soon">Coming soon</span>
+            </div>
+            <p>Draft a handful of players before the first tee and live with it for four days.</p>
+            <div class="sports"><span class="sport">Golf</span></div>
+          </div>
+        </div>
+      </section>
+
+      <section class="wrap">
+        <h2>Already in a pool?</h2>
+        <p class="sub">
+          Open the link your commissioner sent you. It remembers you after the first visit, on that phone or laptop,
+          so you never have to sign in again.
+        </p>
+      </section>
+    </main>
+
+    <footer>
+      <div class="wrap">
+        <span class="display">Tally</span>
+        <span class="note">Pools to play with your friends.</span>
+        <span class="note">iOS app coming soon.</span>
+      </div>
+    </footer>
+  </body>
+</html>

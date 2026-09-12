@@ -10,7 +10,30 @@ const font = (p: string) => `file://${path.join(ROOT, "node_modules", p)}`;
 const logo = (abbr: string, ext = "svg") => `file://${path.join(ROOT, "public/logos", `${abbr}.${ext}`)}`;
 const stickers: [string, number][] = [["SEA", -8], ["KC", 6], ["DET", -4], ["PHI", 7], ["BUF", -6], ["SF", 5]];
 
-const html = `<!doctype html><html><head><style>
+interface Card {
+  file: string;
+  chip: string;
+  head: string;
+  body: string;
+}
+
+/** The pool's own card, and the one the Tally link unfurls with. */
+const cards: Card[] = [
+  {
+    file: "og.jpg",
+    chip: "🏈 High Five · a Tally pool",
+    head: "Pick five.<br>Rank them.",
+    body: "Pick five winners a week and rank them 1–5. Nail your #1 for 5 points. No signup — just your name.",
+  },
+  {
+    file: "og-tally.jpg",
+    chip: "Tally",
+    head: "Games to play<br>with your friends.",
+    body: "Pick a pool, share one link, and everyone's in. Simple, free, and nothing to install.",
+  },
+];
+
+const template = (c: Card) => `<!doctype html><html><head><style>
 @font-face{font-family:"Bricolage";src:url("${font("@fontsource-variable/bricolage-grotesque/files/bricolage-grotesque-latin-wght-normal.woff2")}") format("woff2");font-weight:200 800}
 @font-face{font-family:"InterV";src:url("${font("@fontsource-variable/inter/files/inter-latin-wght-normal.woff2")}") format("woff2");font-weight:100 900}
 html,body{margin:0}
@@ -24,22 +47,25 @@ p{position:absolute;left:72px;top:420px;margin:0;width:640px;font-size:30px;line
 .frame{position:absolute;inset:22px;border:4px solid #14120F;border-radius:34px;pointer-events:none}
 </style></head><body>
 <div class="frame"></div>
-<div class="chip">🏈 High Five · NFL pool</div>
-<h1>Pick five.<br>Rank them.</h1>
-<p>Pick five winners a week and rank them 1–5. Nail your #1 for 5 points. No signup — just your name.</p>
+<div class="chip">${c.chip}</div>
+<h1>${c.head}</h1>
+<p>${c.body}</p>
 <div class="row">${stickers.map(([a, r]) => `<div class="s" style="transform:rotate(${r}deg)"><img src="${logo(a, existsSync(path.join(ROOT, "public/logos", a + ".svg")) ? "svg" : "png")}"></div>`).join("")}</div>
 </body></html>`;
 
 const executablePath = process.env.PW_CHROMIUM_PATH ?? ["/opt/pw-browsers/chromium"].find((p) => existsSync(p));
 const browser = await chromium.launch({ ...(executablePath ? { executablePath } : {}), args: ["--allow-file-access-from-files"] });
 const page = await browser.newPage({ viewport: { width: 1200, height: 630 }, deviceScaleFactor: 1 });
-// A page must itself be file:// for file:// fonts and images to load.
-const tmp = path.join(mkdtempSync(path.join(tmpdir(), "og-")), "og.html");
-writeFileSync(tmp, html);
-await page.goto(`file://${tmp}`, { waitUntil: "load" });
-await page.evaluate(() => document.fonts.ready);
-await page.waitForTimeout(300);
-const out = path.join(ROOT, "public/og.jpg");
-writeFileSync(out, await page.screenshot({ type: "jpeg", quality: 86 }));
+const dir = mkdtempSync(path.join(tmpdir(), "og-"));
+for (const card of cards) {
+  // A page must itself be file:// for file:// fonts and images to load.
+  const tmp = path.join(dir, `${card.file}.html`);
+  writeFileSync(tmp, template(card));
+  await page.goto(`file://${tmp}`, { waitUntil: "load" });
+  await page.evaluate(() => document.fonts.ready);
+  await page.waitForTimeout(300);
+  const out = path.join(ROOT, "public", card.file);
+  writeFileSync(out, await page.screenshot({ type: "jpeg", quality: 86 }));
+  console.log(`Wrote ${out} (${(readFileSync(out).length / 1024).toFixed(0)} kB)`);
+}
 await browser.close();
-console.log(`Wrote ${out} (${(readFileSync(out).length / 1024).toFixed(0)} kB)`);

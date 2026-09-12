@@ -251,17 +251,34 @@ test("a player who shows up Sunday night can still pick what's left", async ({ p
   await expect(page.getByText("Locked in")).toBeVisible();
 });
 
-test("the shared link unfurls with absolute image and url, and the rules page reads", async ({ page, baseURL }) => {
-  const res = await page.request.get("/");
+test("both links unfurl: the app at the root, the pool at its own path", async ({ page, baseURL }) => {
+  // The Tally landing page.
+  const landing = await page.request.get("/");
+  expect(landing.status()).toBe(200);
+  const landingHtml = await landing.text();
+  expect(landingHtml).toContain("<title>Tally — pools to play with your friends</title>");
+  expect(landingHtml).toContain(`property="og:image" content="${baseURL}/og-tally.jpg"`);
+  expect(landingHtml).toContain(`property="og:url" content="${baseURL}/"`);
+
+  // The pool itself.
+  const res = await page.request.get("/p/high-five");
   expect(res.status()).toBe(200);
   const html = await res.text();
   expect(html).toContain(`property="og:image" content="${baseURL}/og.jpg"`);
-  expect(html).toContain(`property="og:url" content="${baseURL}/"`);
+  expect(html).toContain(`property="og:url" content="${baseURL}/p/high-five"`);
   expect(html).toContain(`name="twitter:image" content="${baseURL}/og.jpg"`);
+  expect(html).toContain('property="og:site_name" content="Tally"');
   expect(html).toContain("<title>High Five</title>");
-  const img = await page.request.get("/og.jpg");
-  expect(img.status()).toBe(200);
-  expect(img.headers()["content-type"]).toContain("image/jpeg");
+  for (const src of ["/og.jpg", "/og-tally.jpg"]) {
+    const img = await page.request.get(src);
+    expect(img.status(), src).toBe(200);
+    expect(img.headers()["content-type"]).toContain("image/jpeg");
+  }
+
+  // An old root link still lands in the pool.
+  const moved = await page.request.get("/rules", { maxRedirects: 0 });
+  expect(moved.status()).toBe(301);
+  expect(moved.headers()["location"]).toContain("/p/high-five/rules");
 
 
   await page.goto("/rules");

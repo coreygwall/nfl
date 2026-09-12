@@ -38,10 +38,11 @@ describe("link unfurl tags", () => {
     expect(out).toContain('content="https://cdn.example.com/x.jpg"');
   });
 
-  it("uses the pool name for the title and site name", async () => {
+  it("names the pool in the title and the app in the site name", async () => {
     const out = await render("https://pool.example.com", "Sunday Money");
     expect(out).toContain("<title>Sunday Money</title>");
-    expect(out).toContain('property="og:site_name" content="Sunday Money"');
-    expect(out).toContain('property="og:title" content="Sunday Money — NFL pool"');
+    // The site is Tally; Sunday Money is one pool running on it.
+    expect(out).toContain('property="og:site_name" content="Tally"');
+    expect(out).toContain('property="og:title" content="Sunday Money — a Tally pool"');
   });
 });

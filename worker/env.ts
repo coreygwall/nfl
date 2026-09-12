@@ -5,6 +5,9 @@ export interface Env {
   ASSETS?: Fetcher;
   ADMIN_PIN?: string;
   ENVIRONMENT?: string;
+  APP_NAME?: string;
+  POOL_TYPE?: string;
+  POOL_SLUG?: string;
   POOL_NAME?: string;
 }
 

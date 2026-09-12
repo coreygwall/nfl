@@ -30,39 +30,58 @@ database heals on its own.)
 2. Worker name **`nfl`** (must match `name` in `wrangler.jsonc`, and Cloudflare defaults it to the repo name). Build command `npm run build`. Deploy command `npx wrangler deploy` (the default). Root directory `/`.
 3. After the first deploy: Worker → **Settings** → **Variables and Secrets** → add a **secret** `ADMIN_PIN` (the commissioner PIN). Redeploy or push again.
 4. Optional: **Settings → Builds** → enable non-production branch builds to get a preview URL on every pull request.
-5. Share `https://nfl.<your-subdomain>.workers.dev`, or a custom domain (see **Moving to a custom domain**). Pool name is `POOL_NAME` in `wrangler.jsonc`.
+5. Share `https://playtally.app/p/high-five` (or the `workers.dev` URL, which still works). Pool name and slug are `POOL_NAME` and `POOL_SLUG` in `wrangler.jsonc`.
 
 From a laptop instead: `npx wrangler login && npm run deploy && npx wrangler secret put ADMIN_PIN`.
 
 ## Sharing the link
 
-Send people the root URL. It unfurls in iMessage, WhatsApp and Slack with `public/og.jpg` and the pool name; the
+Send people the pool's URL — `https://playtally.app/p/<slug>`. It unfurls in iMessage, WhatsApp and Slack with `public/og.jpg` and the pool name; the
 Worker fills in the absolute image URL and `POOL_NAME` at request time, so no config is needed when the host
 changes. `npm run og:build` regenerates the image. First-time visitors land on a welcome page that asks for a name,
 with the rules in three steps and a full `/rules` page one tap away. The roster is capped at 200 names.
 
-## Moving to a custom domain
+## How the URLs are laid out
 
-Nothing in the build names a host: every URL is relative, the API is called on `window.location.origin`, and the
-unfurl tags are made absolute from the request (`worker/unfurl.ts`, covered by tests at both a `workers.dev` and a
-custom host). So the move itself is dashboard-only:
+The app is **Tally** (`playtally.app`); **High Five** is a pool *type*; this season's NFL pool is one
+*instance* of it. That maps onto the paths:
 
-1. Point the domain's nameservers at Cloudflare, then Worker → **Settings** → **Domains & Routes** → **Add** →
-   **Custom domain**. Cloudflare issues the certificate.
-2. **Leave the `workers.dev` route enabled** through the cutover. Old links keep working, and anyone still signed
-   in there can read their device code off the old address.
+| Path | What it is |
+| --- | --- |
+| `/` | The Tally landing page — `public/landing.html`, a static file with its own copy and share card. |
+| `/p/<slug>` | A pool instance. The React app mounts here: the router's basename is read from the URL (`src/lib/basename.ts`), so every in-app link is still written as if it were at the root, and the same bundle will serve any pool. |
+| `/api/*` | The API. Single-pool today; the natural shape for many is `/api/pools/<slug>/*`. |
+| `/welcome`, `/week/*`, `/board*`, `/rules`, `/admin` | Where the pool used to live. They 301 into `/p/<slug>/…`, query string intact, so links already texted around keep working. |
 
-One thing to plan for: **browser storage is per-origin, so every device forgets who it is at the new address.**
-Nobody loses picks, points or history — those live in D1 against the player, not the device — but each person has
-to claim their name again, and an unsubmitted draft on a phone is lost. Two ways through it:
+`POOL_SLUG`, `POOL_NAME` and `POOL_TYPE` in `wrangler.jsonc` name this instance. Renaming the pool's
+URL is a one-line change there (people's sign-in links change with it, so do it before sharing widely).
 
-- **Send everyone a sign-in link.** Open `/admin` **on the new domain** → Players → **Copy sign-in link** for each
-  person and text it to them. One tap signs that device in; the code is stripped from the address bar afterwards.
-- **Or let them do it:** open the new address, tap **I already entered**, pick their name, type the code they can
-  still see on the old address (or that you read to them from `/admin`).
+**When a second pool arrives**, the shape is ready for it: `pools(id, slug, type, sport, season, name)`,
+players stay global to Tally (one identity, many pools) with a `pool_players` join, and picks key on
+`(pool_id, player_id)`. Groups slot in above pools as `/g/<slug>` without disturbing pool URLs, and chat
+hangs off either. None of that is built yet — the point is that nothing in the current shape blocks it.
 
-Do this *before* adding passkeys: a passkey is bound to the domain it was created on, so any registered on
-`workers.dev` would have to be created again after the move.
+## The custom domain
+
+`playtally.app` is wired up in `wrangler.jsonc` as a Worker custom domain, so `wrangler deploy` — which
+is what the GitHub build runs — provisions and keeps it. `workers_dev` stays `true` so the old
+`nfl.<subdomain>.workers.dev` URL keeps serving through the transition. Nothing else names a host:
+every URL is relative and the unfurl tags are made absolute from the request (`worker/unfurl.ts`).
+
+If a deploy ever fails with a zone or hostname error, the domain is not active in the account yet —
+wait for it to finish provisioning and re-run the build; the previous version keeps serving meanwhile.
+
+One thing to plan for: **browser storage is per-origin, so every device forgets who it is at a new
+address.** Nobody loses picks, points or history — those live in D1 against the player, not the device —
+but each person has to claim their name again. Two ways through it:
+
+- **Send everyone a sign-in link.** Open `/admin` **on the new domain** → Players → **Copy sign-in link**
+  for each person and text it to them. One tap signs that device in; the code is stripped from the
+  address bar afterwards.
+- **Or let them do it:** open the new address, tap **I already entered**, pick their name, and type the
+  code they can still read on the old address (or that you read to them from `/admin`).
+
+Do this *before* adding passkeys: a passkey is bound to the domain it was created on.
 
 ## Weekly ops
 

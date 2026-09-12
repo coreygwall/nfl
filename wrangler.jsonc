@@ -4,10 +4,15 @@
   "main": "./worker/index.ts",
   "compatibility_date": "2026-08-01",
   "compatibility_flags": ["nodejs_compat"],
+  // The workers.dev URL stays live alongside the custom domain so older links keep working.
+  "workers_dev": true,
+  "routes": [{ "pattern": "playtally.app", "custom_domain": true }],
   "assets": {
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    "run_worker_first": ["/api/*", "/", "/welcome", "/rules", "/week/*", "/board", "/board/*", "/admin"]
+    // The Worker decides what every page route is: the landing page at /, a pool under /p/*,
+    // and a redirect for the root-level paths the pool used to live at.
+    "run_worker_first": ["/api/*", "/", "/p/*", "/welcome", "/rules", "/week/*", "/board", "/board/*", "/admin"]
   },
   "d1_databases": [
     {
@@ -20,6 +25,11 @@
   "triggers": { "crons": ["0 10 * * *"] },
   "vars": {
     "ENVIRONMENT": "production",
+    // The app is Tally; this pool is one instance of the High Five pool type. POOL_SLUG is the
+    // path it lives at — playtally.app/p/high-five — and POOL_NAME is what players see.
+    "APP_NAME": "Tally",
+    "POOL_TYPE": "High Five",
+    "POOL_SLUG": "high-five",
     "POOL_NAME": "High Five"
   },
   "observability": { "enabled": true }

@@ -10,6 +10,7 @@ import App from "./App.tsx";
 import { PlayerProvider } from "./lib/player.tsx";
 import { ToastProvider } from "./components/Toast.tsx";
 import { ErrorBoundary } from "./components/ErrorBoundary.tsx";
+import { BASENAME } from "./lib/basename.ts";
 
 // After a deploy, an open tab may try to load a chunk that no longer exists. Reload once
 // to pick up the new build instead of showing a broken screen.
@@ -35,7 +36,7 @@ createRoot(document.getElementById("root")!).render(
   <StrictMode>
     <ErrorBoundary>
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>
+      <BrowserRouter basename={BASENAME}>
         <MotionConfig reducedMotion="user">
           <ToastProvider>
             <PlayerProvider>
