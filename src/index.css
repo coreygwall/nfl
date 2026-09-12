@@ -1,5 +1,14 @@
 @import "tailwindcss";
 
+.mobile-lock { display: none; }
+@media (max-width: 767px) and (pointer: coarse) {
+  .mobile-lock { display: block; }
+  .desktop-lock { display: none; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .mobile-lock button { transition: none !important; }
+}
+
 @theme {
   --font-display: "Bricolage Grotesque Variable", ui-sans-serif, system-ui, sans-serif;
   --font-sans: "Inter Variable", ui-sans-serif, system-ui, sans-serif;

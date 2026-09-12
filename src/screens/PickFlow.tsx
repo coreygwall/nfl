@@ -16,7 +16,8 @@ import { isLocked, WEEKS } from "../../shared/week.ts";
 import { ErrorState, RankBadge, Spinner } from "../components/Common.tsx";
 import { useHeaderWeek, useHideNav } from "../components/Chrome.tsx";
 import { poolUrl } from "../lib/basename.ts";
-import { ChevronDown, ChevronUp, Grip, Lock, Share } from "../components/Icons.tsx";
+import { ChevronDown, ChevronLeft, ChevronUp, Grip, Lock, Share } from "../components/Icons.tsx";
+import { SlideToLock } from "../components/SlideToLock.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
 import { useToast } from "../components/Toast.tsx";
 
@@ -556,6 +557,7 @@ function RankStep({
   const possible = merged.reduce((sum, p) => sum + (6 - p.rank), 0);
   return (
     <div>
+      <button className="btn btn-sm mb-4" onClick={onBack} disabled={pending}><ChevronLeft /> Back</button>
       <h2 className="font-display text-2xl font-extrabold tracking-tight">How sure are you?</h2>
       <p className="mb-4 text-sm text-ink-2">
         Drag to reorder — top pick <b>5 points</b>, bottom one <b>1</b>. Up to <b>{possible}</b> this week.
@@ -604,11 +606,10 @@ function RankStep({
         </div>
       )}
       <div className="mt-4 flex gap-2">
-        <button className="btn" onClick={onBack} disabled={pending}>
-          Back
-        </button>
+        <SlideToLock onSubmit={onSubmit} pending={pending} disabled={pending || offline || (order.length === 0 && frozen.length === 0)} />
+        <div className="desktop-lock flex-1">
         <motion.button
-          className="btn btn-turf flex-1 text-lg"
+          className="btn btn-turf w-full text-lg"
           onClick={onSubmit}
           disabled={pending || offline || (order.length === 0 && frozen.length === 0)}
           whileTap={{ scale: 0.97 }}
@@ -621,6 +622,7 @@ function RankStep({
             </>
           )}
         </motion.button>
+        </div>
       </div>
     </div>
   );
