@@ -39,6 +39,12 @@ test.describe.serial("pool flow", () => {
     await page.reload();
     await expect(page.getByText("Your five")).toBeVisible();
     await expect(page.getByRole("button", { name: "Switch player" })).toContainText("Corey");
+
+    await page.getByRole("link", { name: "Rules" }).click();
+    await expect(page).toHaveURL(/\/rules$/);
+    await expect(page.getByRole("heading", { name: "How to play High Five" })).toBeVisible();
+    await expect(page.getByText("Pick five. Rank your confidence. Score up to 15 points every week.")).toBeVisible();
+    await expect(page.getByRole("link", { name: "Back to my picks" })).toBeVisible();
   });
 
   test("a second player is guarded against stealing a name, can't see hidden picks, admin scores the week", async ({ page }) => {
@@ -162,7 +168,7 @@ test("the shared link unfurls with absolute image and url, and the rules page re
   expect(img.headers()["content-type"]).toContain("image/jpeg");
 
   await page.goto("/rules");
-  await expect(page.getByRole("heading", { name: "How High Five works" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "How to play High Five" })).toBeVisible();
   await expect(page.getByText("No weekly deadline")).toBeVisible();
   await page.getByRole("link", { name: "Join the pool" }).click();
   await expect(page).toHaveURL(/\/welcome$/);

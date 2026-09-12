@@ -3,16 +3,28 @@ import { useBootstrap } from "../api/queries.ts";
 import { RankBadge } from "../components/Common.tsx";
 import { usePlayer } from "../lib/player.tsx";
 
-const rows: [string, string][] = [
-  ["Each week", "Pick the winner of five games. Any five. Then rank them 1 to 5 by how sure you are."],
-  ["Scoring", "A correct pick scores by its rank: 5, 4, 3, 2, 1. Miss and it's zero. Nail all five for 15."],
-  ["No weekly deadline", "Every game locks at its own kickoff and nothing else does. Change any pick until its game starts."],
-  ["Showing up late", "Missed the early games? Pick from what's left. Two games left means two picks, still worth 5 and 4."],
-  ["After kickoff", "A pick on a started game is frozen: team and rank. Other people's picks stay hidden until that game kicks off."],
-  ["Ties", "A tied game scores zero for everyone who picked it."],
-  ["Standings", "Most points wins. Ties break on correct picks, then on 5-point hits."],
-  ["Results", "The commissioner enters winners after each game, usually the same night."],
-  ["Your name", "That's your login. This phone remembers it. On another device, just tap your name again."],
+const steps = [
+  {
+    title: "Pick 5 winners",
+    body: "Choose any five games you think you can call correctly. You can change each pick until that game kicks off.",
+  },
+  {
+    title: "Rank your confidence",
+    body: "Your surest pick is worth 5 points, then 4, 3, 2, and 1. Put the most points behind the picks you trust most.",
+  },
+  {
+    title: "Climb the board",
+    body: "A correct pick earns its assigned points. A miss earns zero. Get all five right and you score the full 15.",
+  },
+];
+
+const notes: [string, string][] = [
+  ["No weekly deadline", "Games lock one at a time at kickoff, so later games stay open."],
+  ["Showing up late is okay", "Pick from the games that are left. Your first remaining pick is still worth 5 points."],
+  ["Picks stay private", "Other players' picks appear only after those games begin."],
+  ["Season standings", "Most points wins. Ties break on correct picks, then 5-point hits."],
+  ["Using another device?", "Tap “I already entered” and choose your name. No password needed."],
+  ["What about an NFL tie?", "A tied game scores zero for everyone who picked it."],
 ];
 
 export function Rules() {
@@ -20,40 +32,50 @@ export function Rules() {
   const { player } = usePlayer();
   const name = boot.data?.poolName ?? "High Five";
   return (
-    <div className="mx-auto w-full max-w-[640px] lg:max-w-[980px]">
-      <header className="sm:flex sm:items-end sm:justify-between sm:gap-6">
-        <div>
-          <h1 className="font-display text-3xl font-extrabold tracking-tight lg:text-4xl">How {name} works</h1>
-          <div className="mt-3 flex items-center gap-2" aria-hidden>
-            {[1, 2, 3, 4, 5].map((r) => (
-              <RankBadge key={r} rank={r} size="sm" />
-            ))}
-            <span className="text-xs font-semibold text-ink-3">points by rank</span>
-          </div>
-        </div>
-        <div className="hidden gap-2 sm:flex sm:flex-wrap">
-          <Link className="btn btn-sm btn-primary" to={player ? "/" : "/welcome"}>
-            {player ? "Make my picks" : "Join the pool"}
-          </Link>
-          <Link className="btn btn-sm" to="/board">
-            See the board
-          </Link>
-        </div>
+    <div className="mx-auto w-full max-w-[920px]">
+      <header className="max-w-[620px]">
+        <p className="font-display text-xs font-extrabold uppercase tracking-[0.16em] text-turf">Three easy steps</p>
+        <h1 className="font-display mt-1 text-3xl font-extrabold tracking-tight lg:text-4xl">How to play {name}</h1>
+        <p className="mt-2 text-base leading-snug text-ink-2">Pick five. Rank your confidence. Score up to 15 points every week.</p>
       </header>
-      <dl className="mt-5 grid gap-3 md:grid-cols-2 lg:gap-4">
-        {rows.map(([term, body]) => (
-          <div key={term} className="card-flat bg-white px-4 py-3">
-            <dt className="font-display text-[15px] font-extrabold">{term}</dt>
-            <dd className="mt-0.5 text-sm leading-snug text-ink-2">{body}</dd>
-          </div>
+
+      <ol className="mt-6 grid gap-4 md:grid-cols-3">
+        {steps.map((step, index) => (
+          <li key={step.title} className="card bg-white p-5">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-flag font-display text-lg font-extrabold" aria-hidden="true">
+              {index + 1}
+            </span>
+            <h2 className="font-display mt-4 text-xl font-extrabold">{step.title}</h2>
+            <p className="mt-1.5 text-sm leading-relaxed text-ink-2">{step.body}</p>
+            {index === 1 && (
+              <div className="mt-4 flex items-center gap-1.5" role="img" aria-label="Confidence values: 5, 4, 3, 2, and 1 points">
+                {[1, 2, 3, 4, 5].map((rank) => (
+                  <RankBadge key={rank} rank={rank} size="sm" />
+                ))}
+              </div>
+            )}
+          </li>
         ))}
-      </dl>
-      <div className="mt-6 flex flex-wrap gap-2 sm:hidden">
+      </ol>
+
+      <section className="mt-8" aria-labelledby="good-to-know">
+        <h2 id="good-to-know" className="font-display text-2xl font-extrabold">Good to know</h2>
+        <dl className="mt-3 grid gap-x-8 gap-y-4 sm:grid-cols-2">
+          {notes.map(([term, body]) => (
+            <div key={term} className="border-t-2 border-ink pt-3">
+              <dt className="font-display text-[15px] font-extrabold">{term}</dt>
+              <dd className="mt-1 text-sm leading-snug text-ink-2">{body}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
+      <div className="mt-8 flex flex-wrap gap-2">
         <Link className="btn btn-primary" to={player ? "/" : "/welcome"}>
-          {player ? "Make my picks" : "Join the pool"}
+          {player ? "Back to my picks" : "Join the pool"}
         </Link>
         <Link className="btn" to="/board">
-          See the board
+          View the board
         </Link>
       </div>
     </div>
