@@ -4,11 +4,12 @@ import { describe, expect, it } from "vitest";
 const BEFORE = "2026-09-09T12:00:00.000Z";
 let seq = 0;
 const name = () => `Family ${Date.now().toString(36)}${seq++}`;
-async function api(path: string, options: { token?: string; entry?: string; body?: unknown; method?: string; cookie?: string } = {}) {
+async function api(path: string, options: { token?: string; entry?: string; body?: unknown; method?: string; cookie?: string; pin?: string } = {}) {
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (options.token) headers["x-player-token"] = options.token;
   if (options.entry) headers["x-entry-id"] = options.entry;
   if (options.cookie) headers.cookie = options.cookie;
+  if (options.pin) headers["x-admin-pin"] = options.pin;
   const response = await SELF.fetch(`http://pool.test/api${path}?now=${BEFORE}`, {
     headers, method: options.method ?? (options.body !== undefined ? "POST" : "GET"),
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
@@ -58,6 +59,18 @@ describe("account-owned entries", () => {
     expect((await api("/weeks/1/picks", { token: stranger.token, entry: child.id, method: "PUT", body: { picks: [] } })).status).toBe(403);
     expect((await api("/weeks/1/picks", { entry: child.id, method: "PUT", body: { picks: [] } })).status).toBe(401);
     expect((await api("/bootstrap", { token: owner.token, entry: stranger.player.id })).status).toBe(403);
+  });
+
+  it("doesn't offer a fake recovery code, and removes an account's entries together", async () => {
+    const { owner, child } = await family();
+    const reset = await api(`/admin/players/${child.id}/reset-access`, { body: {}, pin: "1234" });
+    expect(reset.status).toBe(409);
+    expect(reset.body.error.code).toBe("MANAGED_ENTRY");
+    expect((await api("/bootstrap", { token: owner.token, entry: child.id })).body.me.id).toBe(child.id);
+
+    expect((await api(`/admin/players/${owner.player.id}`, { method: "DELETE", pin: "1234" })).status).toBe(200);
+    const roster = (await api("/bootstrap")).body.players;
+    expect(roster.some((p: any) => p.id === owner.player.id || p.id === child.id)).toBe(false);
   });
 
   it("keeps picks separate and preserves normal kickoff locks", async () => {

@@ -360,7 +360,7 @@ function Players({ pin }: { pin: string }) {
               <button
                 className="btn btn-sm text-danger"
                 onClick={() => {
-                  if (window.confirm(`Remove ${p.name} and all their picks?`)) void act({ id: p.id, action: "delete" });
+                  if (window.confirm(`Remove ${p.name}, their picks, and any entries managed by their account?`)) void act({ id: p.id, action: "delete" });
                 }}
               >
                 Remove
