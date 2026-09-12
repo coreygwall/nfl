@@ -9,14 +9,14 @@ import { useToast } from "./Toast.tsx";
 import { useOnline } from "../lib/online.ts";
 import { api } from "../api/client.ts";
 import type { Identity } from "../lib/identity.ts";
-import type { AdminDeviceResponse, RosterPlayer } from "../../shared/api.ts";
+import type { RosterPlayer } from "../../shared/api.ts";
 import { formatCode } from "../../shared/codes.ts";
 import { addPasskey, passkeysSupported, wasCancelled } from "../lib/passkey.ts";
 import { useQueryClient } from "@tanstack/react-query";
 import { Check } from "./Icons.tsx";
 
 export function AppShell() {
-  const { player, people, setPlayer, switchTo, forget } = usePlayer();
+  const { player, people, setPlayer, syncEntries, switchTo, forget } = usePlayer();
   const boot = useBootstrap();
   const loc = useLocation();
   const nav = useNavigate();
@@ -28,7 +28,7 @@ export function AppShell() {
   const updateReady = !!boot.data && boot.data.build !== __BUILD_ID__ && __BUILD_ID__ !== "test";
 
   useEffect(() => {
-    document.title = poolName;
+    document.title = `${poolName} · Tally`;
   }, [poolName]);
 
   // The cookie is the other half of staying signed in: if storage was cleared but the cookie
@@ -38,6 +38,11 @@ export function AppShell() {
     if (!me) return;
     if (!player || (!player.token && player.id !== me.id)) setPlayer({ id: me.id, name: me.name });
   }, [boot.data, player, setPlayer]);
+
+  useEffect(() => {
+    if (!boot.data?.account || !boot.data.myEntries || !boot.data.me) return;
+    syncEntries(boot.data.account.id, boot.data.myEntries, player?.token);
+  }, [boot.data, player?.token, syncEntries]);
 
   // Devices that signed in before codes existed hold a name but no token, and no cookie either.
   // Claim one silently if the name is still free; otherwise send them to the code screen.
@@ -84,13 +89,17 @@ export function AppShell() {
   return (
     <div className="relative mx-auto flex min-h-dvh w-full max-w-[1180px] flex-col">
       <header className="sticky top-0 z-30 border-b-2 border-ink bg-paper/90 backdrop-blur">
-        <div className="flex items-center gap-3 px-4 py-2.5 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-3 px-4 py-3 sm:px-6 sm:py-3.5 lg:px-8">
           <Link
             to="/"
-            className="font-display flex shrink-0 items-center gap-2 whitespace-nowrap text-[1.35rem] font-extrabold leading-none tracking-tight sm:text-[1.65rem]"
+            aria-label={`Tally — ${poolName}`}
+            className="flex min-w-0 shrink-0 items-center gap-2.5"
           >
-            <img src="/icon.svg" alt="" className="h-8 w-8 shrink-0 sm:h-9 sm:w-9" />
-            <span>{poolName}</span>
+            <img src="/icon.svg" alt="" className="h-10 w-10 shrink-0 sm:h-11 sm:w-11" />
+            <span className="flex min-w-0 flex-col leading-none">
+              <span className="font-display truncate text-[1.55rem] font-extrabold tracking-tight sm:text-[1.8rem]">Tally</span>
+              <span className="mt-1 truncate text-[0.68rem] font-bold uppercase tracking-[0.16em] text-ink-2 sm:text-[0.72rem]">{poolName}</span>
+            </span>
           </Link>
           {player && !onWelcome && (
             <>
@@ -188,6 +197,7 @@ export function AppShell() {
               player={player}
               people={people}
               roster={boot.data?.players ?? []}
+              accountName={boot.data?.account?.name ?? player?.name ?? ""}
               myCode={boot.data?.myCode ?? null}
               hasPasskey={(boot.data?.myPasskeys ?? 0) > 0}
               onSwitch={(id) => {
@@ -218,14 +228,15 @@ export function AppShell() {
 
 /**
  * The account sheet. Most people see one line here and never touch it. The code stays hidden
- * until someone actually needs another device, and the commissioner can put family members on
- * this phone so four sets of picks come from one device without signing in and out.
+ * until someone actually needs another device. Account-owned entries follow the account
+ * across devices and passkey sign-ins, with separate picks and standings.
  */
 function AccountSheet({
   player,
   people,
   roster,
   myCode,
+  accountName,
   hasPasskey,
   onSwitch,
   onAdded,
@@ -236,6 +247,7 @@ function AccountSheet({
   people: Identity[];
   roster: RosterPlayer[];
   myCode: string | null;
+  accountName: string;
   hasPasskey: boolean;
   onSwitch: (id: string) => void;
   onAdded: (p: Identity) => void;
@@ -255,11 +267,11 @@ function AccountSheet({
       {others.length > 0 && (
         <>
           <h3 className="font-display mb-2 mt-4 text-sm font-extrabold uppercase tracking-wider text-ink-3">
-            Also on this device
+            Your other entries
           </h3>
           <div className="flex flex-wrap gap-2">
             {others.map((p) => (
-              <button key={p.id} className="chip px-3 py-1.5 text-sm" onClick={() => onSwitch(p.id)}>
+              <button key={p.id} className="chip min-h-11 px-3 py-1.5 text-sm" onClick={() => onSwitch(p.id)}>
                 {p.name}
                 {p.managed && <span className="ml-1 text-[10px] font-bold uppercase text-ink-3">yours</span>}
               </button>
@@ -268,12 +280,12 @@ function AccountSheet({
         </>
       )}
 
-      <PasskeyRow hasPasskey={hasPasskey} />
+      <p className="mt-2 text-sm text-ink-2">Add entries for your kids, family, or friends. Each gets their own picks and score, all managed by your account.</p>
+      <PasskeyRow key={player?.accountId ?? player?.id} hasPasskey={hasPasskey} />
 
       {adding ? (
         <AddPerson
-          roster={roster}
-          have={new Set(people.map((p) => p.id))}
+          player={player}
           onDone={(p) => {
             setAdding(false);
             onAdded(p);
@@ -283,7 +295,7 @@ function AccountSheet({
       ) : (
         <div className="mt-5 space-y-2 border-t-2 border-dashed border-line pt-4">
           {showCode && myCode ? (
-            <DeviceCode code={myCode} name={player?.name ?? ""} />
+            <DeviceCode code={myCode} name={accountName} />
           ) : (
             <button className="text-sm font-bold underline" onClick={() => setShowCode(true)} disabled={!myCode}>
               Pick on another device →
@@ -291,7 +303,7 @@ function AccountSheet({
           )}
           <div className="flex flex-wrap gap-2 pt-1">
             <button className="btn btn-sm" onClick={() => setAdding(true)}>
-              Add someone I pick for
+              Add an entry
             </button>
             <button className="btn btn-sm" onClick={onNew}>
               I'm someone new
@@ -319,95 +331,67 @@ function AccountSheet({
   );
 }
 
-/** Commissioner-only: adds another player's name to this device, no code needed. */
+/** Every signed-in account can create a named entry it owns. */
 function AddPerson({
-  roster,
-  have,
+  player,
   onDone,
   onCancel,
 }: {
-  roster: RosterPlayer[];
-  have: Set<string>;
+  player: Identity | null;
   onDone: (p: Identity) => void;
   onCancel: () => void;
 }) {
-  const [pin, setPin] = useState(() => {
-    try {
-      return sessionStorage.getItem("nflpool.admin.pin") ?? "";
-    } catch {
-      return "";
-    }
-  });
-  const [busy, setBusy] = useState<string | null>(null);
+  const [name, setName] = useState("");
+  const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const toast = useToast();
-  const available = roster.filter((p) => !have.has(p.id));
-
-  const add = async (id: string, name: string) => {
-    setBusy(id);
-    setError(null);
-    try {
-      const r = await api<AdminDeviceResponse>(`/admin/players/${id}/device`, { method: "POST", body: {}, pin });
-      try {
-        sessionStorage.setItem("nflpool.admin.pin", pin);
-      } catch {
-        /* ignore */
-      }
-      toast(`${name} is on this device now. Their picks are marked as entered by you.`, "success");
-      onDone({ ...r.player, token: r.token, managed: true });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Couldn't add them.");
-    } finally {
-      setBusy(null);
-    }
-  };
+  const qc = useQueryClient();
 
   return (
-    <div className="mt-5 border-t-2 border-dashed border-line pt-4">
-      <h3 className="font-display text-sm font-extrabold">Add someone you pick for</h3>
-      <p className="mb-3 mt-0.5 text-xs text-ink-2">
-        Commissioner only. Their picks still follow every kickoff lock, and the export shows the picks came from
-        your device.
+    <form className="mt-5 border-t-2 border-dashed border-line pt-4" onSubmit={async (event) => {
+      event.preventDefault();
+      if (busy || !player) return;
+      setBusy(true);
+      setError(null);
+      try {
+        const r = await api<{ player: Identity }>("/entries", { body: { name } });
+        void qc.invalidateQueries({ queryKey: ["bootstrap"] });
+        toast(`${r.player.name}'s entry is ready. Let's make their picks!`, "success");
+        onDone({ ...r.player, accountId: player.accountId ?? player.id, token: player.token });
+      } catch (err) {
+        setError(err instanceof Error ? err.message : "Couldn't add the entry.");
+        setBusy(false);
+      }
+    }}>
+      <h3 className="font-display text-sm font-extrabold">Add an entry</h3>
+      <p className="mb-3 mt-1 text-sm text-ink-2">
+        Choose the name everyone will see on the board. No separate sign-in needed.
       </p>
-      <input
-        type="password"
-        inputMode="numeric"
-        autoComplete="off"
-        value={pin}
-        onChange={(e) => setPin(e.target.value)}
-        placeholder="Admin PIN"
-        aria-label="Admin PIN"
-        className="card-flat mb-3 w-full px-3 py-2 tracking-[0.3em] outline-none focus:shadow-hard"
-      />
-      <div className="flex flex-wrap gap-2">
-        {available.length === 0 && <p className="text-sm text-ink-3">Everyone in the pool is already on this device.</p>}
-        {available.map((p) => (
-          <button
-            key={p.id}
-            className="chip px-3 py-1.5 text-sm"
-            disabled={!pin || busy !== null}
-            onClick={() => void add(p.id, p.name)}
-          >
-            {busy === p.id ? "Adding…" : p.name}
-          </button>
-        ))}
+      <label htmlFor="entry-name" className="text-sm font-bold">Entry name</label>
+      <input id="entry-name" autoFocus autoComplete="off" maxLength={24}
+        value={name} onChange={(e) => setName(e.target.value)}
+        placeholder="e.g. Parker" disabled={busy}
+        aria-describedby={error ? "entry-error" : undefined}
+        className="card-flat mb-3 mt-1 w-full px-3 py-3 outline-none focus:shadow-hard" />
+      {error && <p id="entry-error" role="alert" className="mb-3 text-sm font-semibold text-danger">{error}</p>}
+      <div className="flex flex-wrap gap-3">
+        <button type="submit" className="btn btn-primary min-h-11" disabled={busy || !name.trim()}>
+          {busy ? "Adding…" : "Add entry & make picks"}
+        </button>
+        <button type="button" className="btn min-h-11" disabled={busy} onClick={onCancel}>Cancel</button>
       </div>
-      {error && <p className="mt-2 text-sm font-semibold text-danger">{error}</p>}
-      <button className="mt-4 text-sm font-bold text-ink-2 underline" onClick={onCancel}>
-        Never mind
-      </button>
-    </div>
+    </form>
   );
 }
 
 /** Face ID / Touch ID: an offer, never a requirement. */
 function PasskeyRow({ hasPasskey }: { hasPasskey: boolean }) {
   const [busy, setBusy] = useState(false);
-  const [done, setDone] = useState(hasPasskey);
+  const [done, setDone] = useState(false);
   const toast = useToast();
   const qc = useQueryClient();
   if (!passkeysSupported()) return null;
-  if (done) {
+  if (done || hasPasskey) {
     return (
       <p className="mt-4 flex items-center gap-2 border-t-2 border-dashed border-line pt-4 text-sm text-ink-2">
         <Check size={16} className="text-turf" /> Face ID is on for this account.

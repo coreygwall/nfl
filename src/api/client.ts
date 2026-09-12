@@ -28,6 +28,8 @@ export async function api<T>(path: string, init: ApiInit = {}): Promise<T> {
   if (init.body !== undefined) headers["content-type"] = "application/json";
   const token = init.token ?? loadPlayer()?.token;
   if (token) headers["x-player-token"] = token;
+  const active = loadPlayer();
+  if (active?.accountId && (!init.token || init.token === active.token)) headers["x-entry-id"] = active.id;
   if (init.pin) headers["x-admin-pin"] = init.pin;
   let res: Response;
   try {

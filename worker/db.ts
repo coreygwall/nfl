@@ -305,11 +305,26 @@ export async function renamePlayer(db: D1Database, id: string, name: string, nam
 }
 
 export async function deletePlayer(db: D1Database, id: string): Promise<void> {
+  // An account owns any entries it created. Removing an account from the commissioner view is
+  // therefore an explicit family removal, not a foreign-key failure or an orphaned child.
+  const owned = await db.prepare("SELECT player_id FROM entry_owners WHERE owner_id = ?").bind(id).all<{ player_id: string }>();
+  const ids = [id, ...owned.results.map((row) => row.player_id)];
+  const marks = ids.map(() => "?").join(", ");
   await db.batch([
-    db.prepare("DELETE FROM picks WHERE player_id = ?").bind(id),
-    db.prepare("DELETE FROM devices WHERE player_id = ?").bind(id),
-    db.prepare("DELETE FROM players WHERE id = ?").bind(id),
+    db.prepare(`DELETE FROM picks WHERE player_id IN (${marks})`).bind(...ids),
+    db.prepare(`DELETE FROM devices WHERE player_id IN (${marks})`).bind(...ids),
+    db.prepare("DELETE FROM entry_owners WHERE owner_id = ?").bind(id),
+    db.prepare(`DELETE FROM players WHERE id IN (${marks})`).bind(...ids),
   ]);
+}
+
+/** A child entry belongs to its account; it deliberately has no independent recovery code. */
+export async function ownerOfEntry(db: D1Database, playerId: string): Promise<PlayerRecord | null> {
+  const row = await db
+    .prepare("SELECT p.* FROM players p JOIN entry_owners e ON e.owner_id = p.id WHERE e.player_id = ?")
+    .bind(playerId)
+    .first<PlayerRow>();
+  return row ? toPlayer(row) : null;
 }
 
 export interface PlayerStats {

@@ -29,6 +29,7 @@ import {
   listPlayers,
   listWeekGames,
   listWeekPicks,
+  ownerOfEntry,
   playerStats,
   publicPlayer,
   renamePlayer,
@@ -166,6 +167,10 @@ adminRoutes.post("/players/:id/device", async (c) => {
 adminRoutes.post("/players/:id/reset-access", async (c) => {
   const player = await getPlayer(c.env.DB, c.req.param("id"));
   if (!player) throw notFound("NO_PLAYER", "No such player");
+  const owner = await ownerOfEntry(c.env.DB, player.id);
+  if (owner) {
+    throw new ApiError(409, "MANAGED_ENTRY", `${player.name} is managed through ${owner.name}'s account, so there is no separate recovery code.`);
+  }
   const body = (await c.req.json().catch(() => ({}))) as { revokeDevices?: unknown };
   const code = generateCode();
   await setClaimCode(c.env.DB, player.id, code);

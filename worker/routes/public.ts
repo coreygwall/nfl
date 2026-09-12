@@ -65,14 +65,18 @@ export const publicRoutes = new Hono<AppEnv>();
 publicRoutes.get("/bootstrap", async (c) => {
   const now = c.get("now");
   const me = c.get("player");
-  const [games, players, devices] = await Promise.all([
+  const account = c.get("account");
+  const [games, players, devices, ownership] = await Promise.all([
     listGames(c.env.DB, SEASON),
     listPlayers(c.env.DB),
     deviceCounts(c.env.DB),
+    c.env.DB.prepare("SELECT player_id, owner_id FROM entry_owners").all<{ player_id: string; owner_id: string }>(),
   ]);
   if (me) c.executionCtx.waitUntil(touchPlayer(c.env.DB, me.id, now));
-  const mine = me ? players.find((p) => p.id === me.id) : null;
-  const passkeys = me ? await countPasskeys(c.env.DB, me.id, new URL(c.req.url).hostname) : 0;
+  const mine = account ? players.find((p) => p.id === account.id) : null;
+  const managedIds = new Set(ownership.results.map((r) => r.player_id));
+  const ids = new Set([account?.id, ...ownership.results.filter((r) => r.owner_id === account?.id).map((r) => r.player_id)]);
+  const passkeys = account ? await countPasskeys(c.env.DB, account.id, new URL(c.req.url).hostname) : 0;
   const body: BootstrapResponse = {
     now,
     build: BUILD_ID,
@@ -81,12 +85,33 @@ publicRoutes.get("/bootstrap", async (c) => {
     currentWeek: pickWeek(games, now),
     boardWeek: boardWeek(games, now),
     weeks: weekSummaries(games, now),
-    players: players.map((p) => ({ ...publicPlayer(p), claimed: (devices.get(p.id) ?? 0) > 0 })),
+    players: players.map((p) => ({ ...publicPlayer(p), claimed: (devices.get(p.id) ?? 0) > 0 || managedIds.has(p.id) })),
     me,
+    account,
+    myEntries: account ? players.filter((p) => ids.has(p.id)).map(publicPlayer) : [],
     ...(mine?.claimCode ? { myCode: mine.claimCode } : {}),
     myPasskeys: passkeys,
   };
   return c.json(body);
+});
+
+publicRoutes.post("/entries", async (c) => {
+  const account = c.get("account");
+  if (!account) throw new ApiError(401, "NO_PLAYER", "Sign in to add an entry.");
+  const body = (await c.req.json().catch(() => ({}))) as { name?: unknown };
+  const check = validateName(body.name);
+  if (!check.ok) throw badRequest("INVALID_NAME", check.message);
+  if (await findPlayerByKey(c.env.DB, nameKey(check.name))) {
+    throw new ApiError(409, "NAME_TAKEN", "That name is already in the pool. Use a different entry name.");
+  }
+  if (await countPlayers(c.env.DB) >= MAX_PLAYERS) throw new ApiError(403, "POOL_FULL", "The pool is full.");
+  const player = { id: crypto.randomUUID(), name: check.name };
+  await c.env.DB.batch([
+    c.env.DB.prepare("INSERT INTO players (id, name, name_key, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?)")
+      .bind(player.id, player.name, nameKey(player.name), c.get("now"), c.get("now")),
+    c.env.DB.prepare("INSERT INTO entry_owners (player_id, owner_id) VALUES (?, ?)").bind(player.id, account.id),
+  ]);
+  return c.json({ player }, 201);
 });
 
 publicRoutes.post("/players", async (c) => {
@@ -128,6 +153,9 @@ publicRoutes.post("/players/:id/claim", async (c) => {
   const now = c.get("now");
   const player = await getPlayer(c.env.DB, c.req.param("id"));
   if (!player) throw notFound("NO_PLAYER", "That name is not in the pool.");
+  if (await c.env.DB.prepare("SELECT player_id FROM entry_owners WHERE player_id = ?").bind(player.id).first()) {
+    throw new ApiError(403, "MANAGED_ENTRY", "This entry is managed through its owner's account. Sign in to that account.");
+  }
   const body = (await c.req.json().catch(() => ({}))) as { code?: unknown };
 
   const held = await countDevices(c.env.DB, player.id);
