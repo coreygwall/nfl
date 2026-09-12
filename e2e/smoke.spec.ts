@@ -196,6 +196,8 @@ test("one phone can pick for the whole family, and the code stays out of the way
   await page.goto(`/welcome?claim=${parent.player.id}&code=${parent.code}&now=${BEFORE}`);
   await expect(page.getByRole("button", { name: "Switch player" })).toContainText(`Parent ${stamp}`);
 
+  await page.getByRole("button", { name: "Pick Buffalo Bills" }).click();
+
   // The code is not on show; it is one deliberate tap away.
   await page.getByRole("button", { name: "Switch player" }).click();
   const sheet = page.getByRole("dialog", { name: "Your account" });
@@ -210,6 +212,8 @@ test("one phone can pick for the whole family, and the code stays out of the way
   await sheet.getByRole("button", { name: "Add entry & make picks" }).click();
   await expect(page.getByRole("button", { name: "Switch player" })).toContainText(`Kid ${stamp}`);
 
+  await expect(page.getByRole("button", { name: "Pick Buffalo Bills" })).toHaveAttribute("aria-pressed", "false");
+
   // Picks for the kid go in from here, and switching back is one tap.
   await expect(page).toHaveURL(/\/week\/1$/);
   await page.getByRole("button", { name: "Pick Seattle Seahawks" }).click();
@@ -223,6 +227,9 @@ test("one phone can pick for the whole family, and the code stays out of the way
   await expect(page.getByRole("button", { name: "Switch player" })).toContainText(`Parent ${stamp}`);
 
   await expect(page.getByRole("heading", { name: "Pick 5 winners" })).toBeVisible();
+
+  await expect(page.getByRole("button", { name: "Pick Buffalo Bills" })).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("button", { name: "Pick Seattle Seahawks" })).toHaveAttribute("aria-pressed", "false");
 
   // This is an ordinary player action, not a commissioner override.
   const csv = await request.get("/api/admin/export.csv", { headers: { "x-admin-pin": "1234" } });

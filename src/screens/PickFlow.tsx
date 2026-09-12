@@ -26,9 +26,10 @@ const ALL_RANKS = Array.from({ length: MAX_PICKS }, (_, i) => i + 1);
 
 export function PickFlow() {
   const { week: weekParam } = useParams();
+  const { player } = usePlayer();
   const week = Number(weekParam);
   if (!Number.isInteger(week) || week < 1 || week > WEEKS) return <Navigate to="/" replace />;
-  return <PickFlowInner key={week} week={week} />;
+  return <PickFlowInner key={`${player?.id}:${week}`} week={week} />;
 }
 
 function PickFlowInner({ week }: { week: number }) {
