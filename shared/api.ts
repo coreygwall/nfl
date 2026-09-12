@@ -104,8 +104,15 @@ export interface AdminPlayerDTO extends Player {
   weeksPlayed: number;
   /** How many devices are signed in as this player. */
   devices: number;
+  /** Of those, how many the commissioner put on their own phone. */
+  adminDevices: number;
   /** The code that claims this name on a new device; null for names created before codes. */
   code: string | null;
+}
+
+export interface AdminDeviceResponse {
+  player: Player;
+  token: string;
 }
 
 export interface AdminResetAccessResponse {

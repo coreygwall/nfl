@@ -1,5 +1,6 @@
 import schema from "../migrations/0001_init.sql?raw";
 import devicesSchema from "../migrations/0002_devices.sql?raw";
+import householdSchema from "../migrations/0003_household.sql?raw";
 import schedule from "../shared/schedule-2026.json";
 import { finalsFromCsv, gamesFromCsv, NFLVERSE_GAMES_CSV } from "../shared/nflverse.ts";
 import { applyResults, getMeta, listGames, setMeta, updateKickoffs, upsertGames } from "./db.ts";
@@ -16,12 +17,13 @@ const split = (sql: string) =>
     .filter(Boolean);
 
 const statements = split(schema);
-const deviceStatements = split(devicesSchema);
+// Everything after the initial schema: additive, and safe to re-run.
+const alterStatements = [...split(devicesSchema), ...split(householdSchema)];
 
 async function applySchema(db: D1Database): Promise<void> {
   await db.batch(statements.map((s) => db.prepare(s)));
   // ALTER TABLE has no IF NOT EXISTS, so run these singly and let a second run no-op.
-  for (const statement of deviceStatements) {
+  for (const statement of alterStatements) {
     try {
       await db.prepare(statement).run();
     } catch (err) {

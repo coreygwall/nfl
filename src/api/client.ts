@@ -16,6 +16,8 @@ export interface ApiInit {
   method?: string;
   body?: unknown;
   pin?: string;
+  /** Act as a specific identity rather than the active one (switching, or right after claiming). */
+  token?: string;
 }
 
 export async function api<T>(path: string, init: ApiInit = {}): Promise<T> {
@@ -24,8 +26,8 @@ export async function api<T>(path: string, init: ApiInit = {}): Promise<T> {
   if (override) url.searchParams.set("now", override);
   const headers: Record<string, string> = { accept: "application/json" };
   if (init.body !== undefined) headers["content-type"] = "application/json";
-  const player = loadPlayer();
-  if (player?.token) headers["x-player-token"] = player.token;
+  const token = init.token ?? loadPlayer()?.token;
+  if (token) headers["x-player-token"] = token;
   if (init.pin) headers["x-admin-pin"] = init.pin;
   let res: Response;
   try {

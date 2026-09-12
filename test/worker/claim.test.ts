@@ -123,3 +123,78 @@ describe("claiming a name on another device", () => {
     expect(r.status).toBe(404);
   });
 });
+
+describe("staying signed in and picking for the family", () => {
+  it("sets a session cookie, and that cookie alone is enough to be recognised", async () => {
+    const name = `Cookie ${Date.now().toString(36)}`;
+    const created = await SELF.fetch("http://pool.test/api/players", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ name }),
+    });
+    const setCookie = created.headers.get("set-cookie") ?? "";
+    expect(setCookie).toMatch(/^hf_device=/);
+    expect(setCookie).toContain("HttpOnly");
+    expect(setCookie).toContain("SameSite=Lax");
+    expect(setCookie).toMatch(/Max-Age=\d{7,}/); // over a year
+
+    // A browser that lost localStorage still sends the cookie.
+    const cookie = setCookie.split(";")[0]!;
+    const res = await SELF.fetch("http://pool.test/api/bootstrap", { headers: { cookie } });
+    const body = (await res.json()) as any;
+    expect(body.me).toMatchObject({ name });
+  });
+
+  it("clears the cookie on sign out", async () => {
+    const p = await join();
+    const res = await SELF.fetch("http://pool.test/api/session", {
+      method: "DELETE",
+      headers: { "x-player-token": p.token },
+    });
+    expect(res.status).toBe(200);
+    expect(res.headers.get("set-cookie")).toContain("Max-Age=0");
+  });
+
+  it("lets the commissioner put someone else's name on their own phone", async () => {
+    const son = await join("Son");
+    const issued = await api(`/admin/players/${son.id}/device`, { body: {}, pin: "1234" });
+    expect(issued.status).toBe(200);
+    expect(issued.body.token).not.toBe(son.token);
+
+    // No code was needed, and the son's own device keeps working.
+    for (const token of [son.token, issued.body.token]) {
+      const boot = await api("/bootstrap", { token });
+      expect(boot.body.me).toMatchObject({ id: son.id });
+    }
+    const admin = await api("/admin/players", { pin: "1234" });
+    const row = admin.body.players.find((x: any) => x.id === son.id);
+    expect(row).toMatchObject({ devices: 2, adminDevices: 1 });
+  });
+
+  it("marks picks made from a commissioner's device in the export", async () => {
+    const son = await join("Audit");
+    const issued = await api(`/admin/players/${son.id}/device`, { body: {}, pin: "1234" });
+    const games = await api("/weeks/3", { now: BEFORE });
+    const picks = games.body.games.slice(0, 2).map((g: any, i: number) => ({ gameId: g.id, team: g.home, rank: i + 1 }));
+    const saved = await api("/weeks/3/picks", { method: "PUT", body: { picks }, token: issued.body.token, now: BEFORE });
+    expect(saved.status).toBe(200);
+
+    const csv = await SELF.fetch("http://pool.test/api/admin/export.csv", { headers: { "x-admin-pin": "1234" } });
+    const text = await csv.text();
+    expect(text.split("\n")[0]).toContain("entered_by");
+    const mine = text.split("\n").filter((l) => l.includes(son.name));
+    expect(mine.length).toBe(2);
+    for (const line of mine) expect(line.endsWith("commissioner")).toBe(true);
+  });
+
+  it("records a player's own picks as their own", async () => {
+    const p = await join("Self");
+    const games = await api("/weeks/4", { now: BEFORE });
+    const picks = [{ gameId: games.body.games[0].id, team: games.body.games[0].home, rank: 1 }];
+    await api("/weeks/4/picks", { method: "PUT", body: { picks }, token: p.token, now: BEFORE });
+    const csv = await SELF.fetch("http://pool.test/api/admin/export.csv", { headers: { "x-admin-pin": "1234" } });
+    const text = await csv.text();
+    const line = text.split("\n").find((l) => l.includes(p.name))!;
+    expect(line.endsWith("player")).toBe(true);
+  });
+});

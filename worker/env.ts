@@ -13,6 +13,8 @@ export type AppEnv = {
   Variables: {
     now: string;
     player: Player | null;
+    /** Which device the request authenticated as, for the pick audit trail. */
+    deviceId: string | null;
   };
 };
 

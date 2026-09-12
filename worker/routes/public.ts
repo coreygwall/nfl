@@ -3,7 +3,7 @@ import type { AppEnv } from "../env.ts";
 import { ApiError, badRequest, notFound } from "../errors.ts";
 import { nameKey, validateName } from "../../shared/names.ts";
 import { codesMatch, generateCode } from "../../shared/codes.ts";
-import { hashToken, isLockedOut, lockUntil, MAX_CLAIM_ATTEMPTS, newToken } from "../auth.ts";
+import { clearedSessionCookie, hashToken, isLockedOut, lockUntil, MAX_CLAIM_ATTEMPTS, newToken, sessionCookie } from "../auth.ts";
 import { validatePicks } from "../../shared/picks.ts";
 import { buildSeasonBoard, buildWeekBoard } from "../../shared/scoring.ts";
 import { boardWeek, gameStatus, isLocked, pickWeek, weekSummaries, WEEKS } from "../../shared/week.ts";
@@ -112,6 +112,7 @@ publicRoutes.post("/players", async (c) => {
   }
   const token = await issueToken(c.env.DB, player.id, c.get("now"));
   const res: CreatePlayerResponse = { player, created: true, token, code };
+  c.header("set-cookie", sessionCookie(token, c.req.url));
   return c.json(res, 201);
 });
 
@@ -133,6 +134,7 @@ publicRoutes.post("/players/:id/claim", async (c) => {
     if (!player.claimCode) await setClaimCode(c.env.DB, player.id, code);
     const token = await issueToken(c.env.DB, player.id, now);
     const res: ClaimResponse = { player: publicPlayer(player), token, code };
+    c.header("set-cookie", sessionCookie(token, c.req.url));
     return c.json(res);
   }
 
@@ -151,7 +153,25 @@ publicRoutes.post("/players/:id/claim", async (c) => {
   await clearClaimFailures(c.env.DB, player.id);
   const token = await issueToken(c.env.DB, player.id, now);
   const res: ClaimResponse = { player: publicPlayer(player), token, code: player.claimCode };
+  c.header("set-cookie", sessionCookie(token, c.req.url));
   return c.json(res);
+});
+
+/**
+ * Points the session cookie at whichever identity this device is currently picking as. One
+ * phone can hold several (a parent picking for the family), and the cookie follows the switch.
+ */
+publicRoutes.post("/session", async (c) => {
+  const me = c.get("player");
+  if (!me) throw new ApiError(401, "NO_PLAYER", "That sign-in is no longer valid.");
+  const token = c.req.header("x-player-token");
+  if (token) c.header("set-cookie", sessionCookie(token, c.req.url));
+  return c.json({ player: me });
+});
+
+publicRoutes.delete("/session", (c) => {
+  c.header("set-cookie", clearedSessionCookie(c.req.url));
+  return c.json({ ok: true });
 });
 
 publicRoutes.get("/weeks/:week", async (c) => {
@@ -190,7 +210,7 @@ publicRoutes.put("/weeks/:week/picks", async (c) => {
   const [games, existing] = await Promise.all([listWeekGames(c.env.DB, SEASON, week), listPicks(c.env.DB, me.id, week)]);
   const result = validatePicks({ submitted: body.picks, games, existing, now });
   if (!result.ok) throw new ApiError(result.error.status, result.error.code, result.error.message, result.error.details);
-  await replacePicks(c.env.DB, me.id, week, result.toWrite, now);
+  await replacePicks(c.env.DB, me.id, week, result.toWrite, now, false, c.get("deviceId"));
   c.executionCtx.waitUntil(touchPlayer(c.env.DB, me.id, now));
   const res: PutPicksResponse = { now, picks: result.final };
   return c.json(res);

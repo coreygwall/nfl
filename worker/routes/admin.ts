@@ -5,9 +5,18 @@ import { nameKey, validateName } from "../../shared/names.ts";
 import { validatePicks } from "../../shared/picks.ts";
 import { isAbbr } from "../../shared/teams.ts";
 import type { Winner } from "../../shared/types.ts";
-import type { AdminPlayersResponse, AdminResetAccessResponse, AdminWeekResponse } from "../../shared/api.ts";
+import type {
+  AdminDeviceResponse,
+  AdminPlayersResponse,
+  AdminResetAccessResponse,
+  AdminWeekResponse,
+} from "../../shared/api.ts";
 import { generateCode } from "../../shared/codes.ts";
+import { hashToken, newToken } from "../auth.ts";
 import {
+  addDevice,
+  adminDeviceCounts,
+  adminWrittenPickKeys,
   deletePlayer,
   deviceCounts,
   findPlayerByKey,
@@ -96,7 +105,12 @@ adminRoutes.put("/players/:id/weeks/:week/picks", async (c) => {
 });
 
 adminRoutes.get("/players", async (c) => {
-  const [players, stats, devices] = await Promise.all([listPlayers(c.env.DB), playerStats(c.env.DB), deviceCounts(c.env.DB)]);
+  const [players, stats, devices, adminDevices] = await Promise.all([
+    listPlayers(c.env.DB),
+    playerStats(c.env.DB),
+    deviceCounts(c.env.DB),
+    adminDeviceCounts(c.env.DB),
+  ]);
   const body: AdminPlayersResponse = {
     players: players.map((p) => ({
       id: p.id,
@@ -106,10 +120,31 @@ adminRoutes.get("/players", async (c) => {
       picksCount: stats.get(p.id)?.picksCount ?? 0,
       weeksPlayed: stats.get(p.id)?.weeksPlayed ?? 0,
       devices: devices.get(p.id) ?? 0,
+      adminDevices: adminDevices.get(p.id) ?? 0,
       code: p.claimCode,
     })),
   };
   return c.json(body);
+});
+
+/**
+ * Puts another player's name on the commissioner's own device — the family case: one phone
+ * picking for four people. The token is marked as admin-issued, so every pick it writes is
+ * traceable to "the commissioner's phone" rather than looking like the player themselves.
+ */
+adminRoutes.post("/players/:id/device", async (c) => {
+  const player = await getPlayer(c.env.DB, c.req.param("id"));
+  if (!player) throw notFound("NO_PLAYER", "No such player");
+  const token = newToken();
+  await addDevice(c.env.DB, {
+    id: crypto.randomUUID(),
+    playerId: player.id,
+    tokenHash: await hashToken(token),
+    now: c.get("now"),
+    issuedBy: "admin",
+  });
+  const res: AdminDeviceResponse = { player: publicPlayer(player), token };
+  return c.json(res);
 });
 
 /**
@@ -184,19 +219,29 @@ adminRoutes.get("/status", async (c) => {
 
 /** Every pick with its game and result — the commissioner's backup and the tiebreak referee. */
 adminRoutes.get("/export.csv", async (c) => {
-  const [games, players, picks] = await Promise.all([listGames(c.env.DB, SEASON), listPlayers(c.env.DB), listAllPicks(c.env.DB)]);
+  const [games, players, picks, viaAdmin] = await Promise.all([
+    listGames(c.env.DB, SEASON),
+    listPlayers(c.env.DB),
+    listAllPicks(c.env.DB),
+    adminWrittenPickKeys(c.env.DB),
+  ]);
   const gamesById = new Map(games.map((g) => [g.id, g]));
   const names = new Map(players.map((p) => [p.id, p.name]));
   const esc = (v: unknown) => {
     const s = v === null || v === undefined ? "" : String(v);
     return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
   };
-  const lines = ["week,game_id,kickoff_utc,away,home,winner,player,pick,rank,points"];
+  const lines = ["week,game_id,kickoff_utc,away,home,winner,player,pick,rank,points,entered_by"];
   for (const p of picks) {
     const g = gamesById.get(p.gameId);
     if (!g) continue;
     const points = g.winner && g.winner === p.team ? 6 - p.rank : 0;
-    lines.push([g.week, g.id, g.kickoffAt, g.away, g.home, g.winner ?? "", names.get(p.playerId) ?? p.playerId, p.team, p.rank, g.winner ? points : ""].map(esc).join(","));
+    const enteredBy = viaAdmin.has(`${p.playerId}:${p.gameId}`) ? "commissioner" : "player";
+    lines.push(
+      [g.week, g.id, g.kickoffAt, g.away, g.home, g.winner ?? "", names.get(p.playerId) ?? p.playerId, p.team, p.rank, g.winner ? points : "", enteredBy]
+        .map(esc)
+        .join(","),
+    );
   }
   return new Response(lines.join("\n") + "\n", {
     headers: {

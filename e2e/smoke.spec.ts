@@ -77,9 +77,10 @@ test.describe.serial("pool flow", () => {
     await page.getByRole("button", { name: "Rank 3" }).click();
     await page.getByRole("button", { name: "Lock it in" }).click();
     await expect(page.getByText("Locked in")).toBeVisible();
-    // The code that moves this name to another device lives under the name chip.
+    // The code that moves this name to another device is under the name chip, one tap in.
     await page.getByRole("button", { name: "Switch player" }).click();
     const sheet = page.getByRole("dialog", { name: "Your account" });
+    await sheet.getByRole("button", { name: /Pick on another device/ }).click();
     alexCode = (await sheet.getByText(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/).innerText()).trim();
     expect(alexCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
     await sheet.getByRole("button", { name: "Close" }).click();
@@ -176,6 +177,46 @@ test("a sign-in link with the wrong code falls back to typing it", async ({ page
   await page.goto(`/welcome?claim=${player.id}&code=AAAA2222&now=${BEFORE}`);
   await expect(page.getByRole("heading", { name: `Prove you're ${name}` })).toBeVisible();
   await expect(page).toHaveURL(new RegExp(`claim=${player.id}$`));
+});
+
+test("one phone can pick for the whole family, and the code stays out of the way", async ({ page, request }) => {
+  const stamp = Date.now().toString(36);
+  const parent = await (await request.post("/api/players", { data: { name: `Parent ${stamp}` } })).json();
+  const kid = await (await request.post("/api/players", { data: { name: `Kid ${stamp}` } })).json();
+
+  await page.goto(`/welcome?claim=${parent.player.id}&code=${parent.code}&now=${BEFORE}`);
+  await expect(page.getByRole("button", { name: "Switch player" })).toContainText(`Parent ${stamp}`);
+
+  // The code is not on show; it is one deliberate tap away.
+  await page.getByRole("button", { name: "Switch player" }).click();
+  const sheet = page.getByRole("dialog", { name: "Your account" });
+  await expect(sheet.getByText(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/)).toBeHidden();
+  await sheet.getByRole("button", { name: /Pick on another device/ }).click();
+  await expect(sheet.getByText(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/)).toBeVisible();
+
+  // The commissioner puts the kid on this phone: PIN once, no code, no sign-out.
+  await sheet.getByRole("button", { name: "Add someone I pick for" }).click();
+  await sheet.getByLabel("Admin PIN").fill("1234");
+  await sheet.getByRole("button", { name: `Kid ${stamp}` }).click();
+  await expect(page.getByRole("button", { name: "Switch player" })).toContainText(`Kid ${stamp}`);
+
+  // Picks for the kid go in from here, and switching back is one tap.
+  await expect(page).toHaveURL(/\/week\/1$/);
+  await page.getByRole("button", { name: "Pick Seattle Seahawks" }).click();
+  // One pick of five: the tray offers to rank what you have.
+  await page.getByRole("button", { name: "Rank 1" }).click();
+  await page.getByRole("button", { name: "Lock it in" }).click();
+  await expect(page.getByText("Locked in")).toBeVisible();
+
+  await page.getByRole("button", { name: "Switch player" }).click();
+  await page.getByRole("dialog", { name: "Your account" }).getByRole("button", { name: `Parent ${stamp}` }).click();
+  await expect(page.getByRole("button", { name: "Switch player" })).toContainText(`Parent ${stamp}`);
+
+  // The export shows those picks came from the commissioner's device.
+  const csv = await request.get("/api/admin/export.csv", { headers: { "x-admin-pin": "1234" } });
+  const rows = (await csv.text()).split("\n").filter((l) => l.includes(`Kid ${stamp}`));
+  expect(rows.length).toBe(1);
+  expect(rows[0]!.endsWith("commissioner")).toBe(true);
 });
 
 test("a player who shows up Sunday night can still pick what's left", async ({ page }) => {

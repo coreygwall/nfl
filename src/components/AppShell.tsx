@@ -7,10 +7,13 @@ import { useChrome } from "./Chrome.tsx";
 import { ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Football, Swap, Trophy, X } from "./Icons.tsx";
 import { useToast } from "./Toast.tsx";
 import { useOnline } from "../lib/online.ts";
+import { api } from "../api/client.ts";
+import type { Identity } from "../lib/identity.ts";
+import type { AdminDeviceResponse, RosterPlayer } from "../../shared/api.ts";
 import { formatCode } from "../../shared/codes.ts";
 
 export function AppShell() {
-  const { player, setPlayer, signOut } = usePlayer();
+  const { player, people, setPlayer, switchTo, forget } = usePlayer();
   const boot = useBootstrap();
   const loc = useLocation();
   const nav = useNavigate();
@@ -25,23 +28,32 @@ export function AppShell() {
     document.title = poolName;
   }, [poolName]);
 
-  // Devices that signed in before codes existed hold a name but no token. Claim one silently
-  // if the name is still free; otherwise send them to the code screen.
+  // The cookie is the other half of staying signed in: if storage was cleared but the cookie
+  // survived, the server still knows us, so adopt whoever it says we are.
+  useEffect(() => {
+    const me = boot.data?.me;
+    if (!me) return;
+    if (!player || (!player.token && player.id !== me.id)) setPlayer({ id: me.id, name: me.name });
+  }, [boot.data, player, setPlayer]);
+
+  // Devices that signed in before codes existed hold a name but no token, and no cookie either.
+  // Claim one silently if the name is still free; otherwise send them to the code screen.
   const claim = useClaimPlayer();
   const upgrading = useRef(false);
   useEffect(() => {
     if (!player || player.token || upgrading.current) return;
+    if (!boot.data || boot.data.me !== null) return;
     upgrading.current = true;
     claim
       .mutateAsync({ id: player.id })
       .then((r) => setPlayer({ ...r.player, token: r.token }))
       .catch(() => {
         const id = player.id;
-        signOut();
+        forget(id);
         toast(`${player.name} is already claimed. Enter the code to pick here.`, "error");
         nav(`/welcome?claim=${id}`, { replace: true });
       });
-  }, [player, claim, setPlayer, signOut, toast, nav]);
+  }, [player, boot.data, claim, setPlayer, forget, toast, nav]);
 
   // A bootstrap that finished *before* this device adopted its token still says "me: null".
   // Only a fresher one means the token was really revoked.
@@ -51,11 +63,12 @@ export function AppShell() {
   }, [player?.token]);
   useEffect(() => {
     if (player?.token && boot.data && boot.data.me === null && boot.dataUpdatedAt > tokenSeenAt.current) {
-      signOut();
-      toast("This device was signed out. Tap your name and enter your code.", "error");
+      const name = player.name;
+      forget(player.id);
+      toast(`${name} was signed out on this device. Tap the name chip to sign back in.`, "error");
       nav("/welcome", { replace: true });
     }
-  }, [player, boot.data, boot.dataUpdatedAt, signOut, toast, nav]);
+  }, [player, boot.data, boot.dataUpdatedAt, forget, toast, nav]);
 
   const onWelcome = loc.pathname.startsWith("/welcome");
   const currentWeek = boot.data?.currentWeek ?? 1;
@@ -168,38 +181,213 @@ export function AppShell() {
       <AnimatePresence>
         {switching && (
           <Sheet title="Your account" onClose={() => setSwitching(false)}>
-            {boot.data?.myCode && <DeviceCode code={boot.data.myCode} name={player?.name ?? ""} />}
-            <h3 className="font-display mb-2 mt-5 text-sm font-extrabold uppercase tracking-wider text-ink-3">
-              Someone else picking?
-            </h3>
-            <div className="flex flex-wrap gap-2">
-              {(boot.data?.players ?? [])
-                .filter((p) => p.id !== player?.id)
-                .map((p) => (
-                  <button
-                    key={p.id}
-                    className="chip px-3 py-1.5 text-sm"
-                    onClick={() => {
-                      setSwitching(false);
-                      nav(`/welcome?claim=${p.id}`);
-                    }}
-                  >
-                    {p.name}
-                  </button>
-                ))}
-            </div>
-            <button
-              className="btn btn-sm mt-4"
-              onClick={() => {
+            <AccountSheet
+              player={player}
+              people={people}
+              roster={boot.data?.players ?? []}
+              myCode={boot.data?.myCode ?? null}
+              onSwitch={(id) => {
+                switchTo(id);
+                setSwitching(false);
+                nav("/");
+              }}
+              onAdded={(p) => {
+                setPlayer(p);
+                setSwitching(false);
+                nav("/");
+              }}
+              onClaimElsewhere={(id) => {
+                setSwitching(false);
+                nav(`/welcome?claim=${id}`);
+              }}
+              onNew={() => {
                 setSwitching(false);
                 nav("/welcome?new=1");
               }}
-            >
-              I'm someone new
-            </button>
+            />
           </Sheet>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/**
+ * The account sheet. Most people see one line here and never touch it. The code stays hidden
+ * until someone actually needs another device, and the commissioner can put family members on
+ * this phone so four sets of picks come from one device without signing in and out.
+ */
+function AccountSheet({
+  player,
+  people,
+  roster,
+  myCode,
+  onSwitch,
+  onAdded,
+  onClaimElsewhere,
+  onNew,
+}: {
+  player: Identity | null;
+  people: Identity[];
+  roster: RosterPlayer[];
+  myCode: string | null;
+  onSwitch: (id: string) => void;
+  onAdded: (p: Identity) => void;
+  onClaimElsewhere: (id: string) => void;
+  onNew: () => void;
+}) {
+  const [showCode, setShowCode] = useState(false);
+  const [adding, setAdding] = useState(false);
+  const others = people.filter((p) => p.id !== player?.id);
+
+  return (
+    <div>
+      <p className="text-sm text-ink-2">
+        Picking as <b className="text-ink">{player?.name}</b>
+      </p>
+
+      {others.length > 0 && (
+        <>
+          <h3 className="font-display mb-2 mt-4 text-sm font-extrabold uppercase tracking-wider text-ink-3">
+            Also on this device
+          </h3>
+          <div className="flex flex-wrap gap-2">
+            {others.map((p) => (
+              <button key={p.id} className="chip px-3 py-1.5 text-sm" onClick={() => onSwitch(p.id)}>
+                {p.name}
+                {p.managed && <span className="ml-1 text-[10px] font-bold uppercase text-ink-3">yours</span>}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {adding ? (
+        <AddPerson
+          roster={roster}
+          have={new Set(people.map((p) => p.id))}
+          onDone={(p) => {
+            setAdding(false);
+            onAdded(p);
+          }}
+          onCancel={() => setAdding(false)}
+        />
+      ) : (
+        <div className="mt-5 space-y-2 border-t-2 border-dashed border-line pt-4">
+          {showCode && myCode ? (
+            <DeviceCode code={myCode} name={player?.name ?? ""} />
+          ) : (
+            <button className="text-sm font-bold underline" onClick={() => setShowCode(true)} disabled={!myCode}>
+              Pick on another device →
+            </button>
+          )}
+          <div className="flex flex-wrap gap-2 pt-1">
+            <button className="btn btn-sm" onClick={() => setAdding(true)}>
+              Add someone I pick for
+            </button>
+            <button className="btn btn-sm" onClick={onNew}>
+              I'm someone new
+            </button>
+          </div>
+          {roster.length > people.length && (
+            <p className="pt-1 text-xs text-ink-3">
+              Someone else's turn on this device?{" "}
+              {roster
+                .filter((p) => !people.some((x) => x.id === p.id))
+                .slice(0, 6)
+                .map((p, i) => (
+                  <span key={p.id}>
+                    {i > 0 && " · "}
+                    <button className="font-bold text-ink-2 underline" onClick={() => onClaimElsewhere(p.id)}>
+                      {p.name}
+                    </button>
+                  </span>
+                ))}
+            </p>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+/** Commissioner-only: adds another player's name to this device, no code needed. */
+function AddPerson({
+  roster,
+  have,
+  onDone,
+  onCancel,
+}: {
+  roster: RosterPlayer[];
+  have: Set<string>;
+  onDone: (p: Identity) => void;
+  onCancel: () => void;
+}) {
+  const [pin, setPin] = useState(() => {
+    try {
+      return sessionStorage.getItem("nflpool.admin.pin") ?? "";
+    } catch {
+      return "";
+    }
+  });
+  const [busy, setBusy] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
+  const available = roster.filter((p) => !have.has(p.id));
+
+  const add = async (id: string, name: string) => {
+    setBusy(id);
+    setError(null);
+    try {
+      const r = await api<AdminDeviceResponse>(`/admin/players/${id}/device`, { method: "POST", body: {}, pin });
+      try {
+        sessionStorage.setItem("nflpool.admin.pin", pin);
+      } catch {
+        /* ignore */
+      }
+      toast(`${name} is on this device now. Their picks are marked as entered by you.`, "success");
+      onDone({ ...r.player, token: r.token, managed: true });
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Couldn't add them.");
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <div className="mt-5 border-t-2 border-dashed border-line pt-4">
+      <h3 className="font-display text-sm font-extrabold">Add someone you pick for</h3>
+      <p className="mb-3 mt-0.5 text-xs text-ink-2">
+        Commissioner only. Their picks still follow every kickoff lock, and the export shows the picks came from
+        your device.
+      </p>
+      <input
+        type="password"
+        inputMode="numeric"
+        autoComplete="off"
+        value={pin}
+        onChange={(e) => setPin(e.target.value)}
+        placeholder="Admin PIN"
+        aria-label="Admin PIN"
+        className="card-flat mb-3 w-full px-3 py-2 tracking-[0.3em] outline-none focus:shadow-hard"
+      />
+      <div className="flex flex-wrap gap-2">
+        {available.length === 0 && <p className="text-sm text-ink-3">Everyone in the pool is already on this device.</p>}
+        {available.map((p) => (
+          <button
+            key={p.id}
+            className="chip px-3 py-1.5 text-sm"
+            disabled={!pin || busy !== null}
+            onClick={() => void add(p.id, p.name)}
+          >
+            {busy === p.id ? "Adding…" : p.name}
+          </button>
+        ))}
+      </div>
+      {error && <p className="mt-2 text-sm font-semibold text-danger">{error}</p>}
+      <button className="mt-4 text-sm font-bold text-ink-2 underline" onClick={onCancel}>
+        Never mind
+      </button>
     </div>
   );
 }

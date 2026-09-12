@@ -34,6 +34,7 @@ interface PickRow {
   week: number;
   team: string;
   rank: number;
+  device_id?: string | null;
 }
 
 export interface PlayerRecord extends Player {
@@ -211,27 +212,39 @@ export interface DeviceRecord {
   lastSeenAt: string;
 }
 
-/** The player this token belongs to, or null. Also stamps the device as seen. */
-export async function playerForToken(db: D1Database, tokenHash: string, now: string): Promise<PlayerRecord | null> {
+/** The player this token belongs to and the device it came from, or null. Stamps the device as seen. */
+export async function playerForToken(
+  db: D1Database,
+  tokenHash: string,
+  now: string,
+): Promise<{ player: PlayerRecord; deviceId: string } | null> {
   const row = await db
     .prepare(
-      `SELECT p.* FROM players p JOIN devices d ON d.player_id = p.id WHERE d.token_hash = ?`,
+      `SELECT p.*, d.id AS device_id FROM players p JOIN devices d ON d.player_id = p.id WHERE d.token_hash = ?`,
     )
     .bind(tokenHash)
-    .first<PlayerRow>();
+    .first<PlayerRow & { device_id: string }>();
   if (!row) return null;
   await db.prepare("UPDATE devices SET last_seen_at = ? WHERE token_hash = ?").bind(now, tokenHash).run();
-  return toPlayer(row);
+  return { player: toPlayer(row), deviceId: row.device_id };
 }
 
 export async function addDevice(
   db: D1Database,
-  d: { id: string; playerId: string; tokenHash: string; now: string },
+  d: { id: string; playerId: string; tokenHash: string; now: string; issuedBy?: "self" | "admin" },
 ): Promise<void> {
   await db
-    .prepare("INSERT INTO devices (id, player_id, token_hash, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?)")
-    .bind(d.id, d.playerId, d.tokenHash, d.now, d.now)
+    .prepare("INSERT INTO devices (id, player_id, token_hash, created_at, last_seen_at, issued_by) VALUES (?, ?, ?, ?, ?, ?)")
+    .bind(d.id, d.playerId, d.tokenHash, d.now, d.now, d.issuedBy ?? "self")
     .run();
+}
+
+/** How many of a player's devices the commissioner handed out, rather than the player claiming them. */
+export async function adminDeviceCounts(db: D1Database): Promise<Map<string, number>> {
+  const { results } = await db
+    .prepare("SELECT player_id, count(*) AS n FROM devices WHERE issued_by = 'admin' GROUP BY player_id")
+    .all<{ player_id: string; n: number }>();
+  return new Map(results.map((r) => [r.player_id, r.n]));
 }
 
 export async function countDevices(db: D1Database, playerId: string): Promise<number> {
@@ -318,6 +331,14 @@ export async function listAllPicks(db: D1Database): Promise<PlayerPick[]> {
   return results.map(toPick);
 }
 
+/** Which picks came from a device the commissioner put on their own phone. */
+export async function adminWrittenPickKeys(db: D1Database): Promise<Set<string>> {
+  const { results } = await db
+    .prepare("SELECT p.player_id, p.game_id FROM picks p JOIN devices d ON d.id = p.device_id WHERE d.issued_by = 'admin'")
+    .all<{ player_id: string; game_id: string }>();
+  return new Set(results.map((r) => `${r.player_id}:${r.game_id}`));
+}
+
 /**
  * Replaces a player's picks for a week atomically. Unless `ignoreLocks`, only picks on games that
  * have not kicked off (`kickoff_at > now`) are deleted, so a locked pick can never be removed here.
@@ -329,6 +350,8 @@ export async function replacePicks(
   picks: Pick[],
   now: string,
   ignoreLocks = false,
+  /** The device that wrote them — the audit trail when one phone holds several players. */
+  deviceId: string | null = null,
 ): Promise<void> {
   const del = ignoreLocks
     ? db.prepare("DELETE FROM picks WHERE player_id = ?1 AND week = ?2").bind(playerId, week)
@@ -339,9 +362,9 @@ export async function replacePicks(
         )
         .bind(playerId, week, now);
   const ins = db.prepare(
-    "INSERT INTO picks (player_id, game_id, week, team, rank, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO picks (player_id, game_id, week, team, rank, created_at, updated_at, device_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
   );
-  await db.batch([del, ...picks.map((p) => ins.bind(playerId, p.gameId, week, p.team, p.rank, now, now))]);
+  await db.batch([del, ...picks.map((p) => ins.bind(playerId, p.gameId, week, p.team, p.rank, now, now, deviceId))]);
 }
 
 // ---- meta ----

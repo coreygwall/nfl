@@ -1,25 +1,64 @@
 import { createContext, useCallback, useContext, useMemo, useState, type ReactNode } from "react";
-import { clearPlayer, loadPlayer, savePlayer, type Identity } from "./identity.ts";
+import {
+  clearPlayer,
+  loadStore,
+  savePlayer,
+  setActivePlayer,
+  type Identity,
+} from "./identity.ts";
+import { api } from "../api/client.ts";
 
 interface PlayerContextValue {
   player: Identity | null;
+  /** Every name this device can pick as — usually one, more when a parent picks for the family. */
+  people: Identity[];
   setPlayer: (p: Identity) => void;
+  switchTo: (id: string) => void;
+  forget: (id: string) => void;
   signOut: () => void;
 }
 
 const PlayerContext = createContext<PlayerContextValue | null>(null);
 
+/** Moves the session cookie to whoever we are picking as now. Best effort: the header still rules. */
+function syncSession(p: Identity | null): void {
+  if (!p?.token) return;
+  void api("/session", { method: "POST", body: {}, token: p.token }).catch(() => {});
+}
+
 export function PlayerProvider({ children }: { children: ReactNode }) {
-  const [player, setPlayerState] = useState<Identity | null>(loadPlayer);
+  const [store, setStore] = useState(loadStore);
+  const player = useMemo(
+    () => store.people.find((p) => p.id === store.activeId) ?? store.people[0] ?? null,
+    [store],
+  );
+
   const setPlayer = useCallback((p: Identity) => {
-    savePlayer(p);
-    setPlayerState(p);
+    setStore(savePlayer(p));
+    syncSession(p);
   }, []);
+
+  const switchTo = useCallback((id: string) => {
+    const next = setActivePlayer(id);
+    setStore(next);
+    syncSession(next.people.find((p) => p.id === next.activeId) ?? null);
+  }, []);
+
+  const forget = useCallback((id: string) => {
+    const next = clearPlayer(id);
+    setStore(next);
+    syncSession(next.people.find((p) => p.id === next.activeId) ?? null);
+  }, []);
+
   const signOut = useCallback(() => {
-    clearPlayer();
-    setPlayerState(null);
+    setStore(clearPlayer());
+    void api("/session", { method: "DELETE" }).catch(() => {});
   }, []);
-  const value = useMemo(() => ({ player, setPlayer, signOut }), [player, setPlayer, signOut]);
+
+  const value = useMemo(
+    () => ({ player, people: store.people, setPlayer, switchTo, forget, signOut }),
+    [player, store.people, setPlayer, switchTo, forget, signOut],
+  );
   return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;
 }
 

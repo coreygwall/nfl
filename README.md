@@ -16,7 +16,8 @@ results entered by the commissioner in about a minute a week.
 | Reveal | Other people's picks for a game are hidden until that game kicks off. Your own are always visible. |
 | Standings | Points, then correct picks, then 5-point hits, then name. Ties share a place. |
 | Weeks | Regular season, weeks 1–18. The Picks tab opens to the earliest week that still has an unstarted game. |
-| Identity | Type your name on first visit; the device is handed a token (stored in `localStorage`) and a short **device code**. The token is what every request proves; the code is what claims the same name on a second device. Tap your name in the header to see your code. A name already claimed cannot be taken without it, and a name nobody holds is claimed by the first device that asks — which is how everyone who joined before codes existed keeps their place. |
+| Identity | Type your name on first visit; the device is handed a token and a short **device code**. The token rides in `localStorage` *and* in a long-lived `HttpOnly` cookie, so a browser that clears one still knows you — you stay signed in indefinitely. The code claims the same name on a second device and stays hidden behind **Pick on another device** until you need it. A claimed name cannot be taken without the code; a name nobody holds is claimed by the first device that asks, which is how everyone who joined before codes existed keeps their place. |
+| Picking for others | The commissioner can add other players to their own phone (account sheet → **Add someone I pick for**, admin PIN once). Switching between them is one tap, no code, and each set of picks still obeys every kickoff lock. Those devices are marked admin-issued, so the CSV export's `entered_by` column reads `commissioner` rather than `player`. |
 
 ## Deploying (one-time, ~5 minutes)
 
@@ -75,6 +76,7 @@ Do this *before* adding passkeys: a passkey is bound to the domain it was create
   ```
   Player ids are listed at `GET /api/bootstrap`; game ids look like `2026_03_AWAY_HOME`.
 - **Rename / remove a player:** `/admin` → Players.
+- **Picking for your family:** tap your name → **Add someone I pick for** → enter the admin PIN once → tap their name. They appear beside you in the account sheet; switching is a tap. Their own devices keep working.
 - **Lost code / locked out / wrong person claimed a name:** `/admin` → Players → **Reset access**. It issues a new code and signs out that player's devices; send them the code and the next device to use it becomes them. Eight wrong codes locks claiming for 15 minutes; a reset clears the lock.
 - **Flexed kickoff times:** handled for you. A Cron Trigger checks nflverse every morning (10:00 UTC) and moves any kickoff the NFL has flexed. It only ever changes kickoff time and venue, never picks, results, weeks or teams, and it refuses to apply a feed that doesn't cover the games it already knows. `/admin` → Tools shows when it last ran and has a "Check nflverse now" button.
 - **Backup:** `/admin` → Tools → "Download picks CSV" gives every pick with its game, result and points.
