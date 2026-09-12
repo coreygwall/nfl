@@ -751,7 +751,7 @@ function DoneStep({
         </Link>
       </div>
       <button className="btn btn-ghost btn-sm mt-3 text-ink-2" onClick={onShare}>
-        <Share /> Invite someone to the pool
+        <Share /> Invite someone to join
       </button>
     </div>
   );
