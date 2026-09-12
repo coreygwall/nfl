@@ -11,6 +11,7 @@ test.describe.serial("pool flow", () => {
     await page.getByPlaceholder("Your name").fill("Corey");
     await page.getByRole("button", { name: "Let's go" }).click();
     await expect(page).toHaveURL(/\/week\/1$/);
+    await expect(page.locator('header img[src="/icon.svg"]')).toBeVisible();
     await expect(page.getByText("No weekly deadline")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Pick 5 winners" })).toBeVisible();
 
