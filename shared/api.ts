@@ -108,6 +108,8 @@ export interface AdminPlayerDTO extends Player {
   adminDevices: number;
   /** The code that claims this name on a new device; null for names created before codes. */
   code: string | null;
+  /** The commissioner's checkmark — squared away for the season. Admin API only. */
+  ready: boolean;
 }
 
 export interface AdminDeviceResponse {

@@ -33,6 +33,7 @@ import {
   publicPlayer,
   renamePlayer,
   replacePicks,
+  setPlayerReady,
   revokeDevices,
   setClaimCode,
   setResult,
@@ -122,9 +123,20 @@ adminRoutes.get("/players", async (c) => {
       devices: devices.get(p.id) ?? 0,
       adminDevices: adminDevices.get(p.id) ?? 0,
       code: p.claimCode,
+      ready: p.ready,
     })),
   };
   return c.json(body);
+});
+
+/** The commissioner's checkmark against a name. Nothing outside /admin ever sees it. */
+adminRoutes.put("/players/:id/ready", async (c) => {
+  const player = await getPlayer(c.env.DB, c.req.param("id"));
+  if (!player) throw notFound("NO_PLAYER", "No such player");
+  const body = (await c.req.json().catch(() => ({}))) as { ready?: unknown };
+  if (typeof body.ready !== "boolean") throw badRequest("VALIDATION", "ready must be true or false");
+  await setPlayerReady(c.env.DB, player.id, body.ready, c.get("now"));
+  return c.json({ player: publicPlayer(player), ready: body.ready });
 });
 
 /**

@@ -186,3 +186,12 @@ export function useAdminResetAccess(pin: string | null) {
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["admin"] }),
   });
 }
+
+export function useAdminSetReady(pin: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ready }: { id: string; ready: boolean }) =>
+      api<{ ready: boolean }>(`/admin/players/${id}/ready`, { method: "PUT", body: { ready }, pin: pin! }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["admin"] }),
+  });
+}

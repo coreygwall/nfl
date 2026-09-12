@@ -76,6 +76,7 @@ Do this *before* adding passkeys: a passkey is bound to the domain it was create
   ```
   Player ids are listed at `GET /api/bootstrap`; game ids look like `2026_03_AWAY_HOME`.
 - **Rename / remove a player:** `/admin` → Players.
+- **Who's squared away:** `/admin` → Players → tap the circle beside a name. Filter with **All / Ready / Waiting** to see who still needs chasing. It is commissioner-only: nothing about it reaches the pool, the board, or the API anyone else can call.
 - **Picking for your family:** tap your name → **Add someone I pick for** → enter the admin PIN once → tap their name. They appear beside you in the account sheet; switching is a tap. Their own devices keep working.
 - **Lost code / locked out / wrong person claimed a name:** `/admin` → Players → **Reset access**. It issues a new code and signs out that player's devices; send them the code and the next device to use it becomes them. Eight wrong codes locks claiming for 15 minutes; a reset clears the lock.
 - **Flexed kickoff times:** handled for you. A Cron Trigger checks nflverse every morning (10:00 UTC) and moves any kickoff the NFL has flexed. It only ever changes kickoff time and venue, never picks, results, weeks or teams, and it refuses to apply a feed that doesn't cover the games it already knows. `/admin` → Tools shows when it last ran and has a "Check nflverse now" button.

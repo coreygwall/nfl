@@ -26,6 +26,8 @@ interface PlayerRow {
   claim_code: string | null;
   claim_attempts: number | null;
   claim_locked_until: string | null;
+  ready: number | null;
+  ready_at: string | null;
 }
 
 interface PickRow {
@@ -45,6 +47,9 @@ export interface PlayerRecord extends Player {
   claimCode: string | null;
   claimAttempts: number;
   claimLockedUntil: string | null;
+  /** Commissioner's checkmark: squared away for the season. Admin-only, never public. */
+  ready: boolean;
+  readyAt: string | null;
 }
 
 export interface ScheduleGame {
@@ -80,6 +85,8 @@ const toPlayer = (r: PlayerRow): PlayerRecord => ({
   claimCode: r.claim_code ?? null,
   claimAttempts: r.claim_attempts ?? 0,
   claimLockedUntil: r.claim_locked_until ?? null,
+  ready: r.ready === 1,
+  readyAt: r.ready_at ?? null,
 });
 
 const toPick = (r: PickRow): PlayerPick => ({ playerId: r.player_id, gameId: r.game_id, team: r.team as Abbr, rank: r.rank });
@@ -284,6 +291,13 @@ export async function clearClaimFailures(db: D1Database, playerId: string): Prom
 
 export async function touchPlayer(db: D1Database, id: string, now: string): Promise<void> {
   await db.prepare("UPDATE players SET last_seen_at = ? WHERE id = ?").bind(now, id).run();
+}
+
+export async function setPlayerReady(db: D1Database, id: string, ready: boolean, now: string): Promise<void> {
+  await db
+    .prepare("UPDATE players SET ready = ?, ready_at = ? WHERE id = ?")
+    .bind(ready ? 1 : 0, ready ? now : null, id)
+    .run();
 }
 
 export async function renamePlayer(db: D1Database, id: string, name: string, nameKey: string): Promise<void> {

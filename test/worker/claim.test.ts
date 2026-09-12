@@ -198,3 +198,41 @@ describe("staying signed in and picking for the family", () => {
     expect(line.endsWith("player")).toBe(true);
   });
 });
+
+describe("the commissioner's ready list", () => {
+  it("starts everyone off as not ready and toggles both ways", async () => {
+    const p = await join("Ready");
+    const before = await api("/admin/players", { pin: "1234" });
+    expect(before.body.players.find((x: any) => x.id === p.id)).toMatchObject({ ready: false });
+
+    const on = await api(`/admin/players/${p.id}/ready`, { method: "PUT", body: { ready: true }, pin: "1234" });
+    expect(on.status).toBe(200);
+    const marked = await api("/admin/players", { pin: "1234" });
+    expect(marked.body.players.find((x: any) => x.id === p.id)).toMatchObject({ ready: true });
+
+    await api(`/admin/players/${p.id}/ready`, { method: "PUT", body: { ready: false }, pin: "1234" });
+    const off = await api("/admin/players", { pin: "1234" });
+    expect(off.body.players.find((x: any) => x.id === p.id)).toMatchObject({ ready: false });
+  });
+
+  it("is commissioner-only and never leaks to the pool", async () => {
+    const p = await join("Private");
+    await api(`/admin/players/${p.id}/ready`, { method: "PUT", body: { ready: true }, pin: "1234" });
+
+    const noPin = await api(`/admin/players/${p.id}/ready`, { method: "PUT", body: { ready: true } });
+    expect(noPin.status).toBe(401);
+
+    const boot = await api("/bootstrap", { token: p.token });
+    expect(JSON.stringify(boot.body)).not.toContain("ready");
+    const board = await api("/board/week/1");
+    expect(JSON.stringify(board.body)).not.toContain("ready");
+  });
+
+  it("rejects anything that is not a boolean", async () => {
+    const p = await join("Bool");
+    const bad = await api(`/admin/players/${p.id}/ready`, { method: "PUT", body: { ready: "yes" }, pin: "1234" });
+    expect(bad.status).toBe(400);
+    const missing = await api("/admin/players/nope/ready", { method: "PUT", body: { ready: true }, pin: "1234" });
+    expect(missing.status).toBe(404);
+  });
+});

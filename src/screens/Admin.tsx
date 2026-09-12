@@ -1,13 +1,14 @@
 import { useState, type FormEvent } from "react";
 import { motion } from "motion/react";
 import { api, ApiClientError } from "../api/client.ts";
-import { useAdminPlayerMutation, useAdminPlayers, useAdminPullResults, useAdminResetAccess, useAdminSetResult, useAdminStatus, useAdminSync, useAdminWeek, useBootstrap } from "../api/queries.ts";
+import { useAdminPlayerMutation, useAdminPlayers, useAdminPullResults, useAdminResetAccess, useAdminSetReady, useAdminSetResult, useAdminStatus, useAdminSync, useAdminWeek, useBootstrap } from "../api/queries.ts";
 import { TEAMS, type Abbr } from "../../shared/teams.ts";
 import type { AdminGameDTO, AdminPullResultsResponse } from "../../shared/api.ts";
 import { formatKickoff, formatShortDay } from "../lib/time.ts";
 import { formatCode } from "../../shared/codes.ts";
 import { ErrorState, Segmented, Spinner } from "../components/Common.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
+import { Check } from "../components/Icons.tsx";
 import { useToast } from "../components/Toast.tsx";
 import { useHeaderWeek } from "../components/Chrome.tsx";
 
@@ -250,10 +251,14 @@ function ResultRow({ game, onSet, busy }: { game: AdminGameDTO; onSet: (w: Abbr 
   );
 }
 
+type ReadyFilter = "all" | "ready" | "waiting";
+
 function Players({ pin }: { pin: string }) {
   const data = useAdminPlayers(pin);
   const mut = useAdminPlayerMutation(pin);
   const reset = useAdminResetAccess(pin);
+  const setReady = useAdminSetReady(pin);
+  const [filter, setFilter] = useState<ReadyFilter>("all");
   const toast = useToast();
   if (data.isPending) return <Spinner />;
   if (data.error) return <ErrorState message={data.error.message} onRetry={() => data.refetch()} />;
@@ -276,6 +281,14 @@ function Players({ pin }: { pin: string }) {
       toast(err instanceof Error ? err.message : "Couldn't reset", "error");
     }
   };
+  const toggleReady = async (id: string, name: string, ready: boolean) => {
+    try {
+      await setReady.mutateAsync({ id, ready });
+      toast(ready ? `${name} is ready to go` : `${name} moved back to waiting`, ready ? "success" : undefined);
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Couldn't save", "error");
+    }
+  };
   const act = async (input: Parameters<typeof mut.mutateAsync>[0]) => {
     try {
       await mut.mutateAsync(input);
@@ -284,12 +297,48 @@ function Players({ pin }: { pin: string }) {
       toast(err instanceof Error ? err.message : "Couldn't save", "error");
     }
   };
+  const all = data.data.players;
+  const readyCount = all.filter((p) => p.ready).length;
+  const shown = filter === "all" ? all : all.filter((p) => (filter === "ready" ? p.ready : !p.ready));
+
   return (
-    <ul className="grid gap-2 lg:grid-cols-2">
-      {data.data.players.length === 0 && <p className="text-sm text-ink-2">No players yet.</p>}
-      {data.data.players.map((p) => (
-        <li key={p.id} className="card-flat bg-white p-3">
+    <div>
+      <div className="mb-3 sm:max-w-[460px]">
+        <Segmented
+          value={filter}
+          label="Filter players"
+          pillId="admin-ready"
+          options={[
+            { value: "all", label: `All ${all.length}` },
+            { value: "ready", label: `Ready ${readyCount}` },
+            { value: "waiting", label: `Waiting ${all.length - readyCount}` },
+          ]}
+          onChange={setFilter}
+        />
+      </div>
+      <p className="mb-3 text-sm text-ink-2">
+        {readyCount} of {all.length} ready to go · tap the circle to mark someone off.
+      </p>
+      <ul className="grid gap-2 lg:grid-cols-2">
+      {all.length === 0 && <p className="text-sm text-ink-2">No players yet.</p>}
+      {shown.length === 0 && all.length > 0 && (
+        <p className="text-sm text-ink-2">{filter === "ready" ? "Nobody marked ready yet." : "Everyone is ready."}</p>
+      )}
+      {shown.map((p) => (
+        <li key={p.id} className={`card-flat p-3 ${p.ready ? "bg-turf-soft" : "bg-white"}`}>
           <div className="flex items-center gap-3">
+            <button
+              role="switch"
+              aria-checked={p.ready}
+              aria-label={`${p.name} ready to go`}
+              disabled={setReady.isPending}
+              onClick={() => void toggleReady(p.id, p.name, !p.ready)}
+              className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-ink transition-colors ${
+                p.ready ? "bg-turf text-white" : "bg-white text-transparent hover:text-ink-3"
+              }`}
+            >
+              <Check />
+            </button>
             <div className="min-w-0 flex-1">
               <div className="font-display truncate font-extrabold">{p.name}</div>
               <div className="text-xs text-ink-2">
@@ -341,7 +390,8 @@ function Players({ pin }: { pin: string }) {
           </div>
         </li>
       ))}
-    </ul>
+      </ul>
+    </div>
   );
 }
 

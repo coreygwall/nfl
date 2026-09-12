@@ -105,6 +105,16 @@ test.describe.serial("pool flow", () => {
     await expect(page.getByText("0 of 16 final")).toBeVisible();
     await page.getByRole("button", { name: /Seahawks/ }).first().click();
     await expect(page.getByText("1 of 16 final")).toBeVisible();
+
+    // The ready list: tick someone off, then narrow to who is still outstanding.
+    await page.getByRole("tab", { name: "Players" }).click();
+    await expect(page.getByText(/0 of \d+ ready to go/)).toBeVisible();
+    await page.getByRole("switch", { name: "Corey ready to go" }).click();
+    await expect(page.getByRole("switch", { name: "Corey ready to go" })).toHaveAttribute("aria-checked", "true");
+    await page.getByRole("tab", { name: /Waiting/ }).click();
+    await expect(page.getByRole("switch", { name: "Corey ready to go" })).toBeHidden();
+    await page.getByRole("tab", { name: /^Ready/ }).click();
+    await expect(page.getByRole("switch", { name: "Corey ready to go" })).toBeVisible();
   });
 
   test("after kickoff the pick is frozen and the board reveals it", async ({ page }) => {
