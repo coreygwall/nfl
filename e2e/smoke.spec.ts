@@ -40,17 +40,28 @@ test.describe.serial("pool flow", () => {
     await expect(page.getByRole("button", { name: "Switch player" })).toContainText("Corey");
   });
 
-  test("second player sees the roster, can't see hidden picks, admin scores the week", async ({ page }) => {
+  test("a second player is guarded against stealing a name, can't see hidden picks, admin scores the week", async ({ page }) => {
+    // First run on a new device asks for a name; the roster is one link away.
     await page.goto(`/welcome?now=${BEFORE}`);
+    await expect(page.getByRole("heading", { name: "What should we call you?" })).toBeVisible();
+    await page.getByRole("button", { name: "I already entered" }).click();
     await expect(page.getByText("Tap your name")).toBeVisible();
     await expect(page.getByRole("button", { name: "Corey" })).toBeVisible();
-    await page.getByRole("button", { name: "Add my name" }).click();
-    await page.getByPlaceholder("Your name").fill("corey"); // taken, case-insensitive
+    await page.getByRole("button", { name: /Don't see your name/ }).click();
+
+    // A taken name is caught while typing, case-insensitively, and again on submit.
+    await page.getByPlaceholder("Your name").fill("corey");
+    await expect(page.getByText("Someone's already picking as")).toBeVisible();
     await page.getByRole("button", { name: "Let's go" }).click();
-    await expect(page.getByText("already picking as")).toBeVisible();
-    await page.getByRole("button", { name: "No, try another name" }).click();
-    await page.getByPlaceholder("Your name").fill("Alex");
-    await page.getByRole("button", { name: "Let's go" }).click();
+    await expect(page.getByText("is already in the pool")).toBeVisible();
+
+    // Claiming a new entry forces a name that is actually different.
+    await page.getByRole("button", { name: "I'm a different Corey" }).click();
+    await expect(page.getByRole("heading", { name: "Make it yours" })).toBeVisible();
+    await page.getByPlaceholder(/Corey/).fill("Corey");
+    await expect(page.getByRole("button", { name: "Join as this name" })).toBeDisabled();
+    await page.getByPlaceholder(/Corey/).fill("Alex");
+    await page.getByRole("button", { name: "Join as this name" }).click();
     await expect(page).toHaveURL(/\/week\/1$/);
 
     for (const t of ["New England Patriots", "Los Angeles Rams", "Houston Texans"]) await pick(page, t);
@@ -80,6 +91,7 @@ test.describe.serial("pool flow", () => {
   test("after kickoff the pick is frozen and the board reveals it", async ({ page }) => {
     // Alex is remembered on this device (same browser context is NOT shared across tests, so re-select).
     await page.goto(`/welcome?now=${AFTER_OPENER}`);
+    await page.getByRole("button", { name: "I already entered" }).click();
     await page.getByRole("button", { name: "Alex" }).click();
     await expect(page).toHaveURL(/\/week\/1$/);
     await expect(page.getByText("0 of 1 right so far")).toBeVisible();
@@ -114,7 +126,6 @@ test("a player who shows up Sunday night can still pick what's left", async ({ p
   // Only the Sunday night and Monday night games have yet to kick off.
   const SUNDAY_NIGHT = "2026-09-13T22:00:00Z";
   await page.goto(`/welcome?now=${SUNDAY_NIGHT}`);
-  await page.getByRole("button", { name: "Add my name" }).click();
   await page.getByPlaceholder("Your name").fill("Sunday Nighter");
   await page.getByRole("button", { name: "Let's go" }).click();
 

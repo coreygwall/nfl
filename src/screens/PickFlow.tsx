@@ -194,9 +194,13 @@ function PickFlowInner({ week }: { week: number }) {
       ? { label: "Picks in ✓", tone: "bg-turf-soft" }
       : { label: "", tone: "" };
 
+  // The review screen spreads into two columns once there is a "who picked whom" panel to show.
+  const reviewWide = step === "review" && games.some(lockedNow);
+  const wideStep = step === "select" || reviewWide;
+
   return (
     <div>
-      <div className="mx-auto w-full max-w-[760px]">
+      <div className={`w-full ${wideStep ? "" : "mx-auto max-w-[760px]"}`}>
         <WeekNav
           week={week}
           onChange={(w) => nav(`/week/${w}`)}
@@ -206,7 +210,7 @@ function PickFlowInner({ week }: { week: number }) {
 
       <AnimatePresence mode="wait" initial={false}>
         {step === "review" ? (
-          <StepWrap key="review">
+          <StepWrap key="review" wide={reviewWide}>
             <ReviewStep week={week} games={games} myPicks={myPicks} pickCounts={wk.data!.pickCounts} lockedNow={lockedNow} anyUnlocked={anyUnlocked} onEdit={() => setStep("select")} submitted={wk.data!.submitted} />
           </StepWrap>
         ) : step === "select" ? (
@@ -287,7 +291,7 @@ function SelectStep({
   return (
     <div>
       {allLocked ? (
-        <div className="card-flat mx-auto mb-4 max-w-[760px] bg-paper-2 px-4 py-3 text-sm">
+        <div className="card-flat mb-4 max-w-[760px] bg-paper-2 px-4 py-3 text-sm">
           <b>Every Week {week} game has kicked off.</b> {hasSaved ? "Your picks are in the books." : "No picks this week."}{" "}
           {currentWeek !== week && (
             <Link className="font-bold underline" to={`/week/${currentWeek}`}>
@@ -296,7 +300,7 @@ function SelectStep({
           )}
         </div>
       ) : (
-        <header className="mx-auto mb-4 max-w-[760px]">
+        <header className="mb-4 max-w-[760px]">
           <h2 className="font-display text-[1.9rem] font-extrabold leading-none tracking-tight">
             Pick {slotCount} winner{slotCount === 1 ? "" : "s"}
             {picked > 0 && (
@@ -781,8 +785,9 @@ function ReviewStep({
   const finals = rows.filter((r) => r.outcome === "win" || r.outcome === "loss" || r.outcome === "tie").length;
   const started = games.filter(lockedNow);
   const nextKick = games.filter((g) => !lockedNow(g)).map((g) => g.kickoffAt).sort()[0];
+  const twoCol = started.length > 0;
   return (
-    <div>
+    <div className={twoCol ? "lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)] lg:items-start lg:gap-6" : ""}>
       <div className="card p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
@@ -825,10 +830,10 @@ function ReviewStep({
         </div>
       </div>
 
-      {started.length > 0 && (
-        <section className="mt-6">
+      {twoCol && (
+        <section className="mt-6 lg:mt-0">
           <h3 className="font-display mb-2 text-lg font-extrabold">Who picked whom</h3>
-          <ul className="space-y-2">
+          <ul className="grid gap-2 sm:grid-cols-2 lg:grid-cols-1">
             {started.map((g) => {
               const c = pickCounts[g.id] ?? { away: 0, home: 0 };
               const total = c.away + c.home;

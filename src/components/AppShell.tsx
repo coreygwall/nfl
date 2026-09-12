@@ -42,15 +42,42 @@ export function AppShell() {
   return (
     <div className="relative mx-auto flex min-h-dvh w-full max-w-[1180px] flex-col">
       <header className="sticky top-0 z-30 border-b-2 border-ink bg-paper/90 backdrop-blur">
-        <div className="flex items-center justify-between gap-3 px-4 py-2.5">
+        <div className="flex items-center gap-3 px-4 py-2.5 sm:px-6 lg:px-8">
           <Link to="/" className="font-display text-[1.65rem] font-extrabold leading-none tracking-tight">
             {poolName}
           </Link>
           {player && !onWelcome && (
-            <button className="chip max-w-[55%]" onClick={() => setSwitching(true)} aria-label="Switch player">
-              <span className="truncate">{player.name}</span>
-              <Swap className="shrink-0 text-ink-2" />
-            </button>
+            <>
+              <nav className="ml-4 hidden items-center gap-1 md:flex">
+                {tabs.map((t) => {
+                  const active = loc.pathname.startsWith(t.match);
+                  return (
+                    <Link
+                      key={t.match}
+                      to={t.to}
+                      aria-current={active ? "page" : undefined}
+                      className={`relative flex items-center gap-2 rounded-full px-4 py-1.5 font-display text-[15px] font-bold ${
+                        active ? "text-paper" : "text-ink-2 hover:text-ink"
+                      }`}
+                    >
+                      {active && (
+                        <motion.span
+                          layoutId="top-nav-pill"
+                          className="absolute inset-0 -z-10 rounded-full bg-ink"
+                          transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                        />
+                      )}
+                      {t.icon}
+                      {t.label}
+                    </Link>
+                  );
+                })}
+              </nav>
+              <button className="chip ml-auto max-w-[55%]" onClick={() => setSwitching(true)} aria-label="Switch player">
+                <span className="truncate">{player.name}</span>
+                <Swap className="shrink-0 text-ink-2" />
+              </button>
+            </>
           )}
         </div>
         {!online && (
@@ -68,12 +95,12 @@ export function AppShell() {
         )}
       </header>
 
-      <main className={`flex-1 px-4 pt-4 ${navHidden ? "pb-40" : "pb-28"}`}>
+      <main className={`flex-1 px-4 pt-4 sm:px-6 lg:px-8 ${navHidden ? "pb-40" : "pb-28 md:pb-12"}`}>
         <Outlet />
       </main>
 
       {!onWelcome && !navHidden && (
-        <nav className="fixed inset-x-0 bottom-0 z-30">
+        <nav className="fixed inset-x-0 bottom-0 z-30 md:hidden">
           <div className="mx-auto max-w-[560px] px-4 pb-[max(env(safe-area-inset-bottom),12px)]">
             <div className="card flex p-1.5">
               {tabs.map((t) => {

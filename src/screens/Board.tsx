@@ -18,19 +18,24 @@ export function Board({ tab }: { tab: "week" | "season" }) {
   if (tab === "week" && (!Number.isInteger(week) || week! < 1 || week! > WEEKS)) return <Navigate to="/board" replace />;
   const boardWeek = boot.data?.boardWeek ?? 1;
   return (
-    <div className="mx-auto w-full max-w-[760px]">
-      <Segmented
-        value={tab}
-        options={[
-          { value: "week", label: "This week" },
-          { value: "season", label: "Season" },
-        ]}
-        onChange={(v) => nav(v === "week" ? `/board/week/${boardWeek}` : "/board/season")}
-      />
-      <div className="mt-4">
-        {tab === "week" ? <WeekBoardView week={week!} onWeek={(w) => nav(`/board/week/${w}`)} /> : <SeasonBoardView />}
+    <div className="mx-auto w-full max-w-[760px] lg:max-w-[1060px]">
+      <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start lg:gap-8">
+        <div>
+          <Segmented
+            value={tab}
+            options={[
+              { value: "week", label: "This week" },
+              { value: "season", label: "Season" },
+            ]}
+            onChange={(v) => nav(v === "week" ? `/board/week/${boardWeek}` : "/board/season")}
+          />
+          <div className="mt-4">
+            {tab === "week" ? <WeekBoardView week={week!} onWeek={(w) => nav(`/board/week/${w}`)} /> : <SeasonBoardView />}
+          </div>
+        </div>
+        <SideRail tab={tab} week={tab === "week" ? week! : boardWeek} />
       </div>
-      <p className="mt-10 text-center text-xs text-ink-3">
+      <p className="mt-10 text-center text-xs text-ink-3 lg:hidden">
         <Link to="/rules" className="underline">
           How scoring works
         </Link>
@@ -41,6 +46,74 @@ export function Board({ tab }: { tab: "week" | "season" }) {
       </p>
     </div>
   );
+}
+
+/** Desktop-only rail: uses the space beside the standings for your spot, the scoring key, and shortcuts. */
+function SideRail({ tab, week }: { tab: "week" | "season"; week: number }) {
+  const { player } = usePlayer();
+  const boot = useBootstrap();
+  const weekBoard = useWeekBoard(week);
+  const seasonBoard = useSeasonBoard();
+  const rows: (WeekRow | SeasonRow)[] = tab === "week" ? (weekBoard.data?.rows ?? []) : (seasonBoard.data?.rows ?? []);
+  const mine = rows.find((r) => r.playerId === player?.id);
+  const leader = rows[0];
+  return (
+    <aside className="mt-6 hidden lg:sticky lg:top-24 lg:mt-0 lg:block">
+      <div className="card-flat bg-white p-4">
+        <h2 className="font-display text-[11px] font-extrabold uppercase tracking-wider text-ink-3">
+          {tab === "week" ? `Week ${week}` : "Season"}
+        </h2>
+        {mine ? (
+          <>
+            <div className="mt-1 flex items-baseline gap-2">
+              <span className="font-display text-3xl font-extrabold leading-none tabular">{ordinal(mine.place)}</span>
+              <span className="font-display text-lg font-extrabold tabular text-ink-2">{mine.points} pts</span>
+            </div>
+            <p className="mt-1 text-xs text-ink-2">
+              {leader && leader.playerId !== player?.id
+                ? `${leader.points - mine.points} behind ${leader.name}`
+                : "You're on top. Say nothing, stay humble."}
+            </p>
+          </>
+        ) : (
+          <p className="mt-1 text-sm text-ink-2">
+            {player ? "You're not on this board yet." : "Join the pool to land on the board."}
+          </p>
+        )}
+        <Link className="btn btn-sm btn-primary mt-3 w-full" to={player ? `/week/${boot.data?.currentWeek ?? week}` : "/welcome"}>
+          {player ? "Make my picks" : "Join the pool"}
+        </Link>
+      </div>
+      <div className="card-flat mt-3 bg-white p-4">
+        <h2 className="font-display text-[11px] font-extrabold uppercase tracking-wider text-ink-3">Scoring</h2>
+        <ul className="mt-2 space-y-1.5">
+          {[1, 2, 3, 4, 5].map((r) => (
+            <li key={r} className="flex items-center gap-2 text-sm">
+              <RankBadge rank={r} size="sm" />
+              <span className="text-ink-2">
+                rank {r} → <b className="text-ink">{6 - r}</b> pt{6 - r === 1 ? "" : "s"}
+              </span>
+            </li>
+          ))}
+        </ul>
+        <p className="mt-3 text-xs text-ink-3">
+          <Link to="/rules" className="underline">
+            How scoring works
+          </Link>
+          {" · "}
+          <Link to="/admin" className="underline">
+            Enter results
+          </Link>
+        </p>
+      </div>
+    </aside>
+  );
+}
+
+function ordinal(n: number): string {
+  const suffix = ["th", "st", "nd", "rd"] as const;
+  const v = n % 100;
+  return `${n}${suffix[(v - 20) % 10] ?? suffix[v] ?? "th"}`;
 }
 
 function PlaceBadge({ place, size = "md" }: { place: number; size?: "md" | "sm" }) {

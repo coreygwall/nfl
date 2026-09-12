@@ -52,7 +52,7 @@ export function WeekNav({
   suffix?: ReactNode;
 }) {
   return (
-    <div className="flex items-center justify-between gap-2">
+    <div className="flex w-full max-w-[560px] items-center justify-between gap-2">
       <button
         className="btn btn-sm px-2"
         aria-label="Previous week"
@@ -112,7 +112,7 @@ export function Segmented<T extends string>({
   onChange: (v: T) => void;
 }) {
   return (
-    <div className="card-flat relative flex p-1" role="tablist">
+    <div className="card-flat relative flex p-1 sm:max-w-[420px]" role="tablist">
       {options.map((o) => {
         const active = o.value === value;
         return (

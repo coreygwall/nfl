@@ -16,7 +16,7 @@ results entered by the commissioner in about a minute a week.
 | Reveal | Other people's picks for a game are hidden until that game kicks off. Your own are always visible. |
 | Standings | Points, then correct picks, then 5-point hits, then name. Ties share a place. |
 | Weeks | Regular season, weeks 1–18. The Picks tab opens to the earliest week that still has an unstarted game. |
-| Identity | Tap your name (or add it). It is remembered on the device. Switch with the chip in the header. No passwords. |
+| Identity | Type your name on first visit; it is remembered on the device. Joining from a second device? Tap **I already entered** and pick your name. A name already in the pool cannot be taken by accident — you either continue as that player or pick a name that differs. Switch with the chip in the header. No passwords. |
 
 ## Deploying (one-time, ~5 minutes)
 
@@ -37,8 +37,8 @@ From a laptop instead: `npx wrangler login && npm run deploy && npx wrangler sec
 
 Send people the root URL. It unfurls in iMessage, WhatsApp and Slack with `public/og.jpg` and the pool name; the
 Worker fills in the absolute image URL and `POOL_NAME` at request time, so no config is needed when the host
-changes. `npm run og:build` regenerates the image. First-time visitors land on a welcome page with the rules in
-three steps and a full `/rules` page one tap away. The roster is capped at 200 names.
+changes. `npm run og:build` regenerates the image. First-time visitors land on a welcome page that asks for a name,
+with the rules in three steps and a full `/rules` page one tap away. The roster is capped at 200 names.
 
 ## Weekly ops
 

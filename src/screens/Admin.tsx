@@ -93,7 +93,7 @@ function AdminPanel({ pin, onSignOut }: { pin: string; onSignOut: () => void }) 
   const [week, setWeek] = useState<number | null>(null);
   const activeWeek = week ?? boot.data?.boardWeek ?? 1;
   return (
-    <div className="mx-auto w-full max-w-[860px]">
+    <div className="mx-auto w-full max-w-[860px] lg:max-w-[1060px]">
       <Segmented
         value={tab}
         options={[
@@ -136,7 +136,7 @@ function Results({ pin, week, onWeek }: { pin: string; week: number; onWeek: (w:
           <p className="mb-3 text-sm text-ink-2">
             {data.data.games.filter((g) => g.winner).length} of {data.data.games.length} final · tap the winner. Tap again to clear.
           </p>
-          <ul className="space-y-2">
+          <ul className="grid gap-2 lg:grid-cols-2">
             {data.data.games.map((g) => (
               <ResultRow key={g.id} game={g} onSet={(w) => save(g, w)} busy={set.isPending} />
             ))}
@@ -175,7 +175,9 @@ function ResultRow({ game, onSet, busy }: { game: AdminGameDTO; onSet: (w: Abbr 
           {formatShortDay(game.kickoffAt)} · {formatKickoff(game.kickoffAt).split("·")[1]}
           {!game.locked && <span className="ml-2 chip bg-flag-soft py-0 text-[10px]">Not started</span>}
         </span>
-        <span>{game.picks.length} picks</span>
+        <span>
+          {game.picks.length} pick{game.picks.length === 1 ? "" : "s"}
+        </span>
       </div>
       <div className="flex items-stretch gap-2">
         {teamBtn(game.away)}
@@ -208,7 +210,7 @@ function Players({ pin }: { pin: string }) {
     }
   };
   return (
-    <ul className="space-y-2">
+    <ul className="grid gap-2 lg:grid-cols-2">
       {data.data.players.length === 0 && <p className="text-sm text-ink-2">No players yet.</p>}
       {data.data.players.map((p) => (
         <li key={p.id} className="card-flat flex items-center gap-3 bg-white p-3">
@@ -283,7 +285,7 @@ function Tools({ pin, onSignOut }: { pin: string; onSignOut: () => void }) {
 
   const st = status.data;
   return (
-    <div className="space-y-3">
+    <div className="grid items-start gap-3 lg:grid-cols-2">
       <div className="card-flat bg-white p-4">
         <h3 className="font-display font-extrabold">Schedule</h3>
         <p className="mb-2 text-sm text-ink-2">
@@ -321,7 +323,7 @@ function Tools({ pin, onSignOut }: { pin: string; onSignOut: () => void }) {
           the commissioner only.
         </p>
       </div>
-      <button className="btn btn-sm" onClick={onSignOut}>
+      <button className="btn btn-sm justify-self-start" onClick={onSignOut}>
         Sign out of admin
       </button>
     </div>
