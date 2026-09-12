@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useBootstrap } from "../api/queries.ts";
 import { usePlayer } from "../lib/player.tsx";
 import { useChrome } from "./Chrome.tsx";
-import { ChevronDown, ChevronLeft, ChevronRight, Football, Swap, Trophy, X } from "./Icons.tsx";
+import { ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Football, Swap, Trophy, X } from "./Icons.tsx";
 import { useToast } from "./Toast.tsx";
 import { useOnline } from "../lib/online.ts";
 
@@ -37,6 +37,7 @@ export function AppShell() {
   const tabs = [
     { to: `/week/${currentWeek}`, match: "/week", label: "Picks", icon: <Football /> },
     { to: "/board", match: "/board", label: "Board", icon: <Trophy /> },
+    { to: "/rules", match: "/rules", label: "Rules", icon: <CircleHelp /> },
   ];
 
   return (
@@ -117,7 +118,7 @@ export function AppShell() {
                     key={t.match}
                     to={t.to}
                     aria-current={active ? "page" : undefined}
-                    className={`relative isolate z-0 flex flex-1 items-center justify-center gap-2 rounded-2xl py-2.5 font-display text-base font-bold transition-colors ${
+                    className={`relative isolate z-0 flex flex-1 items-center justify-center gap-1.5 rounded-2xl py-2.5 font-display text-[15px] font-bold transition-colors ${
                       active ? "text-paper" : "text-ink hover:bg-paper-2"
                     }`}
                   >
