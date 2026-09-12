@@ -97,7 +97,8 @@ for (const [abbr, body] of Object.entries(inner)) {
   const withXlink = body.includes("xlink:") ? ' xmlns:xlink="http://www.w3.org/1999/xlink"' : "";
   if (RASTER.has(abbr)) {
     // Render at 3x and save as PNG (transparent), cropped to the art box.
-    const svg = `<svg xmlns="http://www.w3.org/2000/svg"${withXlink} viewBox="${vb}" width="${Math.round((b.width + PAD * 2) * 3)}" height="${Math.round((b.height + PAD * 2) * 3)}">${body}</svg>`;
+    const scale = RASTER_WIDTH / (b.width + PAD * 2);
+    const svg = `<svg xmlns="http://www.w3.org/2000/svg"${withXlink} viewBox="${vb}" width="${RASTER_WIDTH}" height="${Math.round((b.height + PAD * 2) * scale)}">${body}</svg>`;
     await page.setContent(`<html><body style="margin:0;background:transparent">${svg}</body></html>`);
     const el = await page.$("svg");
     const png = await el!.screenshot({ omitBackground: true, type: "png" });

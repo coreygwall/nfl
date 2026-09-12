@@ -1,5 +1,5 @@
 import { useEffect, useState, type FormEvent } from "react";
-import { useNavigate, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { AnimatePresence, motion } from "motion/react";
 import { useBootstrap, useCreatePlayer } from "../api/queries.ts";
 import { ApiClientError } from "../api/client.ts";
@@ -29,8 +29,9 @@ export function Welcome() {
     if (boot.data && players.length === 0) setMode("new");
   }, [boot.data, players.length]);
 
-  const go = (p: Player) => {
+  const go = (p: Player, returning = false) => {
     setPlayer(p);
+    if (returning) toast(`Picking as ${p.name}. Not you? Use the name chip up top to switch.`);
     nav(next, { replace: true });
   };
 
@@ -82,6 +83,25 @@ export function Welcome() {
           Every week, pick the winner of five games and rank them 1 to 5. Nail your #1 for 5 points, your #5 for 1. Most points
           over the season wins.
         </p>
+        <ol className="mt-4 grid grid-cols-3 gap-2 text-center">
+          {[
+            ["Pick 5", "winners"],
+            ["Rank them", "1 to 5"],
+            ["Score", "5·4·3·2·1"],
+          ].map(([a, b], i) => (
+            <li key={a} className="card-flat bg-white px-2 py-2.5">
+              <span className="font-display block text-[10px] font-extrabold uppercase tracking-wider text-ink-3">Step {i + 1}</span>
+              <span className="font-display block text-[15px] font-extrabold leading-tight">{a}</span>
+              <span className="block text-xs text-ink-2">{b}</span>
+            </li>
+          ))}
+        </ol>
+        <p className="mt-2 text-xs text-ink-3">
+          No weekly deadline — each game locks at kickoff.{" "}
+          <Link to="/rules" className="font-bold underline">
+            Full rules
+          </Link>
+        </p>
       </motion.section>
 
       {boot.isPending ? (
@@ -104,7 +124,7 @@ export function Welcome() {
                       animate={{ opacity: 1, scale: 1, y: 0 }}
                       transition={{ type: "spring", stiffness: 500, damping: 26, delay: Math.min(i * 0.03, 0.4) }}
                       whileTap={{ scale: 0.94 }}
-                      onClick={() => go(p)}
+                      onClick={() => go(p, true)}
                     >
                       {p.name}
                     </motion.button>
@@ -122,7 +142,7 @@ export function Welcome() {
                 <h2 className="font-display text-xl font-extrabold">Someone's already picking as “{claim.name}”</h2>
                 <p className="mb-4 text-sm text-ink-2">Is that you on another device?</p>
                 <div className="flex flex-wrap gap-2">
-                  <button className="btn btn-primary" onClick={() => go(claim)}>
+                  <button className="btn btn-primary" onClick={() => go(claim, true)}>
                     Yep, that's me
                   </button>
                   <button

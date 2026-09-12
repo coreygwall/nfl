@@ -150,6 +150,11 @@ export async function listPlayers(db: D1Database): Promise<PlayerRecord[]> {
   return results.map(toPlayer);
 }
 
+export async function countPlayers(db: D1Database): Promise<number> {
+  const row = await db.prepare("SELECT count(*) AS n FROM players").first<{ n: number }>();
+  return row?.n ?? 0;
+}
+
 export async function getPlayer(db: D1Database, id: string): Promise<PlayerRecord | null> {
   const row = await db.prepare("SELECT * FROM players WHERE id = ?").bind(id).first<PlayerRow>();
   return row ? toPlayer(row) : null;

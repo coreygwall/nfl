@@ -133,3 +133,23 @@ test("a player who shows up Sunday night can still pick what's left", async ({ p
   await page.getByRole("button", { name: "Lock it in" }).click();
   await expect(page.getByText("Locked in")).toBeVisible();
 });
+
+test("the shared link unfurls with absolute image and url, and the rules page reads", async ({ page, baseURL }) => {
+  const res = await page.request.get("/");
+  expect(res.status()).toBe(200);
+  const html = await res.text();
+  expect(html).toContain(`property="og:image" content="${baseURL}/og.jpg"`);
+  expect(html).toContain(`property="og:url" content="${baseURL}/"`);
+  expect(html).toContain(`name="twitter:image" content="${baseURL}/og.jpg"`);
+  expect(html).toContain("<title>High Five</title>");
+  const img = await page.request.get("/og.jpg");
+  expect(img.status()).toBe(200);
+  expect(img.headers()["content-type"]).toContain("image/jpeg");
+
+  await page.goto("/rules");
+  await expect(page.getByRole("heading", { name: "How High Five works" })).toBeVisible();
+  await expect(page.getByText("No weekly deadline")).toBeVisible();
+  await page.getByRole("link", { name: "Join the pool" }).click();
+  await expect(page).toHaveURL(/\/welcome$/);
+  await expect(page.getByText("Step 1")).toBeVisible();
+});

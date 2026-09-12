@@ -31,7 +31,10 @@ export function Board({ tab }: { tab: "week" | "season" }) {
         {tab === "week" ? <WeekBoardView week={week!} onWeek={(w) => nav(`/board/week/${w}`)} /> : <SeasonBoardView />}
       </div>
       <p className="mt-10 text-center text-xs text-ink-3">
-        Commissioner?{" "}
+        <Link to="/rules" className="underline">
+          How scoring works
+        </Link>
+        {" · "}Commissioner?{" "}
         <Link to="/admin" className="underline">
           Enter results
         </Link>

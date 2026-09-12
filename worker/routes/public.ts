@@ -16,6 +16,7 @@ import type {
   WeekResponse,
 } from "../../shared/api.ts";
 import {
+  countPlayers,
   createPlayer,
   findPlayerByKey,
   listAllPicks,
@@ -38,6 +39,8 @@ export function parseWeek(raw: string | undefined): number {
   if (!Number.isInteger(week) || week < 1 || week > WEEKS) throw badRequest("BAD_WEEK", `Week must be 1-${WEEKS}`);
   return week;
 }
+
+const MAX_PLAYERS = 200;
 
 export const publicRoutes = new Hono<AppEnv>();
 
@@ -69,6 +72,9 @@ publicRoutes.post("/players", async (c) => {
   if (existing) {
     const res: CreatePlayerResponse = { player: publicPlayer(existing), created: false };
     return c.json(res, 200);
+  }
+  if ((await countPlayers(c.env.DB)) >= MAX_PLAYERS) {
+    throw new ApiError(403, "POOL_FULL", "The pool is full. Ask the commissioner to make room.");
   }
   const player = { id: crypto.randomUUID(), name: check.name };
   try {

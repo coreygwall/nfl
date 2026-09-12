@@ -9,6 +9,7 @@ import { Welcome } from "./screens/Welcome.tsx";
 import { PickFlow } from "./screens/PickFlow.tsx";
 import { Board } from "./screens/Board.tsx";
 import { Admin } from "./screens/Admin.tsx";
+import { Rules } from "./screens/Rules.tsx";
 
 function Home() {
   const { player } = usePlayer();
@@ -40,6 +41,7 @@ export default function App() {
         <Route element={<AppShell />}>
           <Route index element={<Home />} />
           <Route path="welcome" element={<Welcome />} />
+          <Route path="rules" element={<Rules />} />
           <Route
             path="week/:week"
             element={

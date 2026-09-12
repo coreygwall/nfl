@@ -33,6 +33,13 @@ database heals on its own.)
 
 From a laptop instead: `npx wrangler login && npm run deploy && npx wrangler secret put ADMIN_PIN`.
 
+## Sharing the link
+
+Send people the root URL. It unfurls in iMessage, WhatsApp and Slack with `public/og.jpg` and the pool name; the
+Worker fills in the absolute image URL and `POOL_NAME` at request time, so no config is needed when the host
+changes. `npm run og:build` regenerates the image. First-time visitors land on a welcome page with the rules in
+three steps and a full `/rules` page one tap away. The roster is capped at 200 names.
+
 ## Weekly ops
 
 - **Results:** open `/admin`, enter the PIN, tap the winner of each game (tap again to clear, or **Tie**). Boards update instantly. Any device works.
