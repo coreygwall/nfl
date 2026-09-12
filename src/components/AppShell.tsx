@@ -28,7 +28,7 @@ export function AppShell() {
   const updateReady = !!boot.data && boot.data.build !== __BUILD_ID__ && __BUILD_ID__ !== "test";
 
   useEffect(() => {
-    document.title = poolName;
+    document.title = `${poolName} · Tally`;
   }, [poolName]);
 
   // The cookie is the other half of staying signed in: if storage was cleared but the cookie
@@ -89,13 +89,17 @@ export function AppShell() {
   return (
     <div className="relative mx-auto flex min-h-dvh w-full max-w-[1180px] flex-col">
       <header className="sticky top-0 z-30 border-b-2 border-ink bg-paper/90 backdrop-blur">
-        <div className="flex items-center gap-3 px-4 py-2.5 sm:px-6 lg:px-8">
+        <div className="flex items-center gap-3 px-4 py-3 sm:px-6 sm:py-3.5 lg:px-8">
           <Link
             to="/"
-            className="font-display flex shrink-0 items-center gap-2 whitespace-nowrap text-[1.35rem] font-extrabold leading-none tracking-tight sm:text-[1.65rem]"
+            aria-label={`Tally — ${poolName}`}
+            className="flex min-w-0 shrink-0 items-center gap-2.5"
           >
-            <img src="/icon.svg" alt="" className="h-8 w-8 shrink-0 sm:h-9 sm:w-9" />
-            <span>{poolName}</span>
+            <img src="/icon.svg" alt="" className="h-10 w-10 shrink-0 sm:h-11 sm:w-11" />
+            <span className="flex min-w-0 flex-col leading-none">
+              <span className="font-display truncate text-[1.55rem] font-extrabold tracking-tight sm:text-[1.8rem]">Tally</span>
+              <span className="mt-1 truncate text-[0.68rem] font-bold uppercase tracking-[0.16em] text-ink-2 sm:text-[0.72rem]">{poolName}</span>
+            </span>
           </Link>
           {player && !onWelcome && (
             <>
