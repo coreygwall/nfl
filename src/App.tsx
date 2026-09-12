@@ -22,9 +22,11 @@ function Home() {
 
 function BoardIndex() {
   const boot = useBootstrap();
+  const { search } = useLocation();
   if (boot.isPending) return <Spinner />;
   if (boot.error) return <ErrorState message={boot.error.message} onRetry={() => boot.refetch()} />;
-  return <Navigate to={`/board/week/${boot.data.boardWeek}`} replace />;
+  // Carry ?sort= through the redirect, so a shared board link keeps its view.
+  return <Navigate to={`/board/week/${boot.data.boardWeek}${search}`} replace />;
 }
 
 function RequirePlayer({ children }: { children: ReactNode }) {

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, Navigate, useNavigate, useParams } from "react-router";
+import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router";
 import { AnimatePresence, motion } from "motion/react";
 import { useBootstrap, useSeasonBoard, useWeekBoard } from "../api/queries.ts";
 import { usePlayer } from "../lib/player.tsx";
@@ -11,27 +11,51 @@ import { EmptyState, ErrorState, RankBadge, Segmented, Spinner } from "../compon
 import { TeamSticker } from "../components/TeamSticker.tsx";
 import { Lock } from "../components/Icons.tsx";
 
+export type BoardSort = "points" | "possible";
+
 export function Board({ tab }: { tab: "week" | "season" }) {
   const nav = useNavigate();
   const boot = useBootstrap();
   const { week: weekParam } = useParams();
+  const [params, setParams] = useSearchParams();
   const week = tab === "week" ? Number(weekParam) : null;
   if (tab === "week" && (!Number.isInteger(week) || week! < 1 || week! > WEEKS)) return <Navigate to="/board" replace />;
   const boardWeek = boot.data?.boardWeek ?? 1;
+  const sort: BoardSort = params.get("sort") === "possible" ? "possible" : "points";
+  const setSort = (v: BoardSort) => setParams(v === "possible" ? { sort: v } : {}, { replace: true });
+  const keepSort = sort === "possible" ? "?sort=possible" : "";
   return (
     <div className="mx-auto w-full max-w-[760px] lg:max-w-[1060px]">
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start lg:gap-8">
         <div>
-          <Segmented
-            value={tab}
-            options={[
-              { value: "week", label: "This week" },
-              { value: "season", label: "Season" },
-            ]}
-            onChange={(v) => nav(v === "week" ? `/board/week/${boardWeek}` : "/board/season")}
-          />
+          <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
+            <Segmented
+              value={tab}
+              label="Week or season"
+              pillId="board-range"
+              options={[
+                { value: "week", label: "This week" },
+                { value: "season", label: "Season" },
+              ]}
+              onChange={(v) => nav(v === "week" ? `/board/week/${boardWeek}${keepSort}` : `/board/season${keepSort}`)}
+            />
+            <Segmented
+              value={sort}
+              label="Sort the board"
+              pillId="board-sort"
+              options={[
+                { value: "points", label: "Points" },
+                { value: "possible", label: "Potential" },
+              ]}
+              onChange={setSort}
+            />
+          </div>
           <div className="mt-4">
-            {tab === "week" ? <WeekBoardView week={week!} onWeek={(w) => nav(`/board/week/${w}`)} /> : <SeasonBoardView />}
+            {tab === "week" ? (
+              <WeekBoardView week={week!} sort={sort} onWeek={(w) => nav(`/board/week/${w}${keepSort}`)} />
+            ) : (
+              <SeasonBoardView sort={sort} />
+            )}
           </div>
         </div>
         <SideRail tab={tab} week={tab === "week" ? week! : boardWeek} />
@@ -111,6 +135,15 @@ function SideRail({ tab, week }: { tab: "week" | "season"; week: number }) {
   );
 }
 
+/**
+ * Sorting by potential reorders the list but keeps each player's real standing on their badge —
+ * "third, but still the most to play for" is the interesting thing to see.
+ */
+function sortRows<T extends { place: number; possible: number }>(rows: T[], sort: BoardSort): T[] {
+  if (sort === "points") return rows;
+  return [...rows].sort((a, b) => b.possible - a.possible || a.place - b.place);
+}
+
 function ordinal(n: number): string {
   const suffix = ["th", "st", "nd", "rd"] as const;
   const v = n % 100;
@@ -127,7 +160,7 @@ function PlaceBadge({ place, size = "md" }: { place: number; size?: "md" | "sm" 
   );
 }
 
-function WeekBoardView({ week, onWeek }: { week: number; onWeek: (w: number) => void }) {
+function WeekBoardView({ week, sort, onWeek }: { week: number; sort: BoardSort; onWeek: (w: number) => void }) {
   const board = useWeekBoard(week);
   const { player } = usePlayer();
   const [open, setOpen] = useState<string | null>(null);
@@ -157,7 +190,7 @@ function WeekBoardView({ week, onWeek }: { week: number; onWeek: (w: number) => 
             />
           ) : (
             <motion.ul layout className="space-y-2">
-              {board.data.rows.map((row, i) => (
+              {sortRows(board.data.rows, sort).map((row, i) => (
                 <WeekRowItem
                   key={row.playerId}
                   row={row}
@@ -277,13 +310,13 @@ function PickChip({ pick }: { pick: ScoredPick }) {
   );
 }
 
-function SeasonBoardView() {
+function SeasonBoardView({ sort }: { sort: BoardSort }) {
   const board = useSeasonBoard();
   const { player } = usePlayer();
   const [open, setOpen] = useState<string | null>(null);
   if (board.isPending) return <Spinner />;
   if (board.error) return <ErrorState message={board.error.message} onRetry={() => board.refetch()} />;
-  const rows = board.data.rows;
+  const rows = sortRows(board.data.rows, sort);
   return (
     <div>
       <p className="mb-3 text-sm text-ink-2">
@@ -321,7 +354,11 @@ function SeasonRowItem({ row, index, isMe, open, onToggle, throughWeek }: { row:
             {isMe && <span className="chip bg-white py-0 text-[10px]">you</span>}
           </div>
           <div className="text-xs text-ink-2">
-            {row.weeksPlayed === 0 ? "No picks yet" : `${row.correct} right · ${row.weeksPlayed} wk${row.weeksPlayed === 1 ? "" : "s"}${row.bestWeek && row.bestWeek.points > 0 ? ` · best ${row.bestWeek.points} (W${row.bestWeek.week})` : ""}`}
+            {row.weeksPlayed === 0
+              ? "No picks yet"
+              : `${row.correct} right · ${row.weeksPlayed} wk${row.weeksPlayed === 1 ? "" : "s"}${
+                  row.possible > row.points ? ` · up to ${row.possible}` : ""
+                }${row.bestWeek && row.bestWeek.points > 0 ? ` · best ${row.bestWeek.points} (W${row.bestWeek.week})` : ""}`}
           </div>
         </div>
         <div className="text-right">

@@ -135,4 +135,20 @@ describe("buildSeasonBoard", () => {
     expect(board.rows.find((r) => r.name === "sam")).toMatchObject({ points: 0, weeksPlayed: 0, bestWeek: null, place: 3 });
     expect(board.throughWeek).toBe(2);
   });
+
+  it("counts undecided picks towards what is still possible", () => {
+    const games = [...WEEK1, ...WEEK2].map((g) => ({ ...g }));
+    games.find((g) => g.id === "g1")!.winner = "SEA";
+    const picks = [
+      // Banked 5, plus a rank-3 pick on a game with no result yet.
+      { playerId: "p1", gameId: "g1", team: "SEA" as const, rank: 1 },
+      { playerId: "p1", gameId: "h1", team: "MIA" as const, rank: 3 },
+      // Nothing decided: everything is still on the table.
+      { playerId: "p2", gameId: "h2", team: "DET" as const, rank: 1 },
+    ];
+    const board = buildSeasonBoard({ season: 2026, players, picks, games, now: "2026-09-21T12:00:00.000Z" });
+    expect(board.rows.find((r) => r.name === "Corey")).toMatchObject({ points: 5, possible: 5 + 3 });
+    expect(board.rows.find((r) => r.name === "Alex")).toMatchObject({ points: 0, possible: 5 });
+    expect(board.rows.find((r) => r.name === "sam")).toMatchObject({ points: 0, possible: 0 });
+  });
 });

@@ -58,13 +58,18 @@ export function Segmented<T extends string>({
   value,
   options,
   onChange,
+  label,
+  pillId = "segmented-pill",
 }: {
   value: T;
   options: { value: T; label: string }[];
   onChange: (v: T) => void;
+  label?: string;
+  /** Distinct per control, so two on one screen don't animate into each other. */
+  pillId?: string;
 }) {
   return (
-    <div className="card-flat relative flex p-1 sm:max-w-[420px]" role="tablist">
+    <div className="card-flat relative flex w-full p-1" role="tablist" aria-label={label}>
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -79,7 +84,7 @@ export function Segmented<T extends string>({
           >
             {active && (
               <motion.span
-                layoutId="segmented-pill"
+                layoutId={pillId}
                 className="absolute inset-0 -z-10 rounded-2xl bg-ink"
                 transition={{ type: "spring", stiffness: 500, damping: 35 }}
               />

@@ -58,6 +58,8 @@ export interface SeasonRow {
   points: number;
   correct: number;
   fives: number;
+  /** Points banked plus everything still live in undecided games. */
+  possible: number;
   weeksPlayed: number;
   bestWeek: { week: number; points: number } | null;
   byWeek: Record<number, number>;
@@ -173,6 +175,7 @@ export function buildSeasonBoard(input: {
     points: 0,
     correct: 0,
     fives: 0,
+    possible: 0,
     weeksPlayed: 0,
     bestWeek: null,
     byWeek: {},
@@ -188,6 +191,7 @@ export function buildSeasonBoard(input: {
     weeksPlayed.set(p.playerId, set);
     const { outcome, points } = scorePick(p, game);
     row.points += points;
+    row.possible += outcome === "pending" ? pointsForRank(p.rank) : points;
     row.byWeek[game.week] = (row.byWeek[game.week] ?? 0) + points;
     if (outcome === "win") {
       row.correct++;

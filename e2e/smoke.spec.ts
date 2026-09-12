@@ -141,6 +141,14 @@ test.describe.serial("pool flow", () => {
     await expect(page.getByText("4 more picks revealed at kickoff")).toBeVisible();
     await expect(page.getByText("+4")).toBeVisible();
 
+    // Sorting by potential reorders without renaming anyone's standing.
+    await page.getByRole("tab", { name: "Potential" }).click();
+    await expect(page).toHaveURL(/sort=possible/);
+    await expect(page.getByRole("tab", { name: "Potential" })).toHaveAttribute("aria-selected", "true");
+    await expect(page.getByText(/up to/).first()).toBeVisible();
+    await page.getByRole("tab", { name: "Points" }).click();
+    await expect(page).not.toHaveURL(/sort=/);
+
     await page.getByRole("tab", { name: "Season" }).click();
     await expect(page.getByText("through Week 1")).toBeVisible();
   });
