@@ -75,7 +75,7 @@ export function AppShell() {
               </nav>
               <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
                 {headerWeek && <HeaderWeekNav week={headerWeek.week} max={headerWeek.max} onChange={changeWeek} />}
-                <button className="chip min-w-0 max-w-[10ch] sm:max-w-[20ch]" onClick={() => setSwitching(true)} aria-label="Switch player">
+                <button className="chip min-w-0 max-w-[12ch] sm:max-w-[22ch]" onClick={() => setSwitching(true)} aria-label="Switch player">
                   <span className="truncate">{player.name}</span>
                   <Swap className="shrink-0 text-ink-2" />
                 </button>

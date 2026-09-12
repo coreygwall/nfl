@@ -683,7 +683,13 @@ function ConfirmStep({
           disabled={pending || offline}
           whileTap={{ scale: 0.97 }}
         >
-          {pending ? "Saving…" : "Lock it in 🔒"}
+          {pending ? (
+            "Saving…"
+          ) : (
+            <>
+              Lock it in <Lock size={20} />
+            </>
+          )}
         </motion.button>
       </div>
     </div>
