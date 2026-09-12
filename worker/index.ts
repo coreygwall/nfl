@@ -5,6 +5,7 @@ import { isDev } from "./env.ts";
 import { ApiError } from "./errors.ts";
 import { playerForToken, publicPlayer } from "./db.ts";
 import { hashToken } from "./auth.ts";
+import { withUnfurlTags } from "./unfurl.ts";
 import { ensureReady, SCHEDULE_VERSION, syncScheduleFromSource } from "./ready.ts";
 import { publicRoutes } from "./routes/public.ts";
 import { adminRoutes } from "./routes/admin.ts";
@@ -46,34 +47,7 @@ app.notFound(async (c) => {
   if (!c.env.ASSETS) return c.text("Not found", 404);
   const res = await c.env.ASSETS.fetch(c.req.raw);
   if (!(res.headers.get("content-type") ?? "").includes("text/html")) return res;
-  // Chat apps need absolute URLs to unfurl a link, and we only learn the host at request time.
-  const origin = new URL(c.req.url).origin;
-  const poolName = c.env.POOL_NAME || "High Five";
-  const title = `${poolName} — NFL pool`;
-  const absolute = (attr: string) => ({
-    element(el: Element) {
-      const v = el.getAttribute(attr);
-      if (v && v.startsWith("/")) el.setAttribute(attr, origin + v);
-    },
-  });
-  const setContent = (value: string) => ({
-    element(el: Element) {
-      el.setAttribute("content", value);
-    },
-  });
-  return new HTMLRewriter()
-    .on("title", {
-      element(el) {
-        el.setInnerContent(poolName);
-      },
-    })
-    .on('meta[property="og:site_name"]', setContent(poolName))
-    .on('meta[property="og:title"]', setContent(title))
-    .on('meta[name="twitter:title"]', setContent(title))
-    .on('meta[property="og:url"]', absolute("content"))
-    .on('meta[property="og:image"]', absolute("content"))
-    .on('meta[name="twitter:image"]', absolute("content"))
-    .transform(res);
+  return withUnfurlTags(res, new URL(c.req.url).origin, c.env.POOL_NAME || "High Five");
 });
 
 app.onError((err, c) => {

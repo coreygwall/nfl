@@ -29,7 +29,7 @@ database heals on its own.)
 2. Worker name **`nfl`** (must match `name` in `wrangler.jsonc`, and Cloudflare defaults it to the repo name). Build command `npm run build`. Deploy command `npx wrangler deploy` (the default). Root directory `/`.
 3. After the first deploy: Worker → **Settings** → **Variables and Secrets** → add a **secret** `ADMIN_PIN` (the commissioner PIN). Redeploy or push again.
 4. Optional: **Settings → Builds** → enable non-production branch builds to get a preview URL on every pull request.
-5. Share `https://nfl.<your-subdomain>.workers.dev`. Pool name is `POOL_NAME` in `wrangler.jsonc`.
+5. Share `https://nfl.<your-subdomain>.workers.dev`, or a custom domain (see **Moving to a custom domain**). Pool name is `POOL_NAME` in `wrangler.jsonc`.
 
 From a laptop instead: `npx wrangler login && npm run deploy && npx wrangler secret put ADMIN_PIN`.
 
@@ -39,6 +39,29 @@ Send people the root URL. It unfurls in iMessage, WhatsApp and Slack with `publi
 Worker fills in the absolute image URL and `POOL_NAME` at request time, so no config is needed when the host
 changes. `npm run og:build` regenerates the image. First-time visitors land on a welcome page that asks for a name,
 with the rules in three steps and a full `/rules` page one tap away. The roster is capped at 200 names.
+
+## Moving to a custom domain
+
+Nothing in the build names a host: every URL is relative, the API is called on `window.location.origin`, and the
+unfurl tags are made absolute from the request (`worker/unfurl.ts`, covered by tests at both a `workers.dev` and a
+custom host). So the move itself is dashboard-only:
+
+1. Point the domain's nameservers at Cloudflare, then Worker → **Settings** → **Domains & Routes** → **Add** →
+   **Custom domain**. Cloudflare issues the certificate.
+2. **Leave the `workers.dev` route enabled** through the cutover. Old links keep working, and anyone still signed
+   in there can read their device code off the old address.
+
+One thing to plan for: **browser storage is per-origin, so every device forgets who it is at the new address.**
+Nobody loses picks, points or history — those live in D1 against the player, not the device — but each person has
+to claim their name again, and an unsubmitted draft on a phone is lost. Two ways through it:
+
+- **Send everyone a sign-in link.** Open `/admin` **on the new domain** → Players → **Copy sign-in link** for each
+  person and text it to them. One tap signs that device in; the code is stripped from the address bar afterwards.
+- **Or let them do it:** open the new address, tap **I already entered**, pick their name, type the code they can
+  still see on the old address (or that you read to them from `/admin`).
+
+Do this *before* adding passkeys: a passkey is bound to the domain it was created on, so any registered on
+`workers.dev` would have to be created again after the move.
 
 ## Weekly ops
 

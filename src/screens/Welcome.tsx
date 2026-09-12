@@ -40,7 +40,10 @@ export function Welcome() {
   /** The roster entry this typed name would collide with, if any. */
   const collision = name.trim().length >= 2 ? (taken.get(nameKey(name)) ?? null) : null;
 
-  // Arriving from "switch player" or a signed-out device: go straight to the code.
+  // Arriving from "switch player" or a signed-out device: go straight to the code. A link that
+  // carries the code too (the commissioner's sign-in link, or moving to a new address) just works.
+  const linkCode = params.get("code");
+  const [linkTried, setLinkTried] = useState(false);
   useEffect(() => {
     if (!claimId || !boot.data) return;
     const found = players.find((p) => p.id === claimId);
@@ -48,8 +51,20 @@ export function Welcome() {
       setTarget(found);
       setMode("code");
     }
+    if (!found || !linkCode || linkTried) return;
+    setLinkTried(true);
+    claim
+      .mutateAsync({ id: found.id, code: normalizeCode(linkCode) })
+      .then((r) => {
+        // Don't leave the code sitting in the address bar or the back stack.
+        window.history.replaceState(null, "", "/welcome");
+        go({ ...r.player, token: r.token }, true);
+      })
+      .catch(() => {
+        window.history.replaceState(null, "", `/welcome?claim=${found.id}`);
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [claimId, boot.data]);
+  }, [claimId, linkCode, linkTried, boot.data]);
 
   useEffect(() => {
     if (mode === "roster" && boot.data && players.length === 0) setMode("new");
@@ -133,7 +148,11 @@ export function Welcome() {
                 </div>
               )}
               <AnimatePresence mode="wait" initial={false}>
-                {mode === "code" && target ? (
+                {mode === "code" && target && linkCode && !linkTried ? (
+                  <Panel key="link">
+                    <Spinner label={`Signing you in as ${target.name}…`} />
+                  </Panel>
+                ) : mode === "code" && target ? (
                   <Panel key="code">
                     <CodeForm
                       player={target}

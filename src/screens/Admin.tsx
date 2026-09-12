@@ -257,6 +257,17 @@ function Players({ pin }: { pin: string }) {
   const toast = useToast();
   if (data.isPending) return <Spinner />;
   if (data.error) return <ErrorState message={data.error.message} onRetry={() => data.refetch()} />;
+  /** Signs someone in on the device they open it with — for a new domain, or a lost code. */
+  const copySignIn = async (id: string, code: string, name: string) => {
+    const link = `${window.location.origin}/welcome?claim=${id}&code=${code}`;
+    try {
+      await navigator.clipboard.writeText(link);
+      toast(`Copied ${name}'s sign-in link. Send it to them and nobody else.`, "success");
+    } catch {
+      window.prompt(`${name}'s sign-in link`, link);
+    }
+  };
+
   const resetAccess = async (id: string, name: string) => {
     try {
       const r = await reset.mutateAsync(id);
@@ -308,6 +319,15 @@ function Players({ pin }: { pin: string }) {
               {p.devices === 0 ? "No device yet" : `${p.devices} device${p.devices === 1 ? "" : "s"}`}
             </span>
             <span className="font-display tracking-[0.1em]">{p.code ? formatCode(p.code) : "no code"}</span>
+            {p.code && (
+              <button
+                className="btn btn-sm"
+                onClick={() => void copySignIn(p.id, p.code!, p.name)}
+                title="A link that signs this person in on whatever device they open it with"
+              >
+                Copy sign-in link
+              </button>
+            )}
             <button
               className="btn btn-sm ml-auto"
               disabled={reset.isPending}

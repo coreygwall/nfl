@@ -149,6 +149,30 @@ test.describe.serial("pool flow", () => {
   });
 });
 
+test("a sign-in link claims the name in one tap, with no code to type", async ({ page, request }) => {
+  const name = `Linked ${Date.now().toString(36)}`;
+  const created = await request.post("/api/players", { data: { name } });
+  const { player, code } = (await created.json()) as { player: { id: string }; code: string };
+
+  await page.goto(`/welcome?claim=${player.id}&code=${code}&now=${BEFORE}`);
+  await expect(page).toHaveURL(/\/week\/1$/);
+  await expect(page.getByRole("button", { name: "Switch player" })).toContainText(name);
+
+  // The code does not stay in the address bar, and the device is really signed in.
+  await page.reload();
+  await expect(page.getByRole("button", { name: "Switch player" })).toContainText(name);
+});
+
+test("a sign-in link with the wrong code falls back to typing it", async ({ page, request }) => {
+  const name = `Mislinked ${Date.now().toString(36)}`;
+  const created = await request.post("/api/players", { data: { name } });
+  const { player } = (await created.json()) as { player: { id: string } };
+
+  await page.goto(`/welcome?claim=${player.id}&code=AAAA2222&now=${BEFORE}`);
+  await expect(page.getByRole("heading", { name: `Prove you're ${name}` })).toBeVisible();
+  await expect(page).toHaveURL(new RegExp(`claim=${player.id}$`));
+});
+
 test("a player who shows up Sunday night can still pick what's left", async ({ page }) => {
   // Only the Sunday night and Monday night games have yet to kick off.
   const SUNDAY_NIGHT = "2026-09-13T22:00:00Z";
@@ -183,6 +207,7 @@ test("the shared link unfurls with absolute image and url, and the rules page re
   const img = await page.request.get("/og.jpg");
   expect(img.status()).toBe(200);
   expect(img.headers()["content-type"]).toContain("image/jpeg");
+
 
   await page.goto("/rules");
   await expect(page.getByRole("heading", { name: "How to play High Five" })).toBeVisible();
