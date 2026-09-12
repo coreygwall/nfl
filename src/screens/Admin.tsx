@@ -326,7 +326,7 @@ function Players({ pin }: { pin: string }) {
       )}
       {shown.map((p) => (
         <li key={p.id} className={`card-flat p-3 ${p.ready ? "bg-turf-soft" : "bg-white"}`}>
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
             <button
               role="switch"
               aria-checked={p.ready}
@@ -339,29 +339,32 @@ function Players({ pin }: { pin: string }) {
             >
               <Check />
             </button>
-            <div className="min-w-0 flex-1">
+            <div className="min-w-0 flex-1 basis-[55%]">
               <div className="font-display truncate font-extrabold">{p.name}</div>
-              <div className="text-xs text-ink-2">
+              <div className="truncate text-xs text-ink-2">
                 {p.picksCount} picks · {p.weeksPlayed} wk{p.weeksPlayed === 1 ? "" : "s"} · last seen {formatShortDay(p.lastSeenAt)}
               </div>
             </div>
-            <button
-              className="btn btn-sm"
-              onClick={() => {
-                const name = window.prompt("New name", p.name);
-                if (name && name !== p.name) void act({ id: p.id, action: "rename", name });
-              }}
-            >
-              Rename
-            </button>
-            <button
-              className="btn btn-sm text-danger"
-              onClick={() => {
-                if (window.confirm(`Remove ${p.name} and all their picks?`)) void act({ id: p.id, action: "delete" });
-              }}
-            >
-              Remove
-            </button>
+            {/* Wraps to its own line on a phone rather than crushing the name. */}
+            <div className="ml-auto flex gap-2">
+              <button
+                className="btn btn-sm"
+                onClick={() => {
+                  const name = window.prompt("New name", p.name);
+                  if (name && name !== p.name) void act({ id: p.id, action: "rename", name });
+                }}
+              >
+                Rename
+              </button>
+              <button
+                className="btn btn-sm text-danger"
+                onClick={() => {
+                  if (window.confirm(`Remove ${p.name} and all their picks?`)) void act({ id: p.id, action: "delete" });
+                }}
+              >
+                Remove
+              </button>
+            </div>
           </div>
           <div className="mt-2 flex flex-wrap items-center gap-2 border-t-2 border-dashed border-line pt-2 text-xs text-ink-2">
             <span className="chip bg-paper-2 py-0 text-[11px]">
