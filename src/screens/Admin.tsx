@@ -1,9 +1,9 @@
 import { useState, type FormEvent } from "react";
 import { motion } from "motion/react";
 import { api, ApiClientError } from "../api/client.ts";
-import { useAdminPlayerMutation, useAdminPlayers, useAdminSetResult, useAdminStatus, useAdminSync, useAdminWeek, useBootstrap } from "../api/queries.ts";
+import { useAdminPlayerMutation, useAdminPlayers, useAdminPullResults, useAdminSetResult, useAdminStatus, useAdminSync, useAdminWeek, useBootstrap } from "../api/queries.ts";
 import { TEAMS, type Abbr } from "../../shared/teams.ts";
-import type { AdminGameDTO } from "../../shared/api.ts";
+import type { AdminGameDTO, AdminPullResultsResponse } from "../../shared/api.ts";
 import { formatKickoff, formatShortDay } from "../lib/time.ts";
 import { ErrorState, Segmented, Spinner, WeekNav } from "../components/Common.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
@@ -115,7 +115,9 @@ function AdminPanel({ pin, onSignOut }: { pin: string; onSignOut: () => void }) 
 function Results({ pin, week, onWeek }: { pin: string; week: number; onWeek: (w: number) => void }) {
   const data = useAdminWeek(week, pin);
   const set = useAdminSetResult(pin);
+  const pull = useAdminPullResults(pin);
   const toast = useToast();
+  const [conflicts, setConflicts] = useState<AdminPullResultsResponse["conflicts"]>([]);
   const save = async (game: AdminGameDTO, winner: Abbr | "TIE" | null) => {
     try {
       await set.mutateAsync({ gameId: game.id, winner });
@@ -124,6 +126,26 @@ function Results({ pin, week, onWeek }: { pin: string; week: number; onWeek: (w:
       toast(err instanceof Error ? err.message : "Couldn't save", "error");
     }
   };
+  const runPull = async () => {
+    try {
+      const r = await pull.mutateAsync(week);
+      setConflicts(r.conflicts);
+      if (!r.ok) {
+        toast(`Couldn't reach the scores: ${r.reason ?? "unknown"}`, "error");
+        return;
+      }
+      const parts: string[] = [];
+      if (r.applied) parts.push(`${r.applied} filled in`);
+      if (r.confirmed) parts.push(`${r.confirmed} already matched`);
+      if (r.pending) parts.push(`${r.pending} not posted yet`);
+      if (r.applied) toast(`Week ${week}: ${parts.join(" · ")}`, "success");
+      else if (parts.length) toast(`Nothing new · ${parts.join(" · ")}`);
+      else toast("No games have kicked off yet this week.");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Couldn't pull scores", "error");
+    }
+  };
+  const gamesById = new Map((data.data?.games ?? []).map((g) => [g.id, g]));
   return (
     <div>
       <WeekNav week={week} onChange={onWeek} />
@@ -133,9 +155,35 @@ function Results({ pin, week, onWeek }: { pin: string; week: number; onWeek: (w:
         <ErrorState message={data.error.message} onRetry={() => data.refetch()} />
       ) : (
         <div className="mt-4">
-          <p className="mb-3 text-sm text-ink-2">
-            {data.data.games.filter((g) => g.winner).length} of {data.data.games.length} final · tap the winner. Tap again to clear.
-          </p>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <p className="text-sm text-ink-2">
+              {data.data.games.filter((g) => g.winner).length} of {data.data.games.length} final · tap the winner. Tap again to clear.
+            </p>
+            <button className="btn btn-sm btn-primary w-full sm:ml-auto sm:w-auto" disabled={pull.isPending} onClick={runPull}>
+              {pull.isPending ? "Checking…" : "Pull final scores"}
+            </button>
+          </div>
+          {conflicts.length > 0 && (
+            <div className="card-flat mb-3 border-danger/60 bg-danger-soft/60 p-3">
+              <h3 className="font-display text-sm font-extrabold">
+                nflverse disagrees on {conflicts.length} game{conflicts.length === 1 ? "" : "s"}
+              </h3>
+              <ul className="mt-1 space-y-1 text-sm text-ink-2">
+                {conflicts.map((c) => {
+                  const g = gamesById.get(c.gameId);
+                  const label = g ? `${TEAMS[g.away].display} at ${TEAMS[g.home].display}` : c.gameId;
+                  const said = c.feed === "TIE" ? "a tie" : TEAMS[c.feed as Abbr]?.nickname ?? c.feed;
+                  const yours = c.recorded === "TIE" ? "a tie" : TEAMS[c.recorded as Abbr]?.nickname ?? c.recorded;
+                  return (
+                    <li key={c.gameId}>
+                      <b>{label}</b> — you recorded {yours}, the feed says {said} ({c.awayScore}–{c.homeScore}).
+                    </li>
+                  );
+                })}
+              </ul>
+              <p className="mt-2 text-xs text-ink-3">Yours stands. Clear the result below and pull again to take the feed's.</p>
+            </div>
+          )}
           <ul className="grid gap-2 lg:grid-cols-2">
             {data.data.games.map((g) => (
               <ResultRow key={g.id} game={g} onSet={(w) => save(g, w)} busy={set.isPending} />
@@ -175,7 +223,12 @@ function ResultRow({ game, onSet, busy }: { game: AdminGameDTO; onSet: (w: Abbr 
           {formatShortDay(game.kickoffAt)} · {formatKickoff(game.kickoffAt).split("·")[1]}
           {!game.locked && <span className="ml-2 chip bg-flag-soft py-0 text-[10px]">Not started</span>}
         </span>
-        <span>
+        <span className="flex items-center gap-2">
+          {game.awayScore !== null && game.homeScore !== null && (
+            <span className="tabular text-ink-3">
+              {game.awayScore}–{game.homeScore}
+            </span>
+          )}
           {game.picks.length} pick{game.picks.length === 1 ? "" : "s"}
         </span>
       </div>
@@ -306,6 +359,19 @@ function Tools({ pin, onSignOut }: { pin: string; onSignOut: () => void }) {
             Reload bundled copy
           </button>
         </div>
+      </div>
+      <div className="card-flat bg-white p-4">
+        <h3 className="font-display font-extrabold">Final scores</h3>
+        <p className="mb-2 text-sm text-ink-2">
+          The <b>Pull final scores</b> button on the Results tab fills in winners from nflverse for games that have
+          finished. It only fills blanks — anything you entered by hand stands, and a disagreement is shown, never applied.
+        </p>
+        {st && (
+          <p className="text-xs text-ink-3">
+            {st.resultsSyncedAt ? `Last pulled ${formatKickoff(st.resultsSyncedAt)}` : "Not pulled yet"}
+            {st.resultsSyncError ? ` · last error: ${st.resultsSyncError}` : ""}
+          </p>
+        )}
       </div>
       <div className="card-flat bg-white p-4">
         <h3 className="font-display font-extrabold">Backup</h3>

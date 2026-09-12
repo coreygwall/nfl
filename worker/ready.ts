@@ -1,8 +1,9 @@
 import schema from "../migrations/0001_init.sql?raw";
 import schedule from "../shared/schedule-2026.json";
-import { gamesFromCsv, NFLVERSE_GAMES_CSV } from "../shared/nflverse.ts";
-import { getMeta, listGames, setMeta, updateKickoffs, upsertGames } from "./db.ts";
+import { finalsFromCsv, gamesFromCsv, NFLVERSE_GAMES_CSV } from "../shared/nflverse.ts";
+import { applyResults, getMeta, listGames, setMeta, updateKickoffs, upsertGames } from "./db.ts";
 import { isDev, type Env } from "./env.ts";
+import type { Winner } from "../shared/types.ts";
 
 export const SEASON = schedule.season;
 export const SCHEDULE_VERSION = schedule.version;
@@ -79,6 +80,84 @@ export async function syncScheduleFromSource(
   await setMeta(db, "schedule_last_changes", String(changes.length));
   await setMeta(db, "schedule_sync_error", "");
   return { ok: true, fetched: fetched.length, updated: changes.length, syncedAt };
+}
+
+export interface ResultSyncResult {
+  ok: boolean;
+  reason?: string;
+  /** Finals written (only games that had no result recorded). */
+  applied: number;
+  /** Finals the feed agrees with us on. */
+  confirmed: number;
+  /** Games we consider started that the feed has no final for yet. */
+  pending: number;
+  /** Games where the feed disagrees with the recorded winner. Never overwritten — yours wins. */
+  conflicts: { gameId: string; recorded: string; feed: string; awayScore: number; homeScore: number }[];
+  syncedAt: string;
+}
+
+/**
+ * Fills in results from the nflverse feed for games that have finished.
+ *
+ * Deliberately timid, because a wrong result silently rewrites the standings: it only writes
+ * games with no result recorded, only for games that have already kicked off, only when the
+ * feed's teams match ours, and only from a feed that demonstrably covers our schedule. A feed
+ * that disagrees with something already recorded is reported, never applied — the commissioner
+ * clears the result by hand if the feed is the one that's right.
+ */
+export async function syncResultsFromSource(
+  db: D1Database,
+  now: string,
+  options: { week?: number; fetchCsv?: () => Promise<string> } = {},
+): Promise<ResultSyncResult> {
+  const fetchCsv = options.fetchCsv ?? defaultFetchCsv;
+  const syncedAt = new Date().toISOString();
+  const empty = { applied: 0, confirmed: 0, pending: 0, conflicts: [], syncedAt };
+  let text: string;
+  try {
+    text = await fetchCsv();
+  } catch (err) {
+    const reason = `fetch failed: ${err instanceof Error ? err.message : String(err)}`;
+    await setMeta(db, "results_sync_error", `${syncedAt} ${reason}`);
+    return { ok: false, reason, ...empty };
+  }
+
+  const all = await listGames(db, SEASON);
+  const scope = all.filter((g) => options.week === undefined || g.week === options.week);
+  // Same integrity check as the schedule sync: does this feed actually know our season?
+  const ids = new Set(all.map((g) => g.id));
+  const covered = gamesFromCsv(text, SEASON).filter((g) => ids.has(g.id)).length;
+  if (all.length === 0 || covered < Math.ceil(all.length * 0.95)) {
+    const reason = `feed covered ${covered} of ${all.length} known games; not applied`;
+    await setMeta(db, "results_sync_error", `${syncedAt} ${reason}`);
+    return { ok: false, reason, ...empty };
+  }
+
+  const finals = new Map(finalsFromCsv(text, SEASON).map((f) => [f.id, f]));
+  const started = scope.filter((g) => g.kickoffAt <= now);
+  const toWrite: { id: string; winner: Winner; awayScore: number; homeScore: number }[] = [];
+  const conflicts: ResultSyncResult["conflicts"] = [];
+  let confirmed = 0;
+  let pending = 0;
+  for (const game of started) {
+    const f = finals.get(game.id);
+    if (!f || f.away !== game.away || f.home !== game.home) {
+      pending++;
+      continue;
+    }
+    if (game.winner === null) {
+      // f.winner is f.home, f.away or TIE, and those teams just matched this game's.
+      toWrite.push({ id: game.id, winner: f.winner as Winner, awayScore: f.awayScore, homeScore: f.homeScore });
+    } else if (game.winner === f.winner) {
+      confirmed++;
+    } else {
+      conflicts.push({ gameId: game.id, recorded: game.winner, feed: f.winner, awayScore: f.awayScore, homeScore: f.homeScore });
+    }
+  }
+  if (toWrite.length) await applyResults(db, toWrite, now);
+  await setMeta(db, "results_synced_at", syncedAt);
+  await setMeta(db, "results_sync_error", "");
+  return { ok: true, applied: toWrite.length, confirmed, pending, conflicts, syncedAt };
 }
 
 let ready: Promise<void> | null = null;

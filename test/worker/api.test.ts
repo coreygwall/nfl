@@ -200,6 +200,8 @@ describe("admin", () => {
     expect((await api("/admin/verify", { method: "POST", body: {} })).status).toBe(401);
     expect((await api("/admin/verify", { method: "POST", body: {}, pin: "0000" })).status).toBe(401);
     expect((await api("/admin/verify", { method: "POST", body: {}, pin })).status).toBe(200);
+    expect((await api("/admin/pull-results", { method: "POST", body: {} })).status).toBe(401);
+    expect((await api("/admin/pull-results", { method: "POST", body: { week: 99 }, pin })).status).toBe(400);
   });
 
   it("records results that score the board, and keeps them through a schedule sync", async () => {

@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   AdminPlayersResponse,
+  AdminPullResultsResponse,
   AdminSetResultRequest,
   AdminWeekResponse,
   BootstrapResponse,
@@ -128,6 +129,8 @@ export interface AdminStatus {
   scheduleSyncedAt: string | null;
   scheduleLastChanges: number | null;
   scheduleSyncError: string | null;
+  resultsSyncedAt: string | null;
+  resultsSyncError: string | null;
 }
 
 export function useAdminStatus(pin: string | null) {
@@ -151,6 +154,15 @@ export function useAdminSync(pin: string | null) {
   return useMutation({
     mutationFn: (source: "remote" | "bundled") =>
       api<RemoteSyncResult | { upserted: number; version: string }>("/admin/sync-schedule", { method: "POST", body: { source }, pin: pin! }),
+    onSuccess: () => void qc.invalidateQueries(),
+  });
+}
+
+export function useAdminPullResults(pin: string | null) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (week?: number) =>
+      api<AdminPullResultsResponse>("/admin/pull-results", { method: "POST", body: week ? { week } : {}, pin: pin! }),
     onSuccess: () => void qc.invalidateQueries(),
   });
 }

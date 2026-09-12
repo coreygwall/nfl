@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { gamesFromCsv, parseCsv } from "../../shared/nflverse.ts";
+import { finalsFromCsv, gamesFromCsv, parseCsv } from "../../shared/nflverse.ts";
 
 const HEADER = "game_id,season,game_type,week,gameday,weekday,gametime,away_team,home_team,location,stadium";
 const csv = [
@@ -36,5 +36,23 @@ describe("nflverse CSV", () => {
     expect(tbd.tbd).toBe(true);
     expect(tbd.kickoff).toBe("2027-01-10T18:00:00.000Z"); // 1pm ET placeholder
     expect(tbd.venue).toBe("Reliant, Stadium");
+  });
+
+  it("reads finals, skipping games with no score posted yet", () => {
+    const scored = [
+      "game_id,season,game_type,week,gameday,weekday,gametime,away_team,away_score,home_team,home_score,location,stadium",
+      "2026_01_NE_SEA,2026,REG,1,2026-09-09,Wednesday,20:20,NE,10,SEA,13,Home,Lumen Field",
+      "2026_01_SF_LA,2026,REG,1,2026-09-10,Thursday,20:35,SF,27,LA,7,Neutral,MCG",
+      "2026_02_CAR_ATL,2026,REG,2,2026-09-20,Sunday,13:00,CAR,17,ATL,17,Home,Mercedes-Benz",
+      "2026_02_CIN_HOU,2026,REG,2,2026-09-20,Sunday,13:00,CIN,,HOU,,Home,NRG",
+      "2025_01_KC_LAC,2025,REG,1,2025-09-05,Friday,20:00,KC,21,LAC,20,Neutral,Corinthians",
+      "2026_19_BUF_KC,2026,POST,19,2027-01-16,Saturday,16:30,BUF,24,KC,31,Home,Arrowhead",
+    ].join("\n");
+
+    const finals = finalsFromCsv(scored, 2026);
+    expect(finals.map((f) => f.id)).toEqual(["2026_01_NE_SEA", "2026_01_SF_LA", "2026_02_CAR_ATL"]);
+    expect(finals[0]).toMatchObject({ winner: "SEA", awayScore: 10, homeScore: 13, week: 1 });
+    expect(finals[1]!.winner).toBe("SF");
+    expect(finals[2]!.winner).toBe("TIE");
   });
 });

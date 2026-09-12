@@ -84,3 +84,17 @@ export interface AdminPlayerDTO extends Player {
 export interface AdminPlayersResponse {
   players: AdminPlayerDTO[];
 }
+
+export interface AdminPullResultsRequest {
+  /** Limit the pull to one week. Omit to sweep the season. */
+  week?: number;
+}
+export interface AdminPullResultsResponse {
+  ok: boolean;
+  reason?: string;
+  applied: number;
+  confirmed: number;
+  pending: number;
+  conflicts: { gameId: string; recorded: string; feed: string; awayScore: number; homeScore: number }[];
+  syncedAt: string;
+}

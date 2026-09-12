@@ -73,3 +73,39 @@ export function gamesFromCsv(text: string, season: number): ScheduleGame[] {
     })
     .sort((a, b) => a.week - b.week || a.kickoff.localeCompare(b.kickoff) || a.id.localeCompare(b.id));
 }
+
+export interface FinalScore {
+  id: string;
+  week: number;
+  away: string;
+  home: string;
+  awayScore: number;
+  homeScore: number;
+  /** Winning team abbreviation, or "TIE". */
+  winner: string;
+}
+
+/**
+ * Games the feed reports as played, with their final score. Rows without both scores are
+ * games that have not finished (or that nflverse has not filled in yet) and are left out.
+ */
+export function finalsFromCsv(text: string, season: number): FinalScore[] {
+  return parseCsv(text)
+    .filter((r) => Number(r.season) === season && r.game_type === "REG" && r.game_id)
+    .flatMap((r) => {
+      const away = Number(r.away_score);
+      const home = Number(r.home_score);
+      if (r.away_score === "" || r.home_score === "" || !Number.isFinite(away) || !Number.isFinite(home)) return [];
+      return [
+        {
+          id: r.game_id!,
+          week: Number(r.week),
+          away: r.away_team!,
+          home: r.home_team!,
+          awayScore: away,
+          homeScore: home,
+          winner: home > away ? r.home_team! : away > home ? r.away_team! : "TIE",
+        },
+      ];
+    });
+}

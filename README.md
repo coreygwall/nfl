@@ -42,7 +42,8 @@ with the rules in three steps and a full `/rules` page one tap away. The roster 
 
 ## Weekly ops
 
-- **Results:** open `/admin`, enter the PIN, tap the winner of each game (tap again to clear, or **Tie**). Boards update instantly. Any device works.
+- **Results:** open `/admin`, enter the PIN, then either tap **Pull final scores** to fill the week in from nflverse, or tap the winner of each game by hand (tap again to clear, or **Tie**). Boards update instantly. Any device works.
+- **About the pull:** it only fills games with no result recorded, only after kickoff, and only from a feed that still covers the schedule. Anything you entered by hand stands; if the feed disagrees it says so and changes nothing — clear that game and pull again to take the feed's version. nflverse usually posts a final within an hour or two of the whistle.
 - **Someone texted picks after kickoff:** the commissioner can backfill past locks:
   ```sh
   curl -X PUT https://<host>/api/admin/players/<playerId>/weeks/3/picks \

@@ -143,6 +143,23 @@ export async function setResult(
     .run();
 }
 
+/** Records several results at once. Only used by the nflverse pull; single edits go through setResult. */
+export async function applyResults(
+  db: D1Database,
+  rows: { id: string; winner: Winner; awayScore: number; homeScore: number }[],
+  now: string,
+): Promise<number> {
+  if (rows.length === 0) return 0;
+  const stmt = db.prepare(
+    "UPDATE games SET winner = ?2, away_score = ?3, home_score = ?4, result_updated_at = ?5 WHERE id = ?1 AND winner IS NULL",
+  );
+  const chunk = 40;
+  for (let i = 0; i < rows.length; i += chunk) {
+    await db.batch(rows.slice(i, i + chunk).map((r) => stmt.bind(r.id, r.winner, r.awayScore, r.homeScore, now)));
+  }
+  return rows.length;
+}
+
 // ---- players ----
 
 export async function listPlayers(db: D1Database): Promise<PlayerRecord[]> {

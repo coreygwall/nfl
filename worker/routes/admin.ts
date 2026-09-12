@@ -24,7 +24,7 @@ import {
   replacePicks,
   setResult,
 } from "../db.ts";
-import { SCHEDULE_VERSION, SEASON, syncSchedule, syncScheduleFromSource } from "../ready.ts";
+import { SCHEDULE_VERSION, SEASON, syncResultsFromSource, syncSchedule, syncScheduleFromSource } from "../ready.ts";
 import { BUILD_ID } from "../index.ts";
 import { parseWeek, toGameDTO } from "./public.ts";
 
@@ -133,12 +133,21 @@ adminRoutes.post("/sync-schedule", async (c) => {
   return c.json(await syncSchedule(c.env.DB, true));
 });
 
+/** Fills in finals from nflverse for games that have already been played. Never overwrites. */
+adminRoutes.post("/pull-results", async (c) => {
+  const body = (await c.req.json().catch(() => ({}))) as { week?: unknown };
+  const week = body.week === undefined ? undefined : parseWeek(String(body.week));
+  return c.json(await syncResultsFromSource(c.env.DB, c.get("now"), { week }));
+});
+
 adminRoutes.get("/status", async (c) => {
   const db = c.env.DB;
-  const [syncedAt, lastChanges, syncError] = await Promise.all([
+  const [syncedAt, lastChanges, syncError, resultsSyncedAt, resultsError] = await Promise.all([
     getMeta(db, "schedule_synced_at"),
     getMeta(db, "schedule_last_changes"),
     getMeta(db, "schedule_sync_error"),
+    getMeta(db, "results_synced_at"),
+    getMeta(db, "results_sync_error"),
   ]);
   return c.json({
     now: c.get("now"),
@@ -147,6 +156,8 @@ adminRoutes.get("/status", async (c) => {
     scheduleSyncedAt: syncedAt,
     scheduleLastChanges: lastChanges ? Number(lastChanges) : null,
     scheduleSyncError: syncError || null,
+    resultsSyncedAt: resultsSyncedAt || null,
+    resultsSyncError: resultsError || null,
   });
 });
 
