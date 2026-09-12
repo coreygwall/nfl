@@ -1,7 +1,16 @@
 import { defineConfig } from "@playwright/test";
-import { existsSync, mkdtempSync } from "node:fs";
+import { copyFileSync, existsSync, mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+// The suite drives time with `?now=`, which the Worker only honours when ENVIRONMENT=dev, and
+// signs into /admin with the dev PIN. Both live in .dev.vars, which is gitignored — so a fresh
+// clone (CI included) gets the committed defaults rather than silently running as production.
+const root = path.dirname(fileURLToPath(import.meta.url));
+if (!existsSync(path.join(root, ".dev.vars"))) {
+  copyFileSync(path.join(root, ".dev.vars.example"), path.join(root, ".dev.vars"));
+}
 
 // The sandbox and CI may carry a Chromium that predates this Playwright release.
 const executablePath = process.env.PW_CHROMIUM_PATH ?? ["/opt/pw-browsers/chromium"].find((p) => existsSync(p));
