@@ -54,7 +54,7 @@ async function issueToken(db: D1Database, playerId: string, now: string): Promis
 
 /** Step one of adding a passkey: only a signed-in device can put one on an account. */
 passkeyRoutes.post("/register/options", async (c) => {
-  const me = c.get("player");
+  const me = c.get("account");
   if (!me) throw new ApiError(401, "NO_PLAYER", "Sign in first, then add Face ID.");
   const { id: rpID, name } = rp(c, c.env.APP_NAME || "Tally");
   const existing = await listPasskeys(c.env.DB, me.id, rpID);
@@ -83,7 +83,7 @@ passkeyRoutes.post("/register/options", async (c) => {
 });
 
 passkeyRoutes.post("/register", async (c) => {
-  const me = c.get("player");
+  const me = c.get("account");
   if (!me) throw new ApiError(401, "NO_PLAYER", "Sign in first, then add Face ID.");
   const body = (await c.req.json().catch(() => ({}))) as { challengeId?: string; response?: RegistrationResponseJSON };
   if (!body.challengeId || !body.response) throw new ApiError(400, "VALIDATION", "Missing the passkey response.");

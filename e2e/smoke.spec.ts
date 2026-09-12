@@ -192,7 +192,6 @@ test("a sign-in link with the wrong code falls back to typing it", async ({ page
 test("one phone can pick for the whole family, and the code stays out of the way", async ({ page, request }) => {
   const stamp = Date.now().toString(36);
   const parent = await (await request.post("/api/players", { data: { name: `Parent ${stamp}` } })).json();
-  const kid = await (await request.post("/api/players", { data: { name: `Kid ${stamp}` } })).json();
 
   await page.goto(`/welcome?claim=${parent.player.id}&code=${parent.code}&now=${BEFORE}`);
   await expect(page.getByRole("button", { name: "Switch player" })).toContainText(`Parent ${stamp}`);
@@ -204,10 +203,11 @@ test("one phone can pick for the whole family, and the code stays out of the way
   await sheet.getByRole("button", { name: /Pick on another device/ }).click();
   await expect(sheet.getByText(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/)).toBeVisible();
 
-  // The commissioner puts the kid on this phone: PIN once, no code, no sign-out.
-  await sheet.getByRole("button", { name: "Add someone I pick for" }).click();
-  await sheet.getByLabel("Admin PIN").fill("1234");
-  await sheet.getByRole("button", { name: `Kid ${stamp}` }).click();
+  // Any account can create a child entry: no PIN, code, or separate sign-in.
+  await sheet.getByRole("button", { name: "Add an entry", exact: true }).click();
+  await expect(sheet.getByLabel("Admin PIN")).toBeHidden();
+  await sheet.getByLabel("Entry name").fill(`Kid ${stamp}`);
+  await sheet.getByRole("button", { name: "Add entry & make picks" }).click();
   await expect(page.getByRole("button", { name: "Switch player" })).toContainText(`Kid ${stamp}`);
 
   // Picks for the kid go in from here, and switching back is one tap.
@@ -222,11 +222,13 @@ test("one phone can pick for the whole family, and the code stays out of the way
   await page.getByRole("dialog", { name: "Your account" }).getByRole("button", { name: `Parent ${stamp}` }).click();
   await expect(page.getByRole("button", { name: "Switch player" })).toContainText(`Parent ${stamp}`);
 
-  // The export shows those picks came from the commissioner's device.
+  await expect(page.getByRole("heading", { name: "Pick 5 winners" })).toBeVisible();
+
+  // This is an ordinary player action, not a commissioner override.
   const csv = await request.get("/api/admin/export.csv", { headers: { "x-admin-pin": "1234" } });
   const rows = (await csv.text()).split("\n").filter((l) => l.includes(`Kid ${stamp}`));
   expect(rows.length).toBe(1);
-  expect(rows[0]!.endsWith("commissioner")).toBe(true);
+  expect(rows[0]!.endsWith("player")).toBe(true);
 });
 
 test("a player who shows up Sunday night can still pick what's left", async ({ page }) => {
@@ -310,6 +312,16 @@ test("Face ID: turn it on, lose the device's memory, and sign back in with no ty
   await page.getByRole("button", { name: "Let's go" }).click();
   await expect(page.getByRole("button", { name: "Switch player" })).toContainText(name);
 
+  // Add two children before registering the account passkey while picking as a child.
+  for (const childName of [`Child A ${name}`, `Child B ${name}`]) {
+    await page.getByRole("button", { name: "Switch player" }).click();
+    const account = page.getByRole("dialog", { name: "Your account" });
+    await account.getByRole("button", { name: "Add an entry", exact: true }).click();
+    await account.getByLabel("Entry name").fill(childName);
+    await account.getByRole("button", { name: "Add entry & make picks" }).click();
+    await expect(page.getByRole("button", { name: "Switch player" })).toContainText(childName);
+  }
+
   // Opt in — it is a button in the account sheet, never a wall in front of the app.
   await page.getByRole("button", { name: "Switch player" }).click();
   const sheet = page.getByRole("dialog", { name: "Your account" });
@@ -329,6 +341,12 @@ test("Face ID: turn it on, lose the device's memory, and sign back in with no ty
   await page.getByRole("button", { name: "Sign in with Face ID" }).click();
   await expect(page).toHaveURL(/\/week\/1$/);
   await expect(page.getByRole("button", { name: "Switch player" })).toContainText(name);
+
+  // Both children follow the passkey onto the recovered device.
+  await page.getByRole("button", { name: "Switch player" }).click();
+  await expect(sheet.getByRole("button", { name: `Child A ${name}`, exact: true })).toBeVisible();
+  await sheet.getByRole("button", { name: `Child B ${name}`, exact: true }).click();
+  await expect(page.getByRole("button", { name: "Switch player" })).toContainText(`Child B ${name}`);
 
   // And it is a real session: picks save.
   await page.getByRole("button", { name: "Pick Seattle Seahawks" }).click();

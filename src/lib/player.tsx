@@ -4,6 +4,7 @@ import {
   loadStore,
   savePlayer,
   setActivePlayer,
+  syncAccountEntries,
   type Identity,
 } from "./identity.ts";
 import { api } from "../api/client.ts";
@@ -13,6 +14,7 @@ interface PlayerContextValue {
   /** Every name this device can pick as — usually one, more when a parent picks for the family. */
   people: Identity[];
   setPlayer: (p: Identity) => void;
+  syncEntries: (accountId: string, entries: Identity[], token?: string) => void;
   switchTo: (id: string) => void;
   forget: (id: string) => void;
   signOut: () => void;
@@ -38,6 +40,11 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
     syncSession(p);
   }, []);
 
+  const syncEntries = useCallback((accountId: string, entries: Identity[], token?: string) => {
+    const next = syncAccountEntries(accountId, entries, token);
+    setStore((previous) => JSON.stringify(previous) === JSON.stringify(next) ? previous : next);
+  }, []);
+
   const switchTo = useCallback((id: string) => {
     const next = setActivePlayer(id);
     setStore(next);
@@ -56,8 +63,8 @@ export function PlayerProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo(
-    () => ({ player, people: store.people, setPlayer, switchTo, forget, signOut }),
-    [player, store.people, setPlayer, switchTo, forget, signOut],
+    () => ({ player, people: store.people, setPlayer, syncEntries, switchTo, forget, signOut }),
+    [player, store.people, setPlayer, syncEntries, switchTo, forget, signOut],
   );
   return <PlayerContext.Provider value={value}>{children}</PlayerContext.Provider>;
 }

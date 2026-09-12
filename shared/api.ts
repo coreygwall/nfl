@@ -26,6 +26,8 @@ export interface BootstrapResponse {
   weeks: WeekSummary[];
   players: RosterPlayer[];
   me: Player | null;
+  account?: Player | null;
+  myEntries?: Player[];
   /** Your own claim code, for adding another device. Only sent to an authenticated device. */
   myCode?: string;
   /** How many passkeys this identity has for this host — 0 means we can offer to add one. */

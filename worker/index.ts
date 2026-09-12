@@ -3,7 +3,7 @@ import type { Context } from "hono";
 import type { AppEnv, Env } from "./env.ts";
 import { isDev } from "./env.ts";
 import { ApiError } from "./errors.ts";
-import { playerForToken, publicPlayer } from "./db.ts";
+import { getPlayer, playerForToken, publicPlayer } from "./db.ts";
 import { hashToken, tokenFromCookie } from "./auth.ts";
 import { withAbsoluteUrls, withUnfurlTags } from "./unfurl.ts";
 import { ensureReady, SCHEDULE_VERSION, syncScheduleFromSource } from "./ready.ts";
@@ -35,6 +35,15 @@ app.use("/api/*", async (c, next) => {
   const token = c.req.header("x-player-token") ?? tokenFromCookie(c.req.header("cookie"));
   const found = token ? await playerForToken(c.env.DB, await hashToken(token), c.get("now")) : null;
   c.set("player", found ? publicPlayer(found.player) : null);
+  c.set("account", found ? publicPlayer(found.player) : null);
+  const entryId = c.req.header("x-entry-id");
+  if (found && entryId && entryId !== found.player.id) {
+    const owned = await c.env.DB.prepare("SELECT player_id FROM entry_owners WHERE owner_id = ? AND player_id = ?")
+      .bind(found.player.id, entryId).first();
+    if (!owned) throw new ApiError(403, "ENTRY_FORBIDDEN", "This entry isn't managed by your account.");
+    const entry = await getPlayer(c.env.DB, entryId);
+    c.set("player", entry ? publicPlayer(entry) : null);
+  }
   c.set("deviceId", found?.deviceId ?? null);
   await next();
 });

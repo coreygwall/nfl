@@ -7,6 +7,8 @@ const LEGACY_KEY = "nflpool.player.v1";
 export interface Identity extends Player {
   /** Absent on devices that signed in before tokens existed, or when only the cookie holds it. */
   token?: string;
+  /** Account whose credential controls this entry. */
+  accountId?: string;
   /** True when the commissioner put this person on this device (a parent picking for the family). */
   managed?: boolean;
 }
@@ -53,6 +55,20 @@ function write(store: Store): void {
 }
 
 export const loadStore = read;
+
+/** Refresh this account's entries without changing which one is selected. */
+export function syncAccountEntries(accountId: string, entries: Player[], token?: string): Store {
+  const previous = read();
+  const ids = new Set(entries.map((p) => p.id));
+  const people = [
+    ...previous.people.filter((p) => p.accountId !== accountId && !ids.has(p.id)),
+    ...entries.map((p) => ({ ...p, accountId, token })),
+  ];
+  const next = { activeId: previous.activeId, people };
+  if (JSON.stringify(next) === JSON.stringify(previous)) return previous;
+  write(next);
+  return next;
+}
 
 /** Who this device is picking as right now. The API client reads this on every request. */
 export function loadPlayer(): Identity | null {
