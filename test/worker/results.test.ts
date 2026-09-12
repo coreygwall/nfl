@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { ensureReady, syncResultsFromSource } from "../../worker/ready.ts";
 import { getGame, getMeta, setResult } from "../../worker/db.ts";
 import schedule from "../../shared/schedule-2026.json";
+import type { Winner } from "../../shared/types.ts";
 
 const HEADER =
   "game_id,season,game_type,week,gameday,weekday,gametime,away_team,away_score,home_team,home_score,location,stadium,result";
@@ -83,7 +84,7 @@ describe("pulling final scores", () => {
   it("never overwrites a result the commissioner entered, and reports the disagreement", async () => {
     await ensureReady(env);
     const g = week1[3]!;
-    await setResult(env.DB, g.id, g.away, 3, 0, AFTER_WEEK_1);
+    await setResult(env.DB, g.id, g.away as Winner, 3, 0, AFTER_WEEK_1);
 
     const r = await syncResultsFromSource(env.DB, AFTER_WEEK_1, { fetchCsv: async () => feed({ [g.id]: [10, 13] }) });
 
@@ -97,7 +98,7 @@ describe("pulling final scores", () => {
   it("counts a result it agrees with as confirmed", async () => {
     await ensureReady(env);
     const g = week1[4]!;
-    await setResult(env.DB, g.id, g.home, 10, 13, AFTER_WEEK_1);
+    await setResult(env.DB, g.id, g.home as Winner, 10, 13, AFTER_WEEK_1);
     const r = await syncResultsFromSource(env.DB, AFTER_WEEK_1, { fetchCsv: async () => feed({ [g.id]: [10, 13] }) });
     expect(r).toMatchObject({ ok: true, applied: 0, confirmed: 1, conflicts: [] });
   });

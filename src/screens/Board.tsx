@@ -3,10 +3,11 @@ import { Link, Navigate, useNavigate, useParams } from "react-router";
 import { AnimatePresence, motion } from "motion/react";
 import { useBootstrap, useSeasonBoard, useWeekBoard } from "../api/queries.ts";
 import { usePlayer } from "../lib/player.tsx";
+import { useHeaderWeek } from "../components/Chrome.tsx";
 import { TEAMS } from "../../shared/teams.ts";
 import type { ScoredPick, SeasonRow, WeekRow } from "../../shared/scoring.ts";
 import { WEEKS } from "../../shared/week.ts";
-import { EmptyState, ErrorState, RankBadge, Segmented, Spinner, WeekNav } from "../components/Common.tsx";
+import { EmptyState, ErrorState, RankBadge, Segmented, Spinner } from "../components/Common.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
 import { Lock } from "../components/Icons.tsx";
 
@@ -130,9 +131,9 @@ function WeekBoardView({ week, onWeek }: { week: number; onWeek: (w: number) => 
   const board = useWeekBoard(week);
   const { player } = usePlayer();
   const [open, setOpen] = useState<string | null>(null);
+  useHeaderWeek(week, onWeek);
   return (
     <div>
-      <WeekNav week={week} onChange={onWeek} />
       {board.isPending ? (
         <Spinner />
       ) : board.error ? (

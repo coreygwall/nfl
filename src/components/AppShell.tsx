@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useBootstrap } from "../api/queries.ts";
 import { usePlayer } from "../lib/player.tsx";
 import { useChrome } from "./Chrome.tsx";
-import { Football, Swap, Trophy, X } from "./Icons.tsx";
+import { ChevronDown, ChevronLeft, ChevronRight, Football, Swap, Trophy, X } from "./Icons.tsx";
 import { useToast } from "./Toast.tsx";
 import { useOnline } from "../lib/online.ts";
 
@@ -14,7 +14,7 @@ export function AppShell() {
   const loc = useLocation();
   const nav = useNavigate();
   const toast = useToast();
-  const { navHidden } = useChrome();
+  const { navHidden, headerWeek, changeWeek } = useChrome();
   const [switching, setSwitching] = useState(false);
   const poolName = boot.data?.poolName ?? "High Five";
   const online = useOnline();
@@ -43,7 +43,7 @@ export function AppShell() {
     <div className="relative mx-auto flex min-h-dvh w-full max-w-[1180px] flex-col">
       <header className="sticky top-0 z-30 border-b-2 border-ink bg-paper/90 backdrop-blur">
         <div className="flex items-center gap-3 px-4 py-2.5 sm:px-6 lg:px-8">
-          <Link to="/" className="font-display text-[1.65rem] font-extrabold leading-none tracking-tight">
+          <Link to="/" className="font-display shrink-0 whitespace-nowrap text-[1.35rem] font-extrabold leading-none tracking-tight sm:text-[1.65rem]">
             {poolName}
           </Link>
           {player && !onWelcome && (
@@ -73,10 +73,13 @@ export function AppShell() {
                   );
                 })}
               </nav>
-              <button className="chip ml-auto max-w-[55%]" onClick={() => setSwitching(true)} aria-label="Switch player">
-                <span className="truncate">{player.name}</span>
-                <Swap className="shrink-0 text-ink-2" />
-              </button>
+              <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
+                {headerWeek && <HeaderWeekNav week={headerWeek.week} max={headerWeek.max} onChange={changeWeek} />}
+                <button className="chip min-w-0 max-w-[10ch] sm:max-w-[20ch]" onClick={() => setSwitching(true)} aria-label="Switch player">
+                  <span className="truncate">{player.name}</span>
+                  <Swap className="shrink-0 text-ink-2" />
+                </button>
+              </div>
             </>
           )}
         </div>
@@ -160,6 +163,41 @@ export function AppShell() {
           </Sheet>
         )}
       </AnimatePresence>
+    </div>
+  );
+}
+
+/** Week stepper that lives in the app header; the arrows fold away on phones, the label always picks. */
+function HeaderWeekNav({ week, max, onChange }: { week: number; max: number; onChange: (w: number) => void }) {
+  return (
+    <div className="flex shrink-0 items-center gap-1">
+      {/* .btn sets display, so the arrows hide from a wrapper rather than a utility class. */}
+      <span className="hidden sm:block">
+        <button className="btn btn-sm px-1.5" aria-label="Previous week" disabled={week <= 1} onClick={() => onChange(week - 1)}>
+          <ChevronLeft />
+        </button>
+      </span>
+      <label className="chip relative cursor-pointer gap-1 px-2.5">
+        <span className="font-display font-extrabold">Week {week}</span>
+        <ChevronDown size={16} className="text-ink-2" />
+        <select
+          aria-label="Choose week"
+          className="absolute inset-0 cursor-pointer opacity-0"
+          value={week}
+          onChange={(e) => onChange(Number(e.target.value))}
+        >
+          {Array.from({ length: max }, (_, i) => i + 1).map((w) => (
+            <option key={w} value={w}>
+              Week {w}
+            </option>
+          ))}
+        </select>
+      </label>
+      <span className="hidden sm:block">
+        <button className="btn btn-sm px-1.5" aria-label="Next week" disabled={week >= max} onClick={() => onChange(week + 1)}>
+          <ChevronRight />
+        </button>
+      </span>
     </div>
   );
 }

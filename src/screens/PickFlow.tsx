@@ -13,8 +13,8 @@ import type { GameDTO } from "../../shared/api.ts";
 import type { Pick } from "../../shared/types.ts";
 import { MAX_PICKS } from "../../shared/picks.ts";
 import { isLocked, WEEKS } from "../../shared/week.ts";
-import { ErrorState, RankBadge, Spinner, WeekNav } from "../components/Common.tsx";
-import { useHideNav } from "../components/Chrome.tsx";
+import { ErrorState, RankBadge, Spinner } from "../components/Common.tsx";
+import { useHeaderWeek, useHideNav } from "../components/Chrome.tsx";
 import { ChevronDown, ChevronUp, Grip, Lock, Share } from "../components/Icons.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
 import { useToast } from "../components/Toast.tsx";
@@ -117,6 +117,7 @@ function PickFlowInner({ week }: { week: number }) {
 
   const step: Step | "review" = stepParam ?? (hasSaved && !dirty ? "review" : "select");
   useHideNav(step === "select" || step === "rank" || step === "confirm");
+  useHeaderWeek(week, (w) => nav(`/week/${w}`));
 
   const setStep = (s: Step | null) => {
     setParams(s ? { step: s } : {}, { replace: s === "done" ? false : true });
@@ -200,22 +201,14 @@ function PickFlowInner({ week }: { week: number }) {
 
   return (
     <div>
-      <div className={`w-full ${wideStep ? "" : "mx-auto max-w-[760px]"}`}>
-        <WeekNav
-          week={week}
-          onChange={(w) => nav(`/week/${w}`)}
-          suffix={status.label ? <span className={`chip ${status.tone}`}>{status.label}</span> : null}
-        />
-      </div>
-
       <AnimatePresence mode="wait" initial={false}>
         {step === "review" ? (
           <StepWrap key="review" wide={reviewWide}>
-            <ReviewStep week={week} games={games} myPicks={myPicks} pickCounts={wk.data!.pickCounts} lockedNow={lockedNow} anyUnlocked={anyUnlocked} onEdit={() => setStep("select")} submitted={wk.data!.submitted} />
+            <ReviewStep week={week} games={games} myPicks={myPicks} pickCounts={wk.data!.pickCounts} lockedNow={lockedNow} anyUnlocked={anyUnlocked} onEdit={() => setStep("select")} submitted={wk.data!.submitted} status={status} />
           </StepWrap>
         ) : step === "select" ? (
           <StepWrap key="select" wide>
-            <SelectStep games={games} draft={draft} frozen={frozen} lockedNow={lockedNow} onPick={onPick} pickCounts={wk.data!.pickCounts} allLocked={allLocked} hasSaved={hasSaved} currentWeek={boot.data!.currentWeek} week={week} now={now} openCount={openGames.length} picked={merged.length} slotCount={slotCount} />
+            <SelectStep games={games} draft={draft} frozen={frozen} lockedNow={lockedNow} onPick={onPick} pickCounts={wk.data!.pickCounts} allLocked={allLocked} hasSaved={hasSaved} currentWeek={boot.data!.currentWeek} week={week} now={now} openCount={openGames.length} picked={merged.length} slotCount={slotCount} status={status} />
             <PickTray merged={merged} frozen={frozen} shake={shakeTray} slots={slotCount} onRemove={(gameId) => setDraft((d) => removeSelection(d, gameId))} onNext={() => setStep("rank")} disabled={!anyUnlocked} />
           </StepWrap>
         ) : step === "rank" ? (
@@ -253,7 +246,7 @@ function StepWrap({ children, wide = false }: { children: React.ReactNode; wide?
 // ---------- Select ----------
 
 function SelectStep({
-  games, draft, frozen, lockedNow, onPick, pickCounts, allLocked, hasSaved, currentWeek, week, now, openCount, picked, slotCount,
+  games, draft, frozen, lockedNow, onPick, pickCounts, allLocked, hasSaved, currentWeek, week, now, openCount, picked, slotCount, status,
 }: {
   games: GameDTO[];
   draft: Draft;
@@ -269,6 +262,7 @@ function SelectStep({
   openCount: number;
   picked: number;
   slotCount: number;
+  status: { label: string; tone: string };
 }) {
   const frozenByGame = new Map(frozen.map((p) => [p.gameId, p]));
   const open = games.filter((g) => !lockedNow(g));
@@ -308,6 +302,7 @@ function SelectStep({
                 {picked}/{slotCount} in
               </span>
             )}
+            {status.label && <span className={`chip ml-2 align-middle text-sm ${status.tone}`}>{status.label}</span>}
           </h2>
           <p className="mt-1.5 text-[14px] leading-snug text-ink-2">
             Tap who you think wins. You'll rank them next — surest pick <b>5 pts</b>, least sure <b>1</b>.
@@ -759,7 +754,7 @@ function DoneStep({
 // ---------- Review (picks are in) ----------
 
 function ReviewStep({
-  week, games, myPicks, pickCounts, lockedNow, anyUnlocked, onEdit, submitted,
+  week, games, myPicks, pickCounts, lockedNow, anyUnlocked, onEdit, submitted, status,
 }: {
   week: number;
   games: GameDTO[];
@@ -769,6 +764,7 @@ function ReviewStep({
   anyUnlocked: boolean;
   onEdit: () => void;
   submitted: number;
+  status: { label: string; tone: string };
 }) {
   const gamesById = new Map(games.map((g) => [g.id, g]));
   const sorted = [...myPicks].sort((a, b) => a.rank - b.rank);
@@ -791,7 +787,10 @@ function ReviewStep({
       <div className="card p-4">
         <div className="flex items-start justify-between gap-3">
           <div>
-            <h2 className="font-display text-2xl font-extrabold tracking-tight">Your five</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <h2 className="font-display text-2xl font-extrabold tracking-tight">Your five</h2>
+              {status.label && <span className={`chip text-sm ${status.tone}`}>{status.label}</span>}
+            </div>
             <p className="text-sm text-ink-2">
               {finals === 0 ? `${sorted.length} pick${sorted.length === 1 ? "" : "s"} in · ${submitted} player${submitted === 1 ? "" : "s"} submitted` : `${correct} of ${finals} right so far`}
             </p>

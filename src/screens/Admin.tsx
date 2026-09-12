@@ -5,9 +5,10 @@ import { useAdminPlayerMutation, useAdminPlayers, useAdminPullResults, useAdminS
 import { TEAMS, type Abbr } from "../../shared/teams.ts";
 import type { AdminGameDTO, AdminPullResultsResponse } from "../../shared/api.ts";
 import { formatKickoff, formatShortDay } from "../lib/time.ts";
-import { ErrorState, Segmented, Spinner, WeekNav } from "../components/Common.tsx";
+import { ErrorState, Segmented, Spinner } from "../components/Common.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
 import { useToast } from "../components/Toast.tsx";
+import { useHeaderWeek } from "../components/Chrome.tsx";
 
 const PIN_KEY = "nflpool.admin.pin";
 
@@ -146,9 +147,9 @@ function Results({ pin, week, onWeek }: { pin: string; week: number; onWeek: (w:
     }
   };
   const gamesById = new Map((data.data?.games ?? []).map((g) => [g.id, g]));
+  useHeaderWeek(week, onWeek);
   return (
     <div>
-      <WeekNav week={week} onChange={onWeek} />
       {data.isPending ? (
         <Spinner />
       ) : data.error ? (

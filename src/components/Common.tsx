@@ -1,7 +1,5 @@
 import { motion } from "motion/react";
 import type { ReactNode } from "react";
-import { ChevronLeft, ChevronRight } from "./Icons.tsx";
-import { WEEKS } from "../../shared/week.ts";
 
 export function Spinner({ label = "Loading…" }: { label?: string }) {
   return (
@@ -36,52 +34,6 @@ export function EmptyState({ title, body, action }: { title: string; body?: stri
       <p className="font-display text-lg font-bold">{title}</p>
       {body && <p className="mt-1 text-sm text-ink-2">{body}</p>}
       {action && <div className="mt-4">{action}</div>}
-    </div>
-  );
-}
-
-export function WeekNav({
-  week,
-  onChange,
-  max = WEEKS,
-  suffix,
-}: {
-  week: number;
-  onChange: (w: number) => void;
-  max?: number;
-  suffix?: ReactNode;
-}) {
-  return (
-    <div className="flex w-full max-w-[560px] items-center justify-between gap-2">
-      <button
-        className="btn btn-sm px-2"
-        aria-label="Previous week"
-        disabled={week <= 1}
-        onClick={() => onChange(week - 1)}
-      >
-        <ChevronLeft />
-      </button>
-      <div className="flex items-center gap-2">
-        <label className="relative">
-          <span className="font-display text-2xl font-extrabold tracking-tight">Week {week}</span>
-          <select
-            aria-label="Choose week"
-            className="absolute inset-0 cursor-pointer opacity-0"
-            value={week}
-            onChange={(e) => onChange(Number(e.target.value))}
-          >
-            {Array.from({ length: max }, (_, i) => i + 1).map((w) => (
-              <option key={w} value={w}>
-                Week {w}
-              </option>
-            ))}
-          </select>
-        </label>
-        {suffix}
-      </div>
-      <button className="btn btn-sm px-2" aria-label="Next week" disabled={week >= max} onClick={() => onChange(week + 1)}>
-        <ChevronRight />
-      </button>
     </div>
   );
 }
