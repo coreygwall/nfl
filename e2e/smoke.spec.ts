@@ -72,6 +72,9 @@ test.describe.serial("pool flow", () => {
     await page.getByRole("link", { name: "See the board" }).click();
 
     await expect(page).toHaveURL(/\/board\/week\/1$/);
+    const primaryNav = page.getByRole("navigation", { name: "Primary navigation" });
+    await expect(primaryNav.getByRole("link", { name: "Board" })).toHaveAttribute("aria-current", "page");
+    await expect(primaryNav.getByRole("link", { name: "Picks" })).not.toHaveAttribute("aria-current", "page");
     await expect(page.getByText("2 of 2 have picked")).toBeVisible();
     await page.getByRole("button", { name: /Corey/ }).click();
     await expect(page.getByText("5 more picks revealed at kickoff")).toBeVisible();

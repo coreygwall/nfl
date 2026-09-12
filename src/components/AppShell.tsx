@@ -48,7 +48,7 @@ export function AppShell() {
           </Link>
           {player && !onWelcome && (
             <>
-              <nav className="ml-4 hidden items-center gap-1 md:flex">
+              <nav className="ml-4 hidden items-center gap-1 md:flex" aria-label="Primary navigation">
                 {tabs.map((t) => {
                   const active = loc.pathname.startsWith(t.match);
                   return (
@@ -56,7 +56,7 @@ export function AppShell() {
                       key={t.match}
                       to={t.to}
                       aria-current={active ? "page" : undefined}
-                      className={`relative flex items-center gap-2 rounded-full px-4 py-1.5 font-display text-[15px] font-bold ${
+                      className={`relative isolate z-0 flex items-center gap-2 rounded-full px-4 py-1.5 font-display text-[15px] font-bold ${
                         active ? "text-paper" : "text-ink-2 hover:text-ink"
                       }`}
                     >
@@ -103,7 +103,7 @@ export function AppShell() {
       </main>
 
       {!onWelcome && !navHidden && (
-        <nav className="fixed inset-x-0 bottom-0 z-30 md:hidden">
+        <nav className="fixed inset-x-0 bottom-0 z-30 md:hidden" aria-label="Primary navigation">
           <div className="mx-auto max-w-[560px] px-4 pb-[max(env(safe-area-inset-bottom),12px)]">
             <div className="card flex p-1.5">
               {tabs.map((t) => {
@@ -112,15 +112,17 @@ export function AppShell() {
                   <Link
                     key={t.match}
                     to={t.to}
-                    className={`relative flex flex-1 items-center justify-center gap-2 rounded-2xl py-2.5 font-display text-base font-bold ${
-                      active ? "text-paper" : "text-ink-2"
+                    aria-current={active ? "page" : undefined}
+                    className={`relative isolate z-0 flex flex-1 items-center justify-center gap-2 rounded-2xl py-2.5 font-display text-base font-bold transition-colors ${
+                      active ? "text-paper" : "text-ink hover:bg-paper-2"
                     }`}
                   >
                     {active && (
                       <motion.span
                         layoutId="nav-pill"
-                        className="absolute inset-0 -z-10 rounded-2xl bg-ink"
+                        className="pointer-events-none absolute inset-0 -z-10 rounded-2xl bg-ink"
                         transition={{ type: "spring", stiffness: 500, damping: 35 }}
+                        aria-hidden="true"
                       />
                     )}
                     {t.icon}
