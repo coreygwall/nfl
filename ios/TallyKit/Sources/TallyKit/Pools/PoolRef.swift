@@ -1,8 +1,8 @@
 import Foundation
 
 /**
- Where a pool lives. Today there is one pool per Worker and its API sits at `/api/*`; the README
- names `/api/pools/<slug>/*` as the shape once there are many. Every request in the app goes
+ Where a pool lives. Today there is one pool per Worker and its API sits under `/api`; the README
+ names `/api/pools/<slug>` as the shape once there are many. Every request in the app goes
  through `apiURL(_:)`, so that move is one line here and nothing in a screen.
 
  A pool is an *instance* (this season's High Five) of a *type* (High Five) on a *host* (Tally).

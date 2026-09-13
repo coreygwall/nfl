@@ -1,7 +1,7 @@
 import Foundation
 
 /**
- The API as a set of named calls, one per route in `worker/routes/*.ts`. Screens call these and
+ The API as a set of named calls, one per route in the Worker's `routes` folder. Screens call these and
  never build a path themselves, so the endpoints are listed in exactly one place on this side.
  */
 public struct PoolService: Sendable {
