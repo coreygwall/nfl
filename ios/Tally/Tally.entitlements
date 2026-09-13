@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<!-- Both halves of one story: webcredentials lets the app use the passkeys made on
+	     playtally.app (and vice versa); applinks opens pool links in the app. The domain has to
+	     name this app back in /.well-known/apple-app-site-association (worker/apple.ts). -->
+	<key>com.apple.developer.associated-domains</key>
+	<array>
+		<string>webcredentials:playtally.app</string>
+		<string>applinks:playtally.app</string>
+	</array>
+</dict>
+</plist>

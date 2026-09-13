@@ -1,0 +1,27 @@
+# The iOS app builds on a Mac. It runs separately from the web CI so the Worker's tests never
+# wait on a macOS runner, and only when something under ios/ changes.
+name: iOS
+on:
+  push:
+    paths: ["ios/**", ".github/workflows/ios.yml"]
+  pull_request:
+    paths: ["ios/**", ".github/workflows/ios.yml"]
+  workflow_dispatch:
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Select the newest Xcode on the runner
+        run: sudo xcode-select -s "$(ls -d /Applications/Xcode*.app | sort -V | tail -1)/Contents/Developer" && xcodebuild -version
+      - name: TallyKit tests
+        working-directory: ios/TallyKit
+        run: swift test
+      - name: Build the app for the simulator
+        working-directory: ios
+        run: |
+          xcodebuild build \
+            -project Tally.xcodeproj -scheme Tally \
+            -destination 'generic/platform=iOS Simulator' \
+            CODE_SIGNING_ALLOWED=NO \
+            | tail -40

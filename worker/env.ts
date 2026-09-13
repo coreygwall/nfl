@@ -9,6 +9,8 @@ export interface Env {
   POOL_TYPE?: string;
   POOL_SLUG?: string;
   POOL_NAME?: string;
+  /** Apple app ids (TEAMID.bundle.id, comma-separated) allowed to share passkeys and open pool links. */
+  APPLE_APP_IDS?: string;
 }
 
 export type AppEnv = {

@@ -6,6 +6,7 @@ import { ApiError } from "./errors.ts";
 import { getPlayer, playerForToken, publicPlayer } from "./db.ts";
 import { hashToken, tokenFromCookie } from "./auth.ts";
 import { withAbsoluteUrls, withUnfurlTags } from "./unfurl.ts";
+import { appleAppSiteAssociation } from "./apple.ts";
 import { ensureReady, SCHEDULE_VERSION, syncResultsFromSource, syncScheduleFromSource } from "./ready.ts";
 import { publicRoutes } from "./routes/public.ts";
 import { adminRoutes } from "./routes/admin.ts";
@@ -75,6 +76,19 @@ app.get("/p/:slug/manifest.webmanifest", (c) => {
     ],
   });
 });
+
+/**
+ * Apple fetches this from the domain to let the iOS app share the site's passkeys and open pool
+ * links. It has to be real JSON at exactly this path with no redirect, which is why it is a route
+ * rather than a static file: the assets handler would otherwise answer it with the app's HTML.
+ */
+const AASA_PATHS = ["/.well-known/apple-app-site-association", "/apple-app-site-association"];
+for (const path of AASA_PATHS) {
+  app.get(path, (c) => {
+    c.header("cache-control", "public, max-age=3600");
+    return c.json(appleAppSiteAssociation(c.env.APPLE_APP_IDS));
+  });
+}
 
 /** Page routes that used to live at the root, before the pool moved under /p/<slug>. */
 const MOVED = ["/welcome", "/rules", "/admin", "/board", "/week"];

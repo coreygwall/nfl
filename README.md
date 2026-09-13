@@ -32,6 +32,7 @@ database heals on its own.)
 2. Worker name **`nfl`** (must match `name` in `wrangler.jsonc`, and Cloudflare defaults it to the repo name). Build command `npm run build`. Deploy command `npx wrangler deploy` (the default). Root directory `/`.
 3. After the first deploy: Worker → **Settings** → **Variables and Secrets** → add a **secret** `ADMIN_PIN` (the commissioner PIN). Redeploy or push again.
 4. Optional: **Settings → Builds** → enable non-production branch builds to get a preview URL on every pull request.
+   When the iOS app is set up, `APPLE_APP_IDS` in `wrangler.jsonc` names it (see [`ios/README.md`](ios/README.md)).
 5. Share `https://playtally.app/p/high-five` (or the `workers.dev` URL, which still works). Pool name and slug are `POOL_NAME` and `POOL_SLUG` in `wrangler.jsonc`.
 
 From a laptop instead: `npx wrangler login && npm run deploy && npx wrangler secret put ADMIN_PIN`.
@@ -71,6 +72,20 @@ Send people the pool's URL — `https://playtally.app/p/<slug>`. It unfurls in i
 Worker fills in the absolute image URL and `POOL_NAME` at request time, so no config is needed when the host
 changes. `npm run og:build` regenerates the image. First-time visitors land on a welcome page that asks for a name,
 with the rules in three steps and a full `/rules` page one tap away. The roster is capped at 200 names.
+
+## The iOS app
+
+`ios/` is a native SwiftUI app for the same pool — see [`ios/README.md`](ios/README.md) for the
+runbook (TestFlight in an afternoon) and the architecture. It talks to this Worker's API and
+shares its accounts: a passkey made on the website signs into the app with Face ID and the other
+way round. Two things on this side make that work:
+
+- `worker/apple.ts` serves `/.well-known/apple-app-site-association`, which tells Apple the app
+  may use the domain's passkeys and open `/p/*` links. The app is named by `APPLE_APP_IDS` in
+  `wrangler.jsonc` (`<team id>.app.playtally.ios`) — set it once the app exists in App Store
+  Connect, before the first TestFlight install.
+- `worker/routes/passkeys.ts` accepts `https://<host>` as a credential origin alongside the page
+  origin, because a native app signs the domain rather than a page.
 
 ## How the URLs are laid out
 
@@ -182,6 +197,7 @@ Time travel in dev: add `?now=2026-09-13T20:00:00Z` to any URL. The client forwa
 | `npm run typecheck` | Type-checks the client and the Worker |
 | `npm run schedule:build` | Regenerates the schedule JSON from nflverse (`games.csv`) |
 | `npm run logos:extract` | Rebuilds `public/logos` from the npm package plus `scripts/custom-logos/` (tight-cropped, with a baked die-cut outline) |
+| `npm run ios:assets` | Rebuilds the iOS asset catalogue (team stickers, icon) and the static font files from the web's own sources |
 | `npm run deploy` | `vite build` + `wrangler deploy` |
 
 ## How it's put together
@@ -191,7 +207,8 @@ shared/     pure rules shared by client and Worker: validatePicks (locks, frozen
 worker/     Hono API on Cloudflare Workers + D1; self-bootstraps schema + schedule; admin routes behind ADMIN_PIN
 src/        React 19 + Vite + Tailwind 4 + motion; TanStack Query for data; react-router
 migrations/ D1 schema (players, games, picks, meta)
-scripts/    schedule builder, logo extractor
+scripts/    schedule builder, logo extractor, iOS asset + font builders
+ios/        the native app: TallyKit (Swift package: API, rules, auth) + the SwiftUI app
 public/logos  32 team stickers (30 vectors from react-nfl-logos, Browns + Titans as PNG, Commanders drawn here)
 ```
 
