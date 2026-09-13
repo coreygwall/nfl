@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { planNotifications } from "../../worker/notify.ts";
+import { planNotifications } from "../../shared/notify-plan.ts";
 import type { Abbr } from "../../shared/teams.ts";
 import type { Game, Player } from "../../shared/types.ts";
 import { mkGame } from "./helpers.ts";

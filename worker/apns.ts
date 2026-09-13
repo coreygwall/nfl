@@ -15,16 +15,21 @@ const B64URL = (bytes: ArrayBuffer | Uint8Array): string => {
 
 const utf8 = (s: string) => new TextEncoder().encode(s);
 
-/** Strip the PEM armour and decode. A .p8 from Apple is PKCS#8, which is what WebCrypto wants. */
-function pkcs8(pem: string): Uint8Array {
+/**
+ * Strip the PEM armour and decode. A .p8 from Apple is PKCS#8, which is what WebCrypto wants.
+ * Returns the buffer rather than a view: `importKey` wants a plain `ArrayBuffer`, and a
+ * `Uint8Array` built the usual way is typed as possibly backing onto a shared one.
+ */
+function pkcs8(pem: string): ArrayBuffer {
   const body = pem
     .replace(/-----BEGIN [^-]+-----/g, "")
     .replace(/-----END [^-]+-----/g, "")
     .replace(/\s+/g, "");
   const raw = atob(body);
-  const out = new Uint8Array(raw.length);
+  const buffer = new ArrayBuffer(raw.length);
+  const out = new Uint8Array(buffer);
   for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
-  return out;
+  return buffer;
 }
 
 export interface ApnsConfig {

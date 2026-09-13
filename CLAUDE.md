@@ -20,6 +20,25 @@ domains publishes its Team ID in that same file — so it belongs in config rath
 store. `APPLE_APP_STORE_ID` is still empty and turns on Safari's "Open in the app" banner once
 the app has an App Store listing.
 
+## Push notifications
+
+Everything is built and nothing sends. The Worker registers device tokens, works out what to say
+and stays quiet, because one thing is missing and only an Apple developer account can supply it:
+
+```sh
+# Keys ▸ + ▸ tick "Apple Push Notifications service (APNs)" ▸ Continue ▸ Register ▸ Download.
+# The .p8 downloads once and cannot be downloaded again.
+npx wrangler secret put APNS_KEY   # paste the whole .p8, BEGIN/END lines and all
+```
+
+Then put the key's 10-character Key ID into `APNS_KEY_ID` in `wrangler.jsonc` (it is not a secret —
+it travels in the header of every push) and deploy. `APPLE_TEAM_ID` and `APPLE_BUNDLE_ID` are
+already there.
+
+Nothing else needs doing in the developer portal. The Push Notifications capability is in
+`ios/Tally/Tally.entitlements`, and Xcode enables it on the App ID itself when it provisions with
+automatic signing — the same way it already handles associated domains.
+
 ## Deploying is a push, and only to one branch
 
 There is no `main`. Cloudflare Workers Builds deploys from **`claude/nfl-pool-app-9tv2om`**, so a

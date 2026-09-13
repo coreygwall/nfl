@@ -56,10 +56,13 @@ pushRoutes.post("/", async (c) => {
   return c.json({ ok: true });
 });
 
-/** Turning notifications off, or signing out. Unknown tokens are not an error. */
-pushRoutes.delete("/", async (c) => {
-  const body = (await c.req.json().catch(() => ({}))) as RegisterBody;
-  const token = typeof body.token === "string" ? body.token.trim() : "";
+/**
+ * Turning notifications off, or signing out. The token is in the path rather than a body because
+ * a DELETE with a body is awkward from most clients, and a device token is not a secret — it
+ * identifies an install to Apple, and only a valid push key can do anything with it.
+ */
+pushRoutes.delete("/:token", async (c) => {
+  const token = c.req.param("token").trim();
   if (!TOKEN.test(token)) throw badRequest("BAD_TOKEN", "That is not a device token.");
   await deletePushToken(c.env.DB, token);
   return c.json({ ok: true });
