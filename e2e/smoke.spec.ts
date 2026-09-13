@@ -387,7 +387,7 @@ test("Face ID: turn it on, lose the device's memory, and sign back in with no ty
   // A virtual authenticator stands in for the phone's biometrics.
   const cdp = await context.newCDPSession(page);
   await cdp.send("WebAuthn.enable");
-  await cdp.send("WebAuthn.addVirtualAuthenticator", {
+  const { authenticatorId } = await cdp.send("WebAuthn.addVirtualAuthenticator", {
     options: {
       protocol: "ctap2",
       transport: "internal",
@@ -424,10 +424,17 @@ test("Face ID: turn it on, lose the device's memory, and sign back in with no ty
     localStorage.clear();
     sessionStorage.clear();
   });
+  // The name field also offers the passkey through the browser's own autofill, which is a
+  // request left waiting in the background. A real browser waits for someone to pick it; a
+  // virtual authenticator simulating presence answers the moment the page loads, which would
+  // race this assertion. Presence goes off so the signed-out screen holds still, and back on
+  // once the explicit button has asked for it.
+  await cdp.send("WebAuthn.setAutomaticPresenceSimulation", { authenticatorId, enabled: false });
   await page.goto(`/p/high-five/welcome?now=${BEFORE}`);
   await expect(page.getByRole("heading", { name: "What should we call you?" })).toBeVisible();
 
   await page.getByRole("button", { name: "Sign in with Face ID or fingerprint" }).click();
+  await cdp.send("WebAuthn.setAutomaticPresenceSimulation", { authenticatorId, enabled: true });
   await expect(page).toHaveURL(/\/week\/1$/);
   await expect(page.getByRole("button", { name: "Switch player" })).toContainText(name);
 
