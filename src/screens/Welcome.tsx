@@ -6,6 +6,7 @@ import { ApiClientError } from "../api/client.ts";
 import { usePlayer } from "../lib/player.tsx";
 import type { Identity } from "../lib/identity.ts";
 import { nameKey, validateName } from "../../shared/names.ts";
+import { isVulgar, VULGAR_MESSAGE } from "../../shared/profanity.ts";
 import { CODE_LENGTH, formatCode, normalizeCode } from "../../shared/codes.ts";
 import type { Player } from "../../shared/types.ts";
 import type { RosterPlayer } from "../../shared/api.ts";
@@ -113,6 +114,12 @@ export function Welcome() {
     const check = validateName(name);
     if (!check.ok) {
       setError(check.message);
+      setShake((s) => s + 1);
+      return;
+    }
+    // The server refuses these too; catching it here saves a round trip and the same words.
+    if (isVulgar(check.name)) {
+      setError(VULGAR_MESSAGE);
       setShake((s) => s + 1);
       return;
     }

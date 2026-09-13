@@ -28,13 +28,14 @@ export function Board({ tab }: { tab: "week" | "season" }) {
     <div className="mx-auto w-full max-w-[760px] lg:max-w-[1060px]">
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start lg:gap-8">
         <div>
-          <div className="grid gap-2 sm:grid-cols-2 sm:gap-3">
+          {/* Both toggles share one line on a phone: two taps, no scrolling, nothing stacked. */}
+          <div className="grid grid-cols-2 gap-2 sm:gap-3">
             <Segmented
               value={tab}
               label="Week or season"
               pillId="board-range"
               options={[
-                { value: "week", label: "This week" },
+                { value: "week", label: "This week", short: "Week" },
                 { value: "season", label: "Season" },
               ]}
               onChange={(v) => nav(v === "week" ? `/board/week/${boardWeek}${keepSort}` : `/board/season${keepSort}`)}

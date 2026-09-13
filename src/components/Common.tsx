@@ -62,7 +62,8 @@ export function Segmented<T extends string>({
   pillId = "segmented-pill",
 }: {
   value: T;
-  options: { value: T; label: string }[];
+  /** `short` is used where the full label would not fit a phone; it must still stand alone. */
+  options: { value: T; label: string; short?: string }[];
   onChange: (v: T) => void;
   label?: string;
   /** Distinct per control, so two on one screen don't animate into each other. */
@@ -73,14 +74,20 @@ export function Segmented<T extends string>({
       {options.map((o) => {
         const active = o.value === value;
         return (
-          <button
+          <motion.button
             key={o.value}
             role="tab"
             aria-selected={active}
-            onClick={() => onChange(o.value)}
-            className={`relative z-10 flex-1 rounded-2xl px-3 py-2 font-display text-sm font-bold transition-colors ${
+            // Two of these sit side by side on a phone, so the text tightens rather than wraps.
+            className={`relative z-10 min-w-0 flex-1 truncate rounded-2xl px-2 py-2 font-display text-[13px] font-bold transition-colors sm:px-3 sm:text-sm ${
               active ? "text-paper" : "text-ink-2"
             }`}
+            whileTap={{ scale: 0.96 }}
+            transition={{ type: "spring", stiffness: 600, damping: 30 }}
+            onClick={() => {
+              if (!active) navigator.vibrate?.(6);
+              onChange(o.value);
+            }}
           >
             {active && (
               <motion.span
@@ -89,8 +96,16 @@ export function Segmented<T extends string>({
                 transition={{ type: "spring", stiffness: 500, damping: 35 }}
               />
             )}
-            {o.label}
-          </button>
+            {/* The label leans in as the pill arrives under it, so the eye follows the change. */}
+            <motion.span
+              className="block"
+              animate={{ scale: active ? 1 : 0.97, opacity: active ? 1 : 0.82 }}
+              transition={{ type: "spring", stiffness: 500, damping: 32 }}
+            >
+              <span className={o.short ? "sm:hidden" : ""}>{o.short ?? o.label}</span>
+              {o.short && <span className="hidden sm:inline">{o.label}</span>}
+            </motion.span>
+          </motion.button>
         );
       })}
     </div>

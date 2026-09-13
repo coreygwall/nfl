@@ -3,6 +3,7 @@ import type { AppEnv } from "../env.ts";
 import { callerIp } from "../env.ts";
 import { ApiError, badRequest, notFound } from "../errors.ts";
 import { nameKey, validateName } from "../../shared/names.ts";
+import { isVulgar, VULGAR_MESSAGE } from "../../shared/profanity.ts";
 import { codesMatch, generateCode } from "../../shared/codes.ts";
 import { clearedSessionCookie, hashToken, isLockedOut, lockUntil, MAX_CLAIM_ATTEMPTS, newToken, sessionCookie } from "../auth.ts";
 import { validatePicks } from "../../shared/picks.ts";
@@ -114,6 +115,7 @@ publicRoutes.post("/entries", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { name?: unknown };
   const check = validateName(body.name);
   if (!check.ok) throw badRequest("INVALID_NAME", check.message);
+  if (isVulgar(check.name)) throw badRequest("INVALID_NAME", VULGAR_MESSAGE);
   if (await findPlayerByKey(c.env.DB, nameKey(check.name))) {
     throw new ApiError(409, "NAME_TAKEN", "That name is already in the pool. Use a different entry name.");
   }
@@ -137,6 +139,9 @@ publicRoutes.post("/players", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { name?: unknown };
   const check = validateName(body.name);
   if (!check.ok) throw badRequest("INVALID_NAME", check.message);
+  // Only at the door: the commissioner's rename in /admin stays unfiltered, so a real name this
+  // ever refuses can still be set.
+  if (isVulgar(check.name)) throw badRequest("INVALID_NAME", VULGAR_MESSAGE);
   const key = nameKey(check.name);
   const existing = await findPlayerByKey(c.env.DB, key);
   if (existing) {

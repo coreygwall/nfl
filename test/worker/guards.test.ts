@@ -75,6 +75,43 @@ describe("signing up", () => {
   });
 });
 
+describe("names", () => {
+  it("refuses an obviously vulgar name at signup and on an entry, but not a real one", async () => {
+    const rude = await SELF.fetch("http://pool.test/api/players", {
+      method: "POST",
+      headers: { ...json, "cf-connecting-ip": "192.0.2.120" },
+      body: JSON.stringify({ name: "Fuckface" }),
+    });
+    expect(rude.status).toBe(400);
+    expect(((await rude.json()) as any).error.code).toBe("INVALID_NAME");
+
+    const me = await signUp("Cassandra Fukuda");
+    const entry = await SELF.fetch("http://pool.test/api/entries", {
+      method: "POST",
+      headers: { ...json, "x-player-token": me.token },
+      body: JSON.stringify({ name: "sh1thead" }),
+    });
+    expect(entry.status).toBe(400);
+
+    const fine = await SELF.fetch("http://pool.test/api/entries", {
+      method: "POST",
+      headers: { ...json, "x-player-token": me.token },
+      body: JSON.stringify({ name: "Parker" }),
+    });
+    expect(fine.status).toBe(201);
+  });
+
+  it("still lets the commissioner set any name, so a false positive is fixable", async () => {
+    const me = await signUp("Renamable");
+    const res = await SELF.fetch(`http://pool.test/api/admin/players/${me.id}`, {
+      method: "PATCH",
+      headers: { ...json, "x-admin-pin": "1234" },
+      body: JSON.stringify({ name: "Scunthorpe United" }),
+    });
+    expect(res.status).toBe(200);
+  });
+});
+
 describe("entries", () => {
   it("lets an account run a household, not fill the roster", async () => {
     const me = await signUp("Household");

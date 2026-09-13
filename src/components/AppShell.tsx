@@ -11,6 +11,7 @@ import { api, ApiClientError } from "../api/client.ts";
 import type { Identity } from "../lib/identity.ts";
 import type { RosterPlayer } from "../../shared/api.ts";
 import { formatCode } from "../../shared/codes.ts";
+import { isVulgar, VULGAR_MESSAGE } from "../../shared/profanity.ts";
 import { addPasskey, passkeysSupported, wasCancelled } from "../lib/passkey.ts";
 import { useQueryClient } from "@tanstack/react-query";
 import { Check } from "./Icons.tsx";
@@ -368,6 +369,11 @@ function AddPerson({
       if (busy || !player) return;
       setBusy(true);
       setError(null);
+      if (isVulgar(name)) {
+        setError(VULGAR_MESSAGE);
+        setBusy(false);
+        return;
+      }
       try {
         const r = await api<{ player: Identity }>("/entries", { body: { name } });
         void qc.invalidateQueries({ queryKey: ["bootstrap"] });
