@@ -56,8 +56,8 @@ describe("signing up", () => {
         body: JSON.stringify({ name }),
       });
 
-    for (let i = 0; i < 20; i++) expect((await signUpFrom(`Bulk ${i}`, "192.0.2.50")).status).toBe(201);
-    const blocked = await signUpFrom("Bulk 21", "192.0.2.50");
+    for (let i = 0; i < 40; i++) expect((await signUpFrom(`Bulk ${i}`, "192.0.2.50")).status).toBe(201);
+    const blocked = await signUpFrom("Bulk 41", "192.0.2.50");
     expect(blocked.status).toBe(429);
     expect(((await blocked.json()) as any).error.code).toBe("TOO_MANY_SIGNUPS");
 

@@ -62,9 +62,11 @@ const MAX_ENTRIES = 12;
  * The pool's link gets texted around and posted, so the signup form is open to anyone holding it.
  * The number sits between the two cases that matter: a room full of friends joining over one wifi
  * at kickoff, which must never be turned away, and a script filling all 200 seats before anyone
- * real arrives, which must. Cloudflare sets the address at the edge, so it is the caller's own.
+ * real arrives, which must. Cloudflare sets the address at the edge, so it is the caller's own —
+ * though phones behind a carrier's NAT can share one, which is why the ceiling is well above the
+ * size of any group that would be invited at once.
  */
-const SIGNUPS_PER_HOUR = 20;
+const SIGNUPS_PER_HOUR = 40;
 const SIGNUP_WINDOW_MINUTES = 60;
 
 /** Registers a new device for a player and returns the token only this response will carry. */

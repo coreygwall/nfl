@@ -151,8 +151,14 @@ function ordinal(n: number): string {
   return `${n}${suffix[(v - 20) % 10] ?? suffix[v] ?? "th"}`;
 }
 
-function PlaceBadge({ place, size = "md" }: { place: number; size?: "md" | "sm" }) {
-  const tone = place === 1 ? "bg-flag" : place === 2 ? "bg-paper-3" : place === 3 ? "bg-[#e9c9a6]" : "bg-white";
+/**
+ * Before anything has been scored everyone shares first place, which is true but reads as a wall
+ * of gold — and gold that every row has stops meaning anything. Muted until there is a race.
+ */
+function PlaceBadge({ place, size = "md", muted = false }: { place: number; size?: "md" | "sm"; muted?: boolean }) {
+  const tone = muted
+    ? "bg-paper-2 text-ink-3"
+    : place === 1 ? "bg-flag" : place === 2 ? "bg-paper-3" : place === 3 ? "bg-[#e9c9a6]" : "bg-white";
   const dims = size === "sm" ? "h-7 w-7 text-xs" : "h-9 w-9 text-sm";
   return (
     <span className={`flex shrink-0 items-center justify-center rounded-full border-2 border-ink font-display font-extrabold tabular ${tone} ${dims}`}>
@@ -222,7 +228,7 @@ function WeekRowItem({ row, index, open, onToggle, isMe, week, started }: { row:
       className={`card-flat overflow-hidden ${isMe ? "bg-flag-soft shadow-hard" : "bg-white"}`}
     >
       <button className="flex w-full items-center gap-3 p-3 text-left" onClick={onToggle} aria-expanded={open}>
-        <PlaceBadge place={row.place} />
+        <PlaceBadge place={row.place} muted={!started} />
         <div className="min-w-0 flex-1">
           <div className="font-display flex items-center gap-2 truncate text-[17px] font-extrabold">
             <span className="truncate">{row.name}</span>
@@ -348,7 +354,7 @@ function SeasonRowItem({ row, index, isMe, open, onToggle, throughWeek }: { row:
       className={`card-flat overflow-hidden ${isMe ? "bg-flag-soft shadow-hard" : "bg-white"}`}
     >
       <button className="flex w-full items-center gap-3 p-3 text-left" onClick={onToggle} aria-expanded={open}>
-        <PlaceBadge place={row.place} />
+        <PlaceBadge place={row.place} muted={throughWeek === 0} />
         <div className="min-w-0 flex-1">
           <div className="font-display flex items-center gap-2 truncate text-[17px] font-extrabold">
             <span className="truncate">{row.name}</span>
