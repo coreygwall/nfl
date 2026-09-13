@@ -13,7 +13,7 @@ import type { Abbr } from "../../shared/teams.ts";
 import { ErrorState, Spinner } from "../components/Common.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
 import { useToast } from "../components/Toast.tsx";
-import { addPasskey, dismissOffer, offerDismissed, passkeysSupported, signInWithPasskey, wasCancelled } from "../lib/passkey.ts";
+import { addPasskey, dismissOffer, offerDismissed, passkeysSupported, platformBiometricsSupported, signInWithPasskey, wasCancelled } from "../lib/passkey.ts";
 
 /** Every team, in a fixed shuffle so the strip reads as a jumble rather than a division list. */
 const MARQUEE_TEAMS: Abbr[] = [
@@ -82,10 +82,10 @@ export function Welcome() {
     nav(next, { replace: true });
   };
 
-  const welcomeNewPlayer = (p: Identity) => {
+  const welcomeNewPlayer = async (p: Identity) => {
     setPlayer(p);
     toast(`Welcome to the pool, ${p.name}!`, "success");
-    if (passkeysSupported() && !offerDismissed(p.id)) {
+    if (!offerDismissed(p.id) && await platformBiometricsSupported()) {
       setBiometricOffer(p);
       return;
     }
@@ -127,7 +127,7 @@ export function Welcome() {
     try {
       const res = await create.mutateAsync(check.name);
       if (res.created && res.token) {
-        welcomeNewPlayer({ ...res.player, token: res.token });
+        await welcomeNewPlayer({ ...res.player, token: res.token });
       } else {
         // Someone claimed it between our roster load and this submit.
         setTarget(res.player);
