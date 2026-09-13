@@ -171,7 +171,6 @@ export function Welcome() {
                   </button>
                 </div>
               )}
-              <PasskeySignIn onSignedIn={(p) => go(p, true)} />
               <AnimatePresence mode="wait" initial={false}>
                 {mode === "code" && target && linkCode && !linkTried ? (
                   <Panel key="link">
@@ -355,6 +354,9 @@ export function Welcome() {
                   </Panel>
                 )}
               </AnimatePresence>
+              {/* Almost everyone here is signing up, so the name and its button lead; Face ID sits
+                  underneath with the other way back in for someone who already has a name. */}
+              <PasskeySignIn onSignedIn={(p) => go(p, true)} />
             </div>
           )}
         </div>
@@ -458,7 +460,7 @@ function PasskeySignIn({ onSignedIn }: { onSignedIn: (p: Identity) => void }) {
     }
   };
   return (
-    <div className="mb-4 border-b-2 border-dashed border-line pb-4">
+    <div className="mt-3">
       <button className="btn btn-sm w-full" disabled={busy} onClick={() => void go()}>
         {busy ? "Waiting…" : "Sign in with Face ID or fingerprint"}
       </button>
