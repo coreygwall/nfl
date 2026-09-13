@@ -5,7 +5,7 @@ import XCTest
 /// celebration that repeats, or fires for something that did not happen, is an app people mute.
 final class MilestoneTests: XCTestCase {
     private func watch(
-        outcomes: [String: String],
+        outcomes: [String: String] = [:],
         points: Int = 0,
         place: Int = 1,
         finished: Bool = false,

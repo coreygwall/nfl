@@ -76,6 +76,10 @@ struct WeekBoardView: View {
         }
     }
 
+    private func after(_ seconds: Double, _ work: @escaping () -> Void) {
+        DispatchQueue.main.asyncAfter(deadline: .now() + seconds, execute: work)
+    }
+
     /// Winners of the week: everyone level at the top, once every game has a result.
     private func winners(_ data: WeekBoardResponse) -> [WeekRow] {
         guard data.gameCount > 0, data.finalCount == data.gameCount else { return [] }
@@ -112,13 +116,22 @@ struct WeekBoardView: View {
         )
         MilestoneStore.record(watch, playerId: me)
 
+        // Results are spread out, not stacked. A Sunday afternoon settles three games in the same
+        // poll often enough, and three patterns starting in the same millisecond are one long
+        // meaningless buzz — where the same three a half-second apart read as three results. The
+        // cap is there because past a few it stops being information and starts being a rattle.
+        var beat = 0
         for milestone in found {
+            let play: () -> Void
             switch milestone {
-            case .pickWon: Haptics.won()
-            case .pickLost: Haptics.lost()
-            case .finishedWeek: Haptics.weekSettled()
-            case .wonWeek, .tookSeasonLead: break // Handled below, which also covers arriving late.
+            case .pickWon: play = Haptics.won
+            case .pickLost: play = Haptics.lost
+            case .finishedWeek: play = Haptics.weekSettled
+            case .wonWeek, .tookSeasonLead: continue // Below, which also covers arriving late.
             }
+            guard beat < 3 else { break }
+            if beat == 0 { play() } else { after(Double(beat) * 0.5, play) }
+            beat += 1
         }
 
         // The win is claimed rather than reacted to, so it lands once whether you were watching when
