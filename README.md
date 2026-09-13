@@ -49,13 +49,22 @@ The app is **Tally** (`playtally.app`); **High Five** is a pool *type*; this sea
 
 | Path | What it is |
 | --- | --- |
-| `/` | The Tally landing page — `public/landing.html`, a static file with its own copy and share card. |
+| `/` | The Tally landing page (`src/screens/Landing.tsx`) — what Tally is, and each pool type's own explainer in a sheet. It links to no live pool on purpose. |
 | `/p/<slug>` | A pool instance. The React app mounts here: the router's basename is read from the URL (`src/lib/basename.ts`), so every in-app link is still written as if it were at the root, and the same bundle will serve any pool. |
 | `/api/*` | The API. Single-pool today; the natural shape for many is `/api/pools/<slug>/*`. |
 | `/welcome`, `/week/*`, `/board*`, `/rules`, `/admin` | Where the pool used to live. They 301 into `/p/<slug>/…`, query string intact, so links already texted around keep working. |
 
 `POOL_SLUG`, `POOL_NAME` and `POOL_TYPE` in `wrangler.jsonc` name this instance. Renaming the pool's
 URL is a one-line change there (people's sign-in links change with it, so do it before sharing widely).
+
+One HTML document serves both faces. Its own tags describe Tally, which is what `/` is; for a pool the
+Worker writes the pool's name, description and share card over them (`worker/unfurl.ts`), and the app
+reads which face to render from the path. So a pool link unfurls as that pool and the brand link
+unfurls as Tally, from a single build with no host baked in.
+
+**Pool copy lives in `shared/pools.ts`** — the name, the steps, the fine print, one entry per pool type.
+The landing page's sheet, the pool's own *How to play* page and the Worker's share description all read
+from it, so there is one place to edit and no second copy to drift.
 
 **When a second pool arrives**, the shape is ready for it: `pools(id, slug, type, sport, season, name)`,
 players stay global to Tally (one identity, many pools) with a `pool_players` join, and picks key on

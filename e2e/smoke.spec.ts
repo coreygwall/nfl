@@ -261,6 +261,27 @@ test("a player who shows up Sunday night can still pick what's left", async ({ p
   await expect(page.getByText("Locked in")).toBeVisible();
 });
 
+test("the landing page explains a pool without linking into one", async ({ page }) => {
+  await page.goto("/");
+  await expect(page.getByRole("heading", { name: /Simple, fun games/ })).toBeVisible();
+  // Nothing here drops a stranger into someone's pool: you get in from the link you were sent.
+  expect(await page.locator('a[href*="/p/"], a[href*="/welcome"], a[href*="/week"]').count()).toBe(0);
+
+  await page.getByRole("button", { name: /High Five/ }).click();
+  const dialog = page.getByRole("dialog", { name: "High Five" });
+  // The same words the pool's own "How to play" page uses — one source, rendered in two places.
+  await expect(dialog.getByRole("heading", { name: "Rank your confidence" })).toBeVisible();
+  await expect(dialog.getByText("No weekly deadline")).toBeVisible();
+  // …minus the bits that only make sense once you are inside a pool.
+  await expect(dialog.getByText("Using another device?")).toHaveCount(0);
+  await page.keyboard.press("Escape");
+  await expect(dialog).not.toBeVisible();
+
+  // A pool type that isn't open yet says so rather than pretending.
+  await page.getByRole("button", { name: /Survivor/ }).click();
+  await expect(page.getByRole("dialog", { name: "Survivor" })).toContainText("Not open yet");
+});
+
 test("both links unfurl: the app at the root, the pool at its own path", async ({ page, baseURL }) => {
   // The Tally landing page.
   const landing = await page.request.get("/");

@@ -10,7 +10,7 @@
   "assets": {
     "binding": "ASSETS",
     "not_found_handling": "single-page-application",
-    // The Worker decides what every page route is: the landing page at /, a pool under /p/*,
+    // The Worker decides what every page route is: Tally's own tags at /, the pool's at /p/*,
     // and a redirect for the root-level paths the pool used to live at.
     "run_worker_first": ["/api/*", "/", "/p/*", "/welcome", "/rules", "/week/*", "/board", "/board/*", "/admin"]
   },

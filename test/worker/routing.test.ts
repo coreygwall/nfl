@@ -27,6 +27,17 @@ describe("site routing", () => {
     expect(moved.searchParams.get("code")).toBe("QRT49MKP");
   });
 
+  it("gives a pool its own home-screen app, scoped to its own path", async () => {
+    const res = await SELF.fetch("http://pool.test/p/high-five/manifest.webmanifest");
+    expect(res.status).toBe(200);
+    const manifest = (await res.json()) as Record<string, string>;
+    // POOL_NAME is "Test Pool" under test; the pool, not Tally, is what gets installed.
+    expect(manifest.short_name).toBe("Test Pool");
+    expect(manifest.name).toBe("Test Pool — a Tally pool");
+    expect(manifest.start_url).toBe("/p/high-five");
+    expect(manifest.scope).toBe("/p/high-five");
+  });
+
   it("keeps the API at the root, where the app calls it", async () => {
     const health = await SELF.fetch("http://pool.test/api/health");
     expect(health.status).toBe(200);

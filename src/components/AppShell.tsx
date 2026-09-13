@@ -486,7 +486,25 @@ function HeaderWeekNav({ week, max, onChange }: { week: number; max: number; onC
   );
 }
 
-export function Sheet({ title, onClose, children }: { title: string; onClose: () => void; children: React.ReactNode }) {
+export function Sheet({
+  title,
+  onClose,
+  children,
+  size = "md",
+}: {
+  title: string;
+  onClose: () => void;
+  children: React.ReactNode;
+  size?: "md" | "lg";
+}) {
+  // Escape closes it, like every other dialog on the web.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
   return (
     <motion.div
       className="fixed inset-0 z-50 flex items-end justify-center bg-ink/40 sm:items-center"
@@ -498,14 +516,16 @@ export function Sheet({ title, onClose, children }: { title: string; onClose: ()
       <motion.div
         role="dialog"
         aria-label={title}
-        className="card w-full max-w-[520px] rounded-b-none p-5 pb-[max(env(safe-area-inset-bottom),20px)] sm:rounded-b-card"
+        className={`card max-h-[88dvh] w-full overflow-y-auto rounded-b-none p-5 pb-[max(env(safe-area-inset-bottom),20px)] sm:rounded-b-card ${
+          size === "lg" ? "max-w-[860px]" : "max-w-[520px]"
+        }`}
         initial={{ y: 60 }}
         animate={{ y: 0 }}
         exit={{ y: 60 }}
         transition={{ type: "spring", stiffness: 400, damping: 32 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="mb-3 flex items-center justify-between">
+        <div className="sticky top-0 -mx-5 mb-3 flex items-center justify-between bg-white px-5 pb-3">
           <h2 className="font-display text-xl font-extrabold">{title}</h2>
           <button className="btn btn-ghost btn-sm px-2" onClick={onClose} aria-label="Close">
             <X />

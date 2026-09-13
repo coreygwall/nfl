@@ -10,6 +10,8 @@ import { PickFlow } from "./screens/PickFlow.tsx";
 import { Board } from "./screens/Board.tsx";
 import { Admin } from "./screens/Admin.tsx";
 import { Rules } from "./screens/Rules.tsx";
+import { Landing } from "./screens/Landing.tsx";
+import { POOL_SLUG } from "./lib/basename.ts";
 
 function Home() {
   const { player } = usePlayer();
@@ -37,6 +39,15 @@ function RequirePlayer({ children }: { children: ReactNode }) {
 }
 
 export default function App() {
+  // The bare domain is Tally's own front door; a pool only exists under /p/<slug>.
+  if (!POOL_SLUG) {
+    return (
+      <Routes>
+        <Route index element={<Landing />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    );
+  }
   return (
     <ChromeProvider>
       <Routes>

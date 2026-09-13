@@ -53,6 +53,29 @@ app.route("/api", publicRoutes);
 app.route("/api/passkeys", passkeyRoutes);
 app.route("/api/admin", adminRoutes);
 
+/**
+ * A pool installs to a home screen as itself — its name, scoped to its own path — while the bare
+ * domain installs as Tally (public/manifest.webmanifest). Generated rather than a second file, so
+ * a pool that is renamed or moved does not leave a stale one behind.
+ */
+app.get("/p/:slug/manifest.webmanifest", (c) => {
+  const slug = c.req.param("slug");
+  const poolName = c.env.POOL_NAME || c.env.POOL_TYPE || "High Five";
+  return c.json({
+    name: `${poolName} — a ${c.env.APP_NAME || "Tally"} pool`,
+    short_name: poolName,
+    start_url: `/p/${slug}`,
+    scope: `/p/${slug}`,
+    display: "standalone",
+    background_color: "#F6F1E8",
+    theme_color: "#F6F1E8",
+    icons: [
+      { src: "/icon.svg", sizes: "any", type: "image/svg+xml" },
+      { src: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" },
+    ],
+  });
+});
+
 /** Page routes that used to live at the root, before the pool moved under /p/<slug>. */
 const MOVED = ["/welcome", "/rules", "/admin", "/board", "/week"];
 
@@ -63,7 +86,8 @@ app.notFound(async (c) => {
   }
   const slug = c.env.POOL_SLUG || "high-five";
   const appName = c.env.APP_NAME || "Tally";
-  const poolName = c.env.POOL_NAME || "High Five";
+  const poolType = c.env.POOL_TYPE || "High Five";
+  const poolName = c.env.POOL_NAME || poolType;
   const url = new URL(c.req.url);
 
   // Old links — texted, bookmarked, still in someone's history — land where the pool lives now.
@@ -74,20 +98,18 @@ app.notFound(async (c) => {
 
   if (!c.env.ASSETS) return c.text("Not found", 404);
 
-  // Everything under /p/ is the pool app; / is the Tally landing page.
+  // One document, two faces: / is Tally's landing page, /p/<slug> is a pool, and the app reads
+  // which it is from the path. Only the tags differ.
   const isPool = path === "/p" || path.startsWith("/p/");
-  if (isPool) {
-    const assetUrl = new URL("/index.html", url.origin);
-    const res = await c.env.ASSETS.fetch(new Request(assetUrl, { headers: c.req.raw.headers }));
-    if (!res.ok) return res;
-    return withUnfurlTags(new Response(res.body, res), url.origin, poolName, appName);
+  if (isPool || path === "/") {
+    const doc = await c.env.ASSETS.fetch(new Request(new URL("/index.html", url.origin), { headers: c.req.raw.headers }));
+    if (!doc.ok) return doc;
+    const page = new Response(doc.body, doc);
+    return isPool
+      ? withUnfurlTags(page, url.origin, { appName, poolName, poolType, slug })
+      : withAbsoluteUrls(page, url.origin);
   }
 
-  // The Tally landing page: its own file, its own copy, only the URLs need absolving.
-  if (path === "/") {
-    const landing = await c.env.ASSETS.fetch(new Request(new URL("/landing.html", url.origin), { headers: c.req.raw.headers }));
-    return landing.ok ? withAbsoluteUrls(new Response(landing.body, landing), url.origin) : landing;
-  }
   const res = await c.env.ASSETS.fetch(c.req.raw);
   if (!(res.headers.get("content-type") ?? "").includes("text/html")) return res;
   return withAbsoluteUrls(res, url.origin);

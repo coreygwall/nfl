@@ -6,23 +6,29 @@
     <meta name="theme-color" content="#F6F1E8" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-    <meta name="description" content="Pick five NFL games a week, rank them, and climb the board. No signup, just your name." />
+    <!--
+      One document serves the whole site. These tags describe Tally itself, which is what the bare
+      domain is; the Worker rewrites them for a pool under /p/<slug>, so a pool link unfurls with
+      the pool's own name and card. Nothing here names a host — the Worker makes URLs absolute
+      against whatever host served the page.
+    -->
+    <meta name="description" content="Tally is where you and your friends play simple, free pools. Pick a game, share a link, and everyone's in — no signup, no app to install." />
     <meta property="og:type" content="website" />
-    <meta property="og:site_name" content="High Five" />
-    <meta property="og:title" content="High Five — NFL pool" />
-    <meta property="og:description" content="Pick five winners a week and rank them 1–5. Nail your #1 for 5 points. No signup, just your name." />
-    <meta property="og:url" content="/p/high-five" />
-    <meta property="og:image" content="/og.jpg" />
+    <meta property="og:site_name" content="Tally" />
+    <meta property="og:title" content="Tally — pools to play with your friends" />
+    <meta property="og:description" content="Simple, free, fun games to play with your friends. Pick a game, share a link, and everyone's in." />
+    <meta property="og:url" content="/" />
+    <meta property="og:image" content="/og-tally.jpg" />
     <meta property="og:image:width" content="1200" />
     <meta property="og:image:height" content="630" />
     <meta name="twitter:card" content="summary_large_image" />
-    <meta name="twitter:title" content="High Five — NFL pool" />
-    <meta name="twitter:description" content="Pick five winners a week and rank them 1–5. No signup, just your name." />
-    <meta name="twitter:image" content="/og.jpg" />
+    <meta name="twitter:title" content="Tally — pools to play with your friends" />
+    <meta name="twitter:description" content="Simple, free, fun games to play with your friends." />
+    <meta name="twitter:image" content="/og-tally.jpg" />
     <link rel="icon" href="/icon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/manifest.webmanifest" />
-    <title>High Five</title>
+    <title>Tally — pools to play with your friends</title>
   </head>
   <body>
     <div id="root"></div>

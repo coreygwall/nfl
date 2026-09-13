@@ -1,7 +1,7 @@
 {
-  "name": "High Five NFL Pool",
-  "short_name": "High Five",
-  "start_url": "/p/high-five",
+  "name": "Tally",
+  "short_name": "Tally",
+  "start_url": "/",
   "display": "standalone",
   "background_color": "#F6F1E8",
   "theme_color": "#F6F1E8",
@@ -17,5 +17,5 @@
       "type": "image/png"
     }
   ],
-  "scope": "/p/high-five"
+  "scope": "/"
 }
