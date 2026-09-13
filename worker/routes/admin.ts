@@ -33,6 +33,7 @@ import {
   listWeekPicks,
   noteRateLimit,
   ownerOfEntry,
+  pickHistory,
   rateLimit,
   playerStats,
   publicPlayer,
@@ -126,7 +127,7 @@ adminRoutes.put("/players/:id/weeks/:week/picks", async (c) => {
   const [games, existing] = await Promise.all([listWeekGames(c.env.DB, SEASON, week), listPicks(c.env.DB, player.id, week)]);
   const result = validatePicks({ submitted: body.picks, games, existing, now, ignoreLocks: true });
   if (!result.ok) throw new ApiError(result.error.status, result.error.code, result.error.message, result.error.details);
-  await replacePicks(c.env.DB, player.id, week, result.final, now, true);
+  await replacePicks(c.env.DB, player.id, week, result.final, now, true, null, player.name);
   return c.json({ now, picks: result.final });
 });
 
@@ -235,6 +236,20 @@ adminRoutes.post("/pull-results", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { week?: unknown };
   const week = body.week === undefined ? undefined : parseWeek(String(body.week));
   return c.json(await syncResultsFromSource(c.env.DB, c.get("now"), { week }));
+});
+
+/**
+ * What a player saved, and when — including picks whose player row no longer exists. This is the
+ * page to open when someone says their picks are gone.
+ */
+adminRoutes.get("/pick-history", async (c) => {
+  const name = c.req.query("name");
+  const weekRaw = c.req.query("week");
+  const rows = await pickHistory(c.env.DB, {
+    ...(name ? { playerName: name } : {}),
+    ...(weekRaw ? { week: parseWeek(weekRaw) } : {}),
+  });
+  return c.json({ saves: rows });
 });
 
 adminRoutes.get("/status", async (c) => {

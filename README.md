@@ -149,6 +149,15 @@ Passkeys follow the same rule — one created on `workers.dev` will not work on 
   ```
   Player ids are listed at `GET /api/bootstrap`; game ids look like `2026_03_AWAY_HOME`.
 - **Rename / remove a player:** `/admin` → Players.
+- **If someone says their picks are gone:** they are not. Every set of picks ever saved is copied
+  into an append-only `pick_history` table in the same transaction as the save, and nothing in the
+  app ever deletes from it — not even removing the player. Read it back at
+  `/api/admin/pick-history?name=<name>&week=<n>` with the admin PIN, which returns every save
+  newest first, including ones belonging to a player who no longer exists.
+  This is deliberately *not* D1's own point-in-time recovery, which is there as a backstop but is
+  all-or-nothing: rolling the database back to before a mistake also throws away every pick
+  everybody else made in between. On a Sunday that cure is worse than the disease. The history
+  table puts one person's picks back exactly, and touches nothing else.
 - **Who's squared away:** `/admin` → Players → tap the circle beside a name. Filter with **All / Ready / Waiting** to see who still needs chasing. It is commissioner-only: nothing about it reaches the pool, the board, or the API anyone else can call.
 - **Picking for your family:** tap your name → **Add an entry** → give it a name. It appears beside you in the account sheet and switching is a tap; the entry has no separate sign-in, so your account is its recovery. To put an *existing* player on your phone instead, use the admin PIN option in the same sheet — their own devices keep working.
 - **Lost code / locked out / wrong person claimed a name:** `/admin` → Players → **Reset access**. It issues a new code and signs out that player's devices; send them the code and the next device to use it becomes them. Eight wrong codes locks claiming for 15 minutes; a reset clears the lock.

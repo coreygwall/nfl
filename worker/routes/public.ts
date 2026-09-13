@@ -280,7 +280,7 @@ publicRoutes.put("/weeks/:week/picks", async (c) => {
   const [games, existing] = await Promise.all([listWeekGames(c.env.DB, SEASON, week), listPicks(c.env.DB, me.id, week)]);
   const result = validatePicks({ submitted: body.picks, games, existing, now });
   if (!result.ok) throw new ApiError(result.error.status, result.error.code, result.error.message, result.error.details);
-  await replacePicks(c.env.DB, me.id, week, result.toWrite, now, false, c.get("deviceId"));
+  await replacePicks(c.env.DB, me.id, week, result.toWrite, now, false, c.get("deviceId"), me.name);
   c.executionCtx.waitUntil(touchPlayer(c.env.DB, me.id, now));
   const res: PutPicksResponse = { now, picks: result.final };
   return c.json(res);

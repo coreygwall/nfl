@@ -411,6 +411,8 @@ export async function replacePicks(
   ignoreLocks = false,
   /** The device that wrote them — the audit trail when one phone holds several players. */
   deviceId: string | null = null,
+  /** Carried into the history copy so it stays readable after the player is gone. */
+  playerName?: string,
 ): Promise<void> {
   const del = ignoreLocks
     ? db.prepare("DELETE FROM picks WHERE player_id = ?1 AND week = ?2").bind(playerId, week)
@@ -423,7 +425,58 @@ export async function replacePicks(
   const ins = db.prepare(
     "INSERT INTO picks (player_id, game_id, week, team, rank, created_at, updated_at, device_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
   );
-  await db.batch([del, ...picks.map((p) => ins.bind(playerId, p.gameId, week, p.team, p.rank, now, now, deviceId))]);
+  // The same picks, appended to a table nothing ever deletes from, inside the same transaction:
+  // if the save happened, the copy happened. The name is denormalised on purpose — it has to
+  // still be readable after the player row it came from is gone.
+  const log = db.prepare(
+    "INSERT INTO pick_history (saved_at, player_id, player_name, week, game_id, team, rank, device_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+  );
+  const name = playerName ?? playerId;
+  await db.batch([
+    del,
+    ...picks.map((p) => ins.bind(playerId, p.gameId, week, p.team, p.rank, now, now, deviceId)),
+    ...picks.map((p) => log.bind(now, playerId, name, week, p.gameId, p.team, p.rank, deviceId)),
+  ]);
+}
+
+export interface HistoricPick {
+  savedAt: string;
+  playerId: string;
+  playerName: string;
+  week: number;
+  gameId: string;
+  team: string;
+  rank: number;
+}
+
+/** Everything a player ever saved for a week, newest save first. The undo of last resort. */
+export async function pickHistory(db: D1Database, opts: { playerName?: string; week?: number } = {}): Promise<HistoricPick[]> {
+  const where: string[] = [];
+  const binds: unknown[] = [];
+  if (opts.playerName) {
+    where.push("lower(player_name) = ?");
+    binds.push(opts.playerName.toLowerCase());
+  }
+  if (opts.week !== undefined) {
+    where.push("week = ?");
+    binds.push(opts.week);
+  }
+  const sql = `SELECT saved_at, player_id, player_name, week, game_id, team, rank FROM pick_history
+     ${where.length ? `WHERE ${where.join(" AND ")}` : ""}
+     ORDER BY saved_at DESC, rank ASC LIMIT 500`;
+  const rows = await db
+    .prepare(sql)
+    .bind(...binds)
+    .all<{ saved_at: string; player_id: string; player_name: string; week: number; game_id: string; team: string; rank: number }>();
+  return rows.results.map((r) => ({
+    savedAt: r.saved_at,
+    playerId: r.player_id,
+    playerName: r.player_name,
+    week: r.week,
+    gameId: r.game_id,
+    team: r.team,
+    rank: r.rank,
+  }));
 }
 
 // ---- meta ----
