@@ -22,7 +22,13 @@
       "migrations_dir": "migrations"
     }
   ],
-  "triggers": { "crons": ["0 10 * * *"] },
+  // Two expressions, because the free plan allows five per *account* and this is not the only
+  // Worker on it. The first is the daily schedule sync. The second sweeps for finished games every
+  // half hour through the windows games actually end in, in UTC: Sunday afternoon and evening,
+  // plus the small hours that are Sunday, Monday and Thursday night in America. The window is
+  // deliberately wide so it still covers the game times after the clocks change in November, and
+  // a firing with nothing to do never leaves the database.
+  "triggers": { "crons": ["0 10 * * *", "*/30 19-23,0-5 * * 0,1,2,5"] },
   "vars": {
     "ENVIRONMENT": "production",
     // The app is Tally; this pool is one instance of the High Five pool type. POOL_SLUG is the

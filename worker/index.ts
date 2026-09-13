@@ -6,7 +6,7 @@ import { ApiError } from "./errors.ts";
 import { getPlayer, playerForToken, publicPlayer } from "./db.ts";
 import { hashToken, tokenFromCookie } from "./auth.ts";
 import { withAbsoluteUrls, withUnfurlTags } from "./unfurl.ts";
-import { ensureReady, SCHEDULE_VERSION, syncScheduleFromSource } from "./ready.ts";
+import { ensureReady, SCHEDULE_VERSION, syncResultsFromSource, syncScheduleFromSource } from "./ready.ts";
 import { publicRoutes } from "./routes/public.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { passkeyRoutes } from "./routes/passkeys.ts";
@@ -129,15 +129,29 @@ app.onError((err, c) => {
   return c.json({ error: { code: "INTERNAL", message: "Something went wrong" } }, 500);
 });
 
+/** Games are only accepted this long after kickoff when nobody is watching the run. */
+const UNATTENDED_MIN_ELAPSED_HOURS = 3.5;
+
+/** The daily schedule sync; every other firing is looking for finished games. */
+const SCHEDULE_CRON = "0 10 * * *";
+
 const handler: ExportedHandler<Env> = {
   fetch: app.fetch,
-  // Daily: pull flexed kickoff times from nflverse so locks stay accurate all season.
-  scheduled(_event, env, ctx) {
+  scheduled(event, env, ctx) {
     ctx.waitUntil(
       (async () => {
         await ensureReady(env);
-        const result = await syncScheduleFromSource(env.DB);
-        console.log("schedule sync", JSON.stringify(result));
+        // Once a day: flexed kickoff times, so the locks stay honest all season.
+        if (event.cron === SCHEDULE_CRON) {
+          const schedule = await syncScheduleFromSource(env.DB);
+          console.log("schedule sync", JSON.stringify(schedule));
+        }
+        // Through the game windows: fill in results the commissioner has not entered. It costs
+        // nothing to run often — with nothing finished and unrecorded it never leaves the database.
+        const results = await syncResultsFromSource(env.DB, new Date().toISOString(), {
+          minElapsedHours: UNATTENDED_MIN_ELAPSED_HOURS,
+        });
+        console.log("results sync", JSON.stringify(results));
       })(),
     );
   },

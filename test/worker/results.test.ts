@@ -147,3 +147,52 @@ describe("pulling final scores", () => {
     expect(await getMeta(env.DB, "results_sync_error")).toContain("network down");
   });
 });
+
+describe("pulling on a schedule, with nobody watching", () => {
+  it("holds a game back until it has had time to finish", async () => {
+    await ensureReady(env);
+    // A week no other test in this file has touched: the database is shared between them.
+    const g = schedule.games.find((x) => x.week === 9)!;
+    // Two hours in, a score in the feed is not yet trustworthy on an unattended run.
+    const kickoff = Date.parse(g.kickoff);
+    let fetched = 0;
+    const midGame = await syncResultsFromSource(env.DB, new Date(kickoff + 2 * 3_600_000).toISOString(), {
+      week: 9,
+      minElapsedHours: 3.5,
+      fetchCsv: async () => {
+        fetched++;
+        return feed({ [g.id]: [21, 17] });
+      },
+    });
+    expect(midGame.applied).toBe(0);
+    // And it did not even ask: nothing had finished, so there was nothing to look up.
+    expect(fetched).toBe(0);
+    expect((await getGame(env.DB, g.id))!.winner).toBeNull();
+
+    // Four hours in, the same feed is accepted.
+    const after = await syncResultsFromSource(env.DB, new Date(kickoff + 4 * 3_600_000).toISOString(), {
+      week: 9,
+      minElapsedHours: 3.5,
+      fetchCsv: async () => feed({ [g.id]: [21, 17] }),
+    });
+    expect(after.applied).toBeGreaterThanOrEqual(1);
+    expect((await getGame(env.DB, g.id))!.winner).toBe(g.away);
+  });
+
+  it("skips the download entirely once everything finished is already recorded", async () => {
+    await ensureReady(env);
+    let fetched = 0;
+    const counting = async () => {
+      fetched++;
+      return feed(Object.fromEntries(week1.map((g) => [g.id, [3, 7] as [number, number]])));
+    };
+    // First run fills in whatever is still blank and does fetch.
+    await syncResultsFromSource(env.DB, AFTER_WEEK_1, { fetchCsv: counting });
+    expect(fetched).toBe(1);
+    // Second run has nothing left to learn, so it never leaves the database.
+    const again = await syncResultsFromSource(env.DB, AFTER_WEEK_1, { fetchCsv: counting });
+    expect(fetched).toBe(1);
+    expect(again.ok).toBe(true);
+    expect(again.applied).toBe(0);
+  });
+});

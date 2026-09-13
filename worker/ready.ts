@@ -127,11 +127,33 @@ export interface ResultSyncResult {
 export async function syncResultsFromSource(
   db: D1Database,
   now: string,
-  options: { week?: number; fetchCsv?: () => Promise<string> } = {},
+  options: {
+    week?: number;
+    fetchCsv?: () => Promise<string>;
+    /**
+     * Ignore a game until this long after kickoff. The feed carries a score only once a game is
+     * done, so this is belt and braces — but an unattended run has nobody watching it, and a
+     * wrong winner written from a half-finished game would never be corrected on its own: a
+     * recorded result is only ever reported as a conflict, never overwritten.
+     */
+    minElapsedHours?: number;
+  } = {},
 ): Promise<ResultSyncResult> {
   const fetchCsv = options.fetchCsv ?? defaultFetchCsv;
   const syncedAt = new Date().toISOString();
   const empty = { applied: 0, confirmed: 0, pending: 0, conflicts: [], syncedAt };
+
+  const all = await listGames(db, SEASON);
+  const scope = all.filter((g) => options.week === undefined || g.week === options.week);
+  const ripe = Date.parse(now) - (options.minElapsedHours ?? 0) * 3_600_000;
+  const candidates = scope.filter((g) => Date.parse(g.kickoffAt) <= ripe);
+  // Nothing has finished that we do not already know about, so do not go and fetch two megabytes
+  // to find that out. This is what makes running it every half hour reasonable.
+  if (candidates.every((g) => g.winner !== null)) {
+    await setMeta(db, "results_synced_at", syncedAt);
+    return { ok: true, ...empty, confirmed: candidates.length };
+  }
+
   let text: string;
   try {
     text = await fetchCsv();
@@ -141,8 +163,6 @@ export async function syncResultsFromSource(
     return { ok: false, reason, ...empty };
   }
 
-  const all = await listGames(db, SEASON);
-  const scope = all.filter((g) => options.week === undefined || g.week === options.week);
   // Same integrity check as the schedule sync: does this feed actually know our season?
   const ids = new Set(all.map((g) => g.id));
   const covered = gamesFromCsv(text, SEASON).filter((g) => ids.has(g.id)).length;
@@ -153,7 +173,7 @@ export async function syncResultsFromSource(
   }
 
   const finals = new Map(finalsFromCsv(text, SEASON).map((f) => [f.id, f]));
-  const started = scope.filter((g) => g.kickoffAt <= now);
+  const started = candidates;
   const toWrite: { id: string; winner: Winner; awayScore: number; homeScore: number }[] = [];
   const conflicts: ResultSyncResult["conflicts"] = [];
   let confirmed = 0;

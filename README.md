@@ -125,7 +125,21 @@ Passkeys follow the same rule — one created on `workers.dev` will not work on 
 
 ## Weekly ops
 
-- **Results:** open `/admin`, enter the PIN, then either tap **Pull final scores** to fill the week in from nflverse, or tap the winner of each game by hand (tap again to clear, or **Tie**). Boards update instantly. Any device works.
+- **Results:** mostly they arrive on their own. A Cron Trigger sweeps every half hour through the
+  windows games end in — Sunday afternoon and evening, and Sunday, Monday and Thursday nights — and
+  fills in any game the commissioner has not already recorded. You can still open `/admin`, enter
+  the PIN, and tap **Pull final scores** yourself, or set the winner of each game by hand (tap again
+  to clear, or **Tie**). Boards update instantly. Any device works.
+- **Why the automatic pull is safe to leave running:** it only fills blanks. A result already
+  recorded is either confirmed or reported as a conflict for you to settle — never overwritten, so
+  a winner you entered by hand always stands. It ignores games that have not kicked off, refuses
+  the whole feed if it covers less than 95% of the season, and on an unattended run waits until a
+  game is 3.5 hours past kickoff before believing a score, because nothing is watching it. A firing
+  with nothing finished and unrecorded never even downloads the feed.
+- **Cost:** none. Cron Triggers are on the free plan and these firings are a rounding error against
+  the daily request allowance. The one real limit is **five Cron Triggers per account**, shared with
+  every other Worker on it — which is why this uses two expressions rather than one per kickoff
+  window.
 - **About the pull:** it only fills games with no result recorded, only after kickoff, and only from a feed that still covers the schedule. Anything you entered by hand stands; if the feed disagrees it says so and changes nothing — clear that game and pull again to take the feed's version. nflverse usually posts a final within an hour or two of the whistle.
 - **Someone texted picks after kickoff:** the commissioner can backfill past locks:
   ```sh
