@@ -23,12 +23,14 @@
     }
   ],
   // Two expressions, because the free plan allows five per *account* and this is not the only
-  // Worker on it. The first is the daily schedule sync. The second sweeps for finished games every
-  // half hour through the windows games actually end in, in UTC: Sunday afternoon and evening,
-  // plus the small hours that are Sunday, Monday and Thursday night in America. The window is
-  // deliberately wide so it still covers the game times after the clocks change in November, and
-  // a firing with nothing to do never leaves the database.
-  "triggers": { "crons": ["0 10 * * *", "*/30 19-23,0-5 * * 0,1,2,5"] },
+  // Worker on it. The first is the daily schedule sync. The second sweeps for finished games and
+  // sends notifications, every half hour, always. It used to be narrowed to the UTC windows games
+  // end in, but the league keeps finding new ones — a Friday game in Brazil, a Wednesday at
+  // Christmas, a 9:30am kickoff in London — and a notification that never fires is a worse bug
+  // than a cron that finds nothing. It costs nothing to be wrong about the quiet hours: with no
+  // unfinished game to look up, the sweep never fetches the feed, and with nothing new settled
+  // there is nothing to say.
+  "triggers": { "crons": ["0 10 * * *", "*/30 * * * *"] },
   "vars": {
     "ENVIRONMENT": "production",
     // The app is Tally; this pool is one instance of the High Five pool type. POOL_SLUG is the
@@ -43,7 +45,17 @@
     "APPLE_APP_IDS": "8445LWRG3B.app.playtally.ios",
     // The App Store listing id (digits only, from the app's App Store URL). Setting it turns on
     // Safari's "Open in the app" banner on the website. Empty until the app is listed.
-    "APPLE_APP_STORE_ID": ""
+    "APPLE_APP_STORE_ID": "",
+    // Push notifications. These three are public — the team id appears in the file Apple fetches
+    // from this domain, and the bundle id is on the App Store — so they belong here. The key
+    // itself does not: `wrangler secret put APNS_KEY`, pasting in the .p8. Until that secret is
+    // set the worker registers device tokens and sends nothing, which is the right behaviour for
+    // anyone running this without an Apple developer account.
+    "APPLE_TEAM_ID": "8445LWRG3B",
+    "APPLE_BUNDLE_ID": "app.playtally.ios",
+    // The 10-character id of the APNs key, shown next to it in the developer portal. Not a secret
+    // (it travels in the header of every push), but useless without the key.
+    "APNS_KEY_ID": ""
   },
   "observability": { "enabled": true }
 }

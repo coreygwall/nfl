@@ -144,6 +144,29 @@ nowhere else: the tab bar and toolbar (free), the floating pick tray, the toast,
 Content stays on paper. The two families are registered at launch from `Resources/Fonts`; if a
 file is missing the rounded system face stands in rather than a blank.
 
+## Notifications and the lock screen
+
+The app asks for notifications after the first set of picks is locked in — never at launch, which
+is the prompt everybody declines — and registers its APNs token on every launch after that,
+because Apple reissues tokens without telling anyone.
+
+What gets sent is entirely the Worker's business (`worker/notify.ts`): one message per **slate**
+an entry had a pick in, per entry. A slate is how a week actually finishes — Thursday night, the
+1:00 games, the 4:00 games, Sunday night, Monday night — rather than one message per game, which
+would be five in a row on a Sunday afternoon. There is also a nudge about two hours before a slate
+if the five are not in, and a wrap-up with the week's place and the season standing once nothing
+is left to play.
+
+`TallyWidgetsExtension` draws the week's Live Activity: the five picks in rank order, the surest
+first, each showing what it is worth, with the points banked and still available. It renders teams
+as their abbreviation on the team's colour rather than as logos — at the size a lock screen gives
+five picks, three bold letters read from arm's length where a squashed logo does not, and it keeps
+the extension free of the app's asset catalog. The app keeps the activity current while it is open
+and hands the Worker a push token to update it while it is not.
+
+None of it sends until the APNs key is installed. See **Push notifications** in `CLAUDE.md` for the
+one command — it is the only part of this that cannot be done from the repository.
+
 ## Tests
 
 `cd ios/TallyKit && swift test` runs on a Mac without a simulator: the rules, URL parsing, the

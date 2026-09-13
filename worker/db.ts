@@ -593,3 +593,149 @@ export async function takeChallenge(
   if (!row || row.expires_at < now) return null;
   return { challenge: row.challenge, playerId: row.player_id };
 }
+
+// MARK: Push tokens
+
+export interface PushTokenRecord {
+  token: string;
+  environment: "sandbox" | "production";
+  accountId: string | null;
+  playerId: string | null;
+  prefs: Record<string, boolean>;
+}
+
+interface PushTokenRow {
+  token: string;
+  environment: string;
+  account_id: string | null;
+  player_id: string | null;
+  prefs: string;
+}
+
+const pushToken = (r: PushTokenRow): PushTokenRecord => {
+  let prefs: Record<string, boolean> = {};
+  try {
+    const parsed: unknown = JSON.parse(r.prefs);
+    if (parsed && typeof parsed === "object") prefs = parsed as Record<string, boolean>;
+  } catch {
+    // A malformed prefs blob means "everything on", which is the default anyway.
+  }
+  return {
+    token: r.token,
+    environment: r.environment === "sandbox" ? "sandbox" : "production",
+    accountId: r.account_id,
+    playerId: r.player_id,
+    prefs,
+  };
+};
+
+/**
+ * Record where an install can be reached. Re-registering is the normal case — the app does it on
+ * every launch — so this is an upsert that also moves the token to whoever is signed in now.
+ */
+export async function savePushToken(
+  db: D1Database,
+  input: {
+    token: string;
+    environment: "sandbox" | "production";
+    accountId: string | null;
+    playerId: string | null;
+    prefs?: Record<string, boolean>;
+    appVersion?: string | null;
+  },
+  now: string,
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO push_tokens (token, environment, account_id, player_id, prefs, app_version, created_at, last_seen_at, retired_at)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)
+       ON CONFLICT(token) DO UPDATE SET
+         environment = excluded.environment,
+         account_id = excluded.account_id,
+         player_id = excluded.player_id,
+         prefs = excluded.prefs,
+         app_version = excluded.app_version,
+         last_seen_at = excluded.last_seen_at,
+         retired_at = NULL`,
+    )
+    .bind(
+      input.token,
+      input.environment,
+      input.accountId,
+      input.playerId,
+      JSON.stringify(input.prefs ?? {}),
+      input.appVersion ?? null,
+      now,
+      now,
+    )
+    .run();
+}
+
+export async function deletePushToken(db: D1Database, token: string): Promise<void> {
+  await db.prepare("DELETE FROM push_tokens WHERE token = ?").bind(token).run();
+}
+
+/** Marks a token Apple has rejected, rather than deleting it outright. */
+export async function retirePushToken(db: D1Database, token: string, now: string): Promise<void> {
+  await db.prepare("UPDATE push_tokens SET retired_at = ? WHERE token = ?").bind(now, token).run();
+}
+
+export async function listPushTokens(db: D1Database): Promise<PushTokenRecord[]> {
+  const { results } = await db
+    .prepare("SELECT token, environment, account_id, player_id, prefs FROM push_tokens WHERE retired_at IS NULL")
+    .all<PushTokenRow>();
+  return results.map(pushToken);
+}
+
+/**
+ * Which entry each account can be notified about. An account's own player row counts — plenty of
+ * people pick under the name they signed up with — as does everything they later added.
+ */
+export async function entriesByOwner(db: D1Database): Promise<Map<string, string[]>> {
+  const { results } = await db
+    .prepare("SELECT owner_id, player_id FROM entry_owners")
+    .all<{ owner_id: string; player_id: string }>();
+  const byOwner = new Map<string, string[]>();
+  for (const r of results) {
+    const list = byOwner.get(r.owner_id) ?? [];
+    list.push(r.player_id);
+    byOwner.set(r.owner_id, list);
+  }
+  return byOwner;
+}
+
+// MARK: What we have already said
+
+/** The ids of messages already sent, so a cron running every half hour says each thing once. */
+export async function sentNotificationIds(db: D1Database, since: string): Promise<Set<string>> {
+  const { results } = await db
+    .prepare("SELECT id FROM notifications_sent WHERE sent_at >= ?")
+    .bind(since)
+    .all<{ id: string }>();
+  return new Set(results.map((r) => r.id));
+}
+
+/**
+ * Claim a message before sending it. Returns false if another run got there first, which is what
+ * makes two overlapping crons safe: the insert is the lock.
+ */
+export async function claimNotification(
+  db: D1Database,
+  input: { id: string; kind: string; playerId: string },
+  now: string,
+): Promise<boolean> {
+  const res = await db
+    .prepare("INSERT OR IGNORE INTO notifications_sent (id, kind, player_id, sent_at, delivered) VALUES (?, ?, ?, ?, 0)")
+    .bind(input.id, input.kind, input.playerId, now)
+    .run();
+  return (res.meta.changes ?? 0) > 0;
+}
+
+export async function noteDelivered(db: D1Database, id: string, delivered: number): Promise<void> {
+  await db.prepare("UPDATE notifications_sent SET delivered = ? WHERE id = ?").bind(delivered, id).run();
+}
+
+/** Undo a claim whose send found nobody to send to, so a later run can try again. */
+export async function releaseNotification(db: D1Database, id: string): Promise<void> {
+  await db.prepare("DELETE FROM notifications_sent WHERE id = ?").bind(id).run();
+}

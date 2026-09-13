@@ -7,7 +7,12 @@ struct TeamSticker: View {
     let team: Team
     var size: CGFloat = 72
     var selected = false
+    /// Not chosen — the other side of a matchup while you are picking. Pushed right back.
     var dimmed = false
+    /// Beaten. Held back, but nothing like as far as `dimmed`: the surrounding pill has already
+    /// gone red, and a logo at a fifth of its colour on a pink ground reads as washed out rather
+    /// than as lost. It also keeps its size, so a row of finished picks stays level.
+    var lost = false
     /// Straight (no tilt) — used in lists.
     var flat = false
 
@@ -36,8 +41,8 @@ struct TeamSticker: View {
                 }
             }
             .frame(width: size, height: size)
-            .grayscale(dimmed ? 0.7 : 0)
-            .opacity(dimmed ? 0.4 : 1)
+            .grayscale(dimmed ? 0.7 : lost ? 0.55 : 0)
+            .opacity(dimmed ? 0.4 : lost ? 0.65 : 1)
             .scaleEffect(selected ? 1.1 : dimmed ? 0.9 : 1)
             .rotationEffect(.degrees(selected || flat ? 0 : TeamSticker.tilt(for: team.abbr)))
 

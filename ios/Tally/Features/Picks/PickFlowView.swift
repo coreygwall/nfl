@@ -127,6 +127,7 @@ struct PickFlowView: View {
             seedIfNeeded(data)
             dropStale()
             syncTray()
+            model.syncLiveActivity(week: week, response: data)
         } catch {
             if wk.value == nil { wk = .failed(error.asAPIError) }
         }
@@ -215,6 +216,9 @@ struct PickFlowView: View {
             confetti += 1
             await load(quiet: true)
             await model.refreshBootstrap()
+            // The moment to ask: five picks are in, there is visibly something to be told about,
+            // and nobody is being interrupted. Asking at launch is how you get a "no" forever.
+            await model.offerNotifications()
         } catch {
             let err = error.asAPIError
             if err.status == 409 {

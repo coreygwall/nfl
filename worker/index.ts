@@ -7,10 +7,13 @@ import { getPlayer, playerForToken, publicPlayer } from "./db.ts";
 import { hashToken, tokenFromCookie } from "./auth.ts";
 import { withAbsoluteUrls, withAppBanner, withUnfurlTags } from "./unfurl.ts";
 import { appleAppSiteAssociation } from "./apple.ts";
-import { ensureReady, SCHEDULE_VERSION, syncResultsFromSource, syncScheduleFromSource } from "./ready.ts";
+import { ensureReady, SCHEDULE_VERSION, SEASON, syncResultsFromSource, syncScheduleFromSource } from "./ready.ts";
 import { publicRoutes } from "./routes/public.ts";
 import { adminRoutes } from "./routes/admin.ts";
 import { passkeyRoutes } from "./routes/passkeys.ts";
+import { pushRoutes } from "./routes/push.ts";
+import { configFrom } from "./apns.ts";
+import { dispatchNotifications } from "./notify.ts";
 
 /** Injected by Vite at build time (git sha); "dev" when running under the test runner. */
 export const BUILD_ID: string = typeof __BUILD_ID__ === "string" ? __BUILD_ID__ : "dev";
@@ -53,6 +56,7 @@ app.get("/api/health", (c) => c.json({ ok: true, now: c.get("now"), schedule: SC
 app.route("/api", publicRoutes);
 app.route("/api/passkeys", passkeyRoutes);
 app.route("/api/admin", adminRoutes);
+app.route("/api/push", pushRoutes);
 
 /**
  * A pool installs to a home screen as itself — its name, scoped to its own path — while the bare
@@ -163,10 +167,16 @@ const handler: ExportedHandler<Env> = {
         }
         // Through the game windows: fill in results the commissioner has not entered. It costs
         // nothing to run often — with nothing finished and unrecorded it never leaves the database.
-        const results = await syncResultsFromSource(env.DB, new Date().toISOString(), {
+        const now = new Date().toISOString();
+        const results = await syncResultsFromSource(env.DB, now, {
           minElapsedHours: UNATTENDED_MIN_ELAPSED_HOURS,
         });
         console.log("results sync", JSON.stringify(results));
+        // Straight after, so a result that has just landed is already in the database when we work
+        // out whether a slate is over. Every message is claimed before it is sent, so a firing that
+        // finds nothing new says nothing.
+        const pushed = await dispatchNotifications(env, SEASON, now, configFrom(env));
+        if (pushed.sent || pushed.retired || pushed.skipped) console.log("notifications", JSON.stringify(pushed));
       })(),
     );
   },

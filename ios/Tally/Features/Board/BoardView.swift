@@ -278,7 +278,7 @@ struct EmptySlotChip: View {
 
     var body: some View {
         let said = locked ? "A hidden pick worth \(points) points, revealed at kickoff" : "No pick worth \(points) points"
-        HStack(spacing: 2) {
+        HStack(spacing: PillFit.Chip.gap) {
             Group {
                 if locked {
                     Image(systemName: "lock.fill").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.ink2)
@@ -286,15 +286,17 @@ struct EmptySlotChip: View {
                     Text("–").sans(13, weight: .bold).foregroundStyle(Color.ink3)
                 }
             }
-            .frame(width: 26, height: 26)
+            .frame(width: PillFit.Chip.logo, height: PillFit.Chip.logo)
             Text("\(points)")
                 .font(TallyFont.display(11))
                 .monospacedDigit()
                 .foregroundStyle(locked ? Color.ink : Color.ink3)
-                .frame(minWidth: 18, minHeight: 18)
+                .frame(minWidth: PillFit.Chip.badge, minHeight: PillFit.Chip.badge)
                 .background(Circle().fill(locked ? Color.white : Color.clear))
         }
-        .padding(.leading, 2).padding(.trailing, 4).padding(.vertical, 2)
+        .padding(.leading, PillFit.Chip.leading)
+        .padding(.trailing, PillFit.Chip.trailing)
+        .padding(.vertical, PillFit.Chip.vertical)
         .background(Capsule().fill(locked ? Color.white : Color.paper2.opacity(0.5)))
         .overlay(
             Capsule().strokeBorder(
@@ -319,11 +321,18 @@ struct PickChip: View {
         let value: String
     }
 
-    /// Colour carries the state, so nothing has to say "pending" — plain means not finished.
+    /**
+     Colour carries the state, so nothing has to say "pending" — plain means not finished.
+
+     A loss is red rather than merely faded. Grey reads as "nothing happened here", which is what a
+     rank nobody took looks like; a pick that went down is a different thing and should be legible
+     as one from across the row. A tie stays neutral: it scored nothing, but it was not wrong.
+     */
     private var style: Style {
         switch pick.outcome {
         case .win: return Style(border: .turf, fill: .turfSoft, badgeFill: .turf, badgeText: .white, value: "\(pick.points)")
-        case .loss, .tie: return Style(border: .line, fill: .paper2, badgeFill: .white, badgeText: .ink3, value: "0")
+        case .loss: return Style(border: Color.danger.opacity(0.55), fill: .dangerSoft, badgeFill: .white, badgeText: .danger, value: "0")
+        case .tie: return Style(border: .line, fill: .paper2, badgeFill: .white, badgeText: .ink3, value: "0")
         case .pending: return Style(border: Color.ink.opacity(0.25), fill: .white, badgeFill: .white, badgeText: .ink, value: "\(Scoring.points(forRank: pick.rank))")
         }
     }
@@ -332,16 +341,18 @@ struct PickChip: View {
         let team = model.sport.teamOrPlaceholder(pick.team)
         let stake = Scoring.points(forRank: pick.rank)
         let s = style
-        HStack(spacing: 2) {
-            TeamSticker(team: team, size: 26, dimmed: pick.outcome == .loss, flat: true)
+        HStack(spacing: PillFit.Chip.gap) {
+            TeamSticker(team: team, size: PillFit.Chip.logo, lost: pick.outcome == .loss, flat: true)
             Text(s.value)
                 .font(TallyFont.display(11))
                 .monospacedDigit()
                 .foregroundStyle(s.badgeText)
-                .frame(minWidth: 18, minHeight: 18)
+                .frame(minWidth: PillFit.Chip.badge, minHeight: PillFit.Chip.badge)
                 .background(Circle().fill(s.badgeFill))
         }
-        .padding(.leading, 2).padding(.trailing, 4).padding(.vertical, 2)
+        .padding(.leading, PillFit.Chip.leading)
+        .padding(.trailing, PillFit.Chip.trailing)
+        .padding(.vertical, PillFit.Chip.vertical)
         .background(Capsule().fill(s.fill))
         .overlay(Capsule().strokeBorder(s.border, lineWidth: 2))
         .accessibilityLabel("\(team.nickname), \(pick.outcome == .win ? "won \(pick.points) points" : pick.outcome == .pending ? "still playing, worth \(stake) points" : "got nothing")")

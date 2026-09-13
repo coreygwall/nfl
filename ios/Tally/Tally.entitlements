@@ -10,5 +10,12 @@
 		<string>webcredentials:playtally.app</string>
 		<string>applinks:playtally.app</string>
 	</array>
+	<!-- Push notifications. "development" is what a build signed by Xcode needs; Xcode rewrites it
+	     to "production" when the app is archived for TestFlight or the App Store, so this value is
+	     correct in the repository and correct in a release. Adding this capability is also what
+	     tells Xcode to enable Push Notifications on the App ID when it provisions, which is why
+	     there is nothing to do in the developer portal beyond minting the key itself. -->
+	<key>aps-environment</key>
+	<string>development</string>
 </dict>
 </plist>

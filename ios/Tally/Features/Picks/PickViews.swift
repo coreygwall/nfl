@@ -131,7 +131,9 @@ struct PickTrayView: View {
                             Button {
                                 if !frozen { state.onRemove(pick.gameId) }
                             } label: {
-                                TeamSticker(team: model.sport.teamOrPlaceholder(pick.team), size: 36, flat: true)
+                                // 30 inside a 40pt slot: the slot's corner radius is 12, so a
+                                // bigger square would have its corners hanging over the dashes.
+                                TeamSticker(team: model.sport.teamOrPlaceholder(pick.team), size: 30, flat: true)
                                     .overlay(alignment: .bottomTrailing) {
                                         if frozen {
                                             Image(systemName: "lock.fill")
@@ -139,7 +141,7 @@ struct PickTrayView: View {
                                                 .foregroundStyle(Color.paper)
                                                 .padding(3)
                                                 .background(Circle().fill(Color.ink))
-                                                .offset(x: 3, y: 3)
+                                                .offset(x: 2, y: 2)
                                         }
                                     }
                             }
@@ -194,7 +196,7 @@ enum OutcomeStyle {
     static func fill(_ o: PickOutcome) -> Color {
         switch o {
         case .win: return .turfSoft
-        case .loss: return Color.dangerSoft.opacity(0.6)
+        case .loss: return .dangerSoft
         case .tie: return .paper2
         case .live: return .flagSoft
         case .pending: return .white
@@ -204,7 +206,7 @@ enum OutcomeStyle {
     static func border(_ o: PickOutcome) -> Color {
         switch o {
         case .win: return .turf
-        case .loss: return Color.danger.opacity(0.6)
+        case .loss: return Color.danger.opacity(0.55)
         case .tie, .pending: return .line
         case .live: return .flag
         }

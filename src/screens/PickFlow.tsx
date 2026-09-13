@@ -515,11 +515,13 @@ function PickTray({
                         exit={{ scale: 0, rotate: 20 }}
                         transition={{ type: "spring", stiffness: 600, damping: 22 }}
                         onClick={() => !isFrozen && onRemove(p.gameId)}
-                        className="relative h-9 w-9"
+                        /* 30 inside a 40px slot: the slot is rounded-xl, so a bigger square would
+                           have its corners hanging over the dashes. */
+                        className="relative h-[30px] w-[30px]"
                       >
-                        <TeamSticker abbr={p.team} size={36} flat />
+                        <TeamSticker abbr={p.team} size={30} flat />
                         {isFrozen && (
-                          <span className="absolute -bottom-1 -right-1 rounded-full bg-ink p-0.5 text-paper">
+                          <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-ink p-0.5 text-paper">
                             <Lock size={10} />
                           </span>
                         )}
@@ -825,7 +827,7 @@ function ReviewStep({
           {rows.map(({ p, g, outcome, pts }) => (
             <li key={p.gameId} className={`flex items-center gap-3 rounded-2xl border-2 p-2 ${outcomeStyle(outcome)}`}>
               <RankBadge rank={p.rank} size="sm" />
-              <TeamSticker abbr={p.team} size={40} flat dimmed={outcome === "loss" || outcome === "tie"} />
+              <TeamSticker abbr={p.team} size={40} flat lost={outcome === "loss"} dimmed={outcome === "tie"} />
               <MatchupText pick={p} game={g} />
               <span className="ml-auto shrink-0 text-right">
                 <OutcomeTag outcome={outcome} pts={pts} />
@@ -891,7 +893,7 @@ export function outcomeStyle(outcome: string): string {
     case "win":
       return "border-turf bg-turf-soft";
     case "loss":
-      return "border-danger/60 bg-danger-soft/60";
+      return "border-danger/55 bg-danger-soft";
     case "tie":
       return "border-line bg-paper-2";
     case "live":

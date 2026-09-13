@@ -13,6 +13,7 @@ import TallyKit
 @main
 struct TallyApp: App {
     @State private var model: AppModel
+    @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     init() {
         FontRegistrar.registerBundledFonts()
@@ -25,6 +26,10 @@ struct TallyApp: App {
                 .environment(model)
                 .tint(.ink)
                 .onOpenURL { url in model.open(url) }
+                // A notification tapped while the app was shut arrives before any view exists, so
+                // the path waits on the service and is picked up here instead of being lost.
+                .onChange(of: model.push.pendingPath) { _, _ in model.consumeNotificationTap() }
+                .task { model.consumeNotificationTap() }
         }
     }
 }

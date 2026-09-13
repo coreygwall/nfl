@@ -1,5 +1,6 @@
 import SwiftUI
 import TallyKit
+import UIKit
 
 /**
  Two different jobs used to share one sheet, which is why it felt busy: *which name am I picking
@@ -26,6 +27,7 @@ struct AccountView: View {
 
             entriesSection
             passkeySection
+            notificationsSection
             anotherDeviceSection
             moreSection
         }
@@ -75,6 +77,15 @@ struct AccountView: View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Signing in")
             PasskeyRow(hasPasskey: (boot?.myPasskeys ?? 0) > 0)
+        }
+    }
+
+    // MARK: Notifications
+
+    private var notificationsSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "Notifications")
+            NotificationsRow()
         }
     }
 
@@ -376,5 +387,51 @@ struct FlowLayout: Layout {
             x += size.width + spacing
             rowHeight = max(rowHeight, size.height)
         }
+    }
+}
+
+/**
+ What the app will tell you about, and how to change your mind.
+
+ Once iOS has been answered it will not ask again, so a "no" here is a trip to Settings — which is
+ what the button does rather than pretending a second prompt would work.
+ */
+private struct NotificationsRow: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.openURL) private var openURL
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            switch model.push.permission {
+            case .granted:
+                HStack(spacing: 8) {
+                    Image(systemName: "bell.fill").foregroundStyle(Color.turf)
+                    Text("On").font(TallyFont.display(16))
+                    Spacer()
+                    Chip(text: "you'll hear", fill: .turfSoft, size: 10)
+                }
+                Text("One message per entry each time a set of games finishes — the 1:00 games, the 4:00 games, Sunday night — plus a nudge if your picks aren't in.")
+                    .sans(12).foregroundStyle(Color.ink2)
+            case .denied:
+                Text("Turned off in Settings.").font(TallyFont.display(16))
+                Button("Open Settings") {
+                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+                }
+                .buttonStyle(.tally(.plain, size: .small))
+                Text("iOS only asks once, so this has to be changed there.")
+                    .sans(12).foregroundStyle(Color.ink2)
+            case .notAsked, .unknown:
+                Button("Tell me when my games finish") {
+                    Task { await model.offerNotifications() }
+                }
+                .buttonStyle(.tally(.plain, size: .small))
+                Text("A message when each set of games is done, and a nudge if you haven't picked.")
+                    .sans(12).foregroundStyle(Color.ink2)
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardFlat()
+        .task { await model.push.refreshPermission() }
     }
 }

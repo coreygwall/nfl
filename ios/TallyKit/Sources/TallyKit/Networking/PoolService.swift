@@ -121,6 +121,31 @@ public struct PoolService: Sendable {
         try await client.post("/admin/players/\(playerId)/device", options: .init(pin: pin))
     }
 
+    // MARK: Notifications
+
+    /// Tells the server where to reach this install. Called on every launch: an APNs token can
+    /// change without warning, and a stale one is a notification nobody ever sees.
+    @discardableResult
+    public func registerPushToken(
+        _ token: String,
+        environment: PushEnvironment,
+        appVersion: String?
+    ) async throws -> OkResponse {
+        try await client.post("/push", body: RegisterPushBody(token: token, environment: environment.rawValue, appVersion: appVersion))
+    }
+
+    /// Notifications off, or signing out on this phone.
+    @discardableResult
+    public func unregisterPushToken(_ token: String) async throws -> OkResponse {
+        try await client.delete("/push/\(token)")
+    }
+
+    private struct RegisterPushBody: Encodable {
+        let token: String
+        let environment: String
+        let appVersion: String?
+    }
+
     private struct SyncBody: Encodable { let source: String }
     private struct PullBody: Encodable { let week: Int? }
 

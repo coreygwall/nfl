@@ -44,6 +44,8 @@ final class AppModel {
     private(set) var pool: PoolRef
     private(set) var service: PoolService
     let passkeys: PasskeyService
+    let push = PushService()
+    let live = LiveActivityService()
 
     // MARK: Identity
 
@@ -114,6 +116,7 @@ final class AppModel {
             Task { @MainActor in self?.online = path.status == .satisfied }
         }
         monitor.start(queue: DispatchQueue(label: "tally.network"))
+        connectPush()
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(300))
@@ -121,6 +124,67 @@ final class AppModel {
             }
         }
         Task { await self.refreshBootstrap() }
+    }
+
+    // MARK: Notifications
+
+    /**
+     Hand the push service a way to reach whichever pool is open. Read at call time rather than
+     captured, so switching pools moves the phone's notifications with it.
+     */
+    private func connectPush() {
+        AppDelegate.push = push
+        push.connect(
+            register: { [weak self] token, environment in
+                guard let self else { return }
+                let version = Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String
+                try? await self.service.registerPushToken(token, environment: environment, appVersion: version)
+            },
+            unregister: { [weak self] token in
+                try? await self?.service.unregisterPushToken(token)
+            }
+        )
+        Task {
+            await push.refreshPermission()
+            live.adoptExisting()
+        }
+    }
+
+    /**
+     Ask for notifications, once, at a moment when the answer is obviously yes. Does nothing if
+     they have already been asked — iOS only ever shows the prompt once, and a second call after a
+     refusal is silently a no.
+     */
+    func offerNotifications() async {
+        guard push.permission == .notAsked else { return }
+        if await push.requestPermission() {
+            toast("You'll hear when your games finish.")
+        }
+    }
+
+    /// A tapped notification carried the page it is about, so there is nothing to look up.
+    func consumeNotificationTap() {
+        guard let path = push.pendingPath else { return }
+        push.pendingPath = nil
+        if let url = URL(string: "https://\(pool.host)\(path)") { open(url) }
+    }
+
+    /**
+     Keep the lock screen in step with the week the app just loaded. Safe to call on every refresh:
+     the service starts, updates or ends as the state calls for, and does nothing at all when Live
+     Activities are switched off.
+     */
+    func syncLiveActivity(week: Int, response: WeekResponse) {
+        guard let name = player?.name else { return }
+        let state = WeekActivityAttributes.ContentState.from(
+            picks: response.myPicks,
+            games: response.games,
+            now: ServerClock.shared.now
+        )
+        let firstKickoff = response.games.map(\.kickoffAt).min()
+        Task {
+            await live.sync(week: week, entryName: name, poolName: poolName, state: state, firstKickoff: firstKickoff)
+        }
     }
 
     private static func makeService(pool: PoolRef, session: @escaping @Sendable () -> AuthHeaders) -> PoolService {
