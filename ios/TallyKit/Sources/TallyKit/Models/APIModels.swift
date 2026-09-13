@@ -79,6 +79,8 @@ public struct BootstrapResponse: Codable, Sendable {
     public let currentWeek: Int
     /// Latest week with started games — the results view default.
     public let boardWeek: Int
+    /// First week that counts towards the season total. Optional so an older Worker still decodes.
+    public let seasonFromWeek: Int?
     public let weeks: [WeekSummary]
     public let players: [RosterPlayer]
     public let me: Player?
@@ -90,6 +92,8 @@ public struct BootstrapResponse: Codable, Sendable {
     public let myPasskeys: Int?
 
     public var maxWeek: Int { weeks.map(\.week).max() ?? WeekLogic.weeks }
+    /// Weeks before this one crown their own winner but do not carry into the season race.
+    public var seasonStartsAt: Int { seasonFromWeek ?? 1 }
 }
 
 public struct CreatePlayerResponse: Codable, Sendable {
@@ -180,7 +184,46 @@ public struct WeekRow: Codable, Hashable, Sendable, BoardRow {
     public let possible: Int
     /// Only picks whose game has kicked off, plus all of the requester's own.
     public let picks: [ScoredPick]
+    /// Ranks held by picks whose team is still hidden. Optional so a board served by an older
+    /// Worker still decodes; `pickSlots` is what screens should read.
+    public let hiddenRanks: [Int]?
     public var id: String { playerId }
+
+    /// One entry per rank, in rank order, so a row draws five places that fill in rather than a
+    /// list that grows sideways as games kick off.
+    public var pickSlots: [PickSlot] {
+        let byRank = Dictionary(picks.map { ($0.rank, $0) }, uniquingKeysWith: { a, _ in a })
+        let hidden = Set(hiddenRanks ?? [])
+        return Scoring.allRanks.map { rank in
+            if let pick = byRank[rank] { return .taken(pick) }
+            return hidden.contains(rank) ? .hidden(rank: rank) : .empty(rank: rank)
+        }
+    }
+}
+
+/// What one of the five places on a board row is holding.
+public enum PickSlot: Hashable, Sendable, Identifiable {
+    /// A pick whose game has begun, or the requester's own.
+    case taken(ScoredPick)
+    /// A pick that exists at this rank; the team stays secret until kickoff.
+    case hidden(rank: Int)
+    /// Nobody picked at this rank.
+    case empty(rank: Int)
+
+    public var rank: Int {
+        switch self {
+        case .taken(let pick): return pick.rank
+        case .hidden(let rank), .empty(let rank): return rank
+        }
+    }
+
+    /// What this place is worth: banked for a finished pick, at stake for anything else.
+    public var points: Int {
+        if case .taken(let pick) = self, pick.outcome != .pending { return pick.points }
+        return Scoring.points(forRank: rank)
+    }
+
+    public var id: Int { rank }
 }
 
 public struct WeekBoardResponse: Codable, Sendable {
@@ -219,8 +262,16 @@ public struct SeasonRow: Codable, Hashable, Sendable, BoardRow {
 public struct SeasonBoardResponse: Codable, Sendable {
     public let now: Date
     public let season: Int
+    /// First week that counts towards the season total; earlier weeks are played for their own
+    /// sake. Optional so a board served by an older Worker still decodes.
+    public let fromWeek: Int?
+    /// Latest counting week that has started, or 0 before the season race begins.
     public let throughWeek: Int
     public let rows: [SeasonRow]
+
+    public var seasonStartsAt: Int { fromWeek ?? 1 }
+    /// True while the season race has not begun, which is worth saying out loud on a board of zeroes.
+    public var notStarted: Bool { throughWeek == 0 }
 }
 
 public struct SessionResponse: Codable, Sendable {

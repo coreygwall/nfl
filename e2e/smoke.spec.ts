@@ -118,7 +118,11 @@ test.describe.serial("pool flow", () => {
     await expect(primaryNav.getByRole("link", { name: "Picks" })).not.toHaveAttribute("aria-current", "page");
     await expect(page.getByText("2 of 2 have picked")).toBeVisible();
     await page.getByRole("button", { name: /Corey/ }).click();
-    await expect(page.getByText("5 more picks revealed at kickoff")).toBeVisible();
+    await expect(page.getByText("5 picks still hidden — the team shows at kickoff")).toBeVisible();
+    // Five places are drawn from the start; hidden picks hold their own rank rather than
+    // bunching at the end, so the row fills in instead of growing.
+    const slots = page.getByRole("list", { name: "Picks, most confident first" }).first();
+    await expect(slots.getByRole("listitem")).toHaveCount(5);
 
     // Admin records the opener.
     await page.goto("/admin");
@@ -177,7 +181,7 @@ test.describe.serial("pool flow", () => {
     const corey = page.getByRole("button", { name: /Corey/ });
     await expect(corey).toContainText("4");
     await corey.click();
-    await expect(page.getByText("4 more picks revealed at kickoff")).toBeVisible();
+    await expect(page.getByText("4 picks still hidden — the team shows at kickoff")).toBeVisible();
     // The chip says what the pick was worth, and says it in words for anyone who cannot see colour.
     await expect(page.getByTitle(/Seattle Seahawks — won 4 points/)).toBeVisible();
 

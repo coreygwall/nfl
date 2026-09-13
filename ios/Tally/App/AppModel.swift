@@ -6,7 +6,7 @@ import TallyKit
 import UIKit
 
 enum AppTab: Hashable {
-    case picks, board, rules
+    case picks, board, rules, account
 }
 
 enum BoardScope: String, Hashable {
@@ -65,7 +65,8 @@ final class AppModel {
     var boardWeek: Int?
     var boardScope: BoardScope = .week
     var boardSort: BoardSort = .points
-    var showAccount = false
+    /// The entry switcher over the name chip. Account settings live on their own tab.
+    var showEntrySwitcher = false
     var showAdmin = false
     var showPools = false
     /// The welcome screen over a signed-in device — from a sign-in link or "I'm someone new".
@@ -296,6 +297,8 @@ final class AppModel {
     var sport: any Sport { NFL.shared }
     var currentWeek: Int { boot.value?.currentWeek ?? 1 }
     var maxWeek: Int { boot.value?.maxWeek ?? WeekLogic.weeks }
+    /// First week that counts towards the season race; earlier ones stand on their own.
+    var seasonStartsAt: Int { boot.value?.seasonStartsAt ?? 1 }
     var activePickWeek: Int { pickWeek ?? currentWeek }
     var activeBoardWeek: Int { boardWeek ?? boot.value?.boardWeek ?? 1 }
     var now: Date { ServerClock.shared.now }

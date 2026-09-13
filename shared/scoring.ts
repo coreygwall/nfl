@@ -40,6 +40,12 @@ export interface WeekRow {
   possible: number;
   /** Only picks whose game has kicked off, plus all of the requester's own. */
   picks: ScoredPick[];
+  /**
+   * Ranks held by picks that are still hidden. The team stays secret until kickoff, but the rank
+   * does not need to: it lets the board draw every pick in its own slot, so five places are
+   * visible from the start and fill in as games begin, rather than a row that grows sideways.
+   */
+  hiddenRanks: number[];
 }
 
 export interface WeekBoard {
@@ -125,6 +131,7 @@ export function buildWeekBoard(input: {
     const mine = (byPlayer.get(player.id) ?? []).sort((a, b) => a.rank - b.rank);
     let points = 0, correct = 0, fives = 0, possible = 0;
     const scored: ScoredPick[] = [];
+    const hiddenRanks: number[] = [];
     for (const p of mine) {
       const game = gamesById.get(p.gameId)!;
       const { outcome, points: pts } = scorePick(p, game);
@@ -136,6 +143,8 @@ export function buildWeekBoard(input: {
       possible += outcome === "pending" ? pointsForRank(p.rank) : pts;
       if (player.id === requesterId || isLocked(game, now)) {
         scored.push({ gameId: p.gameId, team: p.team, rank: p.rank, points: pts, outcome });
+      } else {
+        hiddenRanks.push(p.rank);
       }
     }
     return {
@@ -149,6 +158,7 @@ export function buildWeekBoard(input: {
       picksMade: mine.length,
       possible,
       picks: scored,
+      hiddenRanks,
     };
   });
   return {

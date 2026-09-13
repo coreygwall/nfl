@@ -2,129 +2,190 @@ import SwiftUI
 import TallyKit
 
 /**
- The account sheet, as on the web: most people see one line here and never touch it. The code
- stays hidden until someone actually needs another device; entries the account manages are one
- tap to switch; Face ID is offered, never required. Pools and the commissioner's office hang
- off the bottom, because both are rare.
+ Two different jobs used to share one sheet, which is why it felt busy: *which name am I picking
+ as* is a thing you do mid-week in two taps, and *my account* is a thing you visit once. The
+ switcher stays on the name chip; everything else lives here, on its own tab.
  */
-struct AccountSheet: View {
+struct AccountView: View {
     @Environment(AppModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
     @State private var showCode = false
     @State private var adding = false
-    @State private var copied = false
 
     private var boot: BootstrapResponse? { model.boot.value }
-    private var others: [Identity] { model.people.filter { $0.id != model.player?.id } }
     private var accountName: String { boot?.account?.name ?? model.player?.name ?? "" }
+    private var entries: [Identity] { model.people }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 22) {
+            VStack(alignment: .leading, spacing: 4) {
+                SectionLabel(text: "Signed in as")
+                Text(accountName).display(28)
+                Text("One account, and every entry it picks for.")
+                    .sans(14).foregroundStyle(Color.ink2)
+            }
+
+            entriesSection
+            passkeySection
+            anotherDeviceSection
+            moreSection
+        }
+    }
+
+    // MARK: Entries
+
+    private var entriesSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "Your entries")
+            ForEach(entries) { p in
+                let active = p.id == model.player?.id
+                Button {
+                    if !active { model.switchTo(p.id) }
+                } label: {
+                    HStack(spacing: 10) {
+                        Text(p.name).font(TallyFont.display(16))
+                        if p.isManagedEntry { Chip(text: "you manage", size: 10) }
+                        Spacer()
+                        if active { Chip(text: "picking", fill: .flag, size: 10) }
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.plain)
+                .modifier(TallyCard(hard: active, fill: .white, border: .ink, radius: TallyRadius.card, dashed: false))
+            }
+            if adding {
+                AddEntryForm(onDone: { identity in
+                    adding = false
+                    model.setPlayer(identity)
+                    model.tab = .picks
+                }, onCancel: { adding = false })
+            } else {
+                Button("Add an entry") { adding = true }
+                    .buttonStyle(.tally(.plain, size: .small))
+                Text("For your kids, a partner, a friend who won't install anything. Each gets its own picks and its own row on the board; none of them needs a sign-in of its own.")
+                    .sans(12).foregroundStyle(Color.ink2)
+            }
+        }
+    }
+
+    // MARK: Face ID
+
+    private var passkeySection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "Signing in")
+            PasskeyRow(hasPasskey: (boot?.myPasskeys ?? 0) > 0)
+        }
+    }
+
+    // MARK: Another device
+
+    private var anotherDeviceSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "Play on another device")
+            if showCode, let code = boot?.myCode {
+                DeviceCodeCard(code: code, name: accountName, accountId: boot?.account?.id)
+            } else {
+                Button("Show my sign-in link and code") { showCode = true }
+                    .buttonStyle(.tally(.plain, size: .small))
+                    .disabled(boot?.myCode == nil)
+                Text("A one-tap link you can text yourself, and the code to type if you'd rather.")
+                    .sans(12).foregroundStyle(Color.ink2)
+            }
+            if let roster = boot?.players, roster.count > entries.count {
+                SomeoneElse(roster: roster.filter { r in !entries.contains { $0.id == r.id } }) { id in
+                    model.pendingClaim = PendingClaim(playerId: id, code: nil)
+                    model.showWelcome = true
+                }
+            }
+        }
+    }
+
+    // MARK: More
+
+    private var moreSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            DashedDivider()
+            HStack(spacing: 8) {
+                Button { model.showAdmin = true } label: { Label("Commissioner", systemImage: "key.fill") }
+                    .buttonStyle(.tally(.plain, size: .small))
+                Button { model.showPools = true } label: { Label("Pools", systemImage: "square.grid.2x2.fill") }
+                    .buttonStyle(.tally(.plain, size: .small))
+            }
+            LinkButton(title: "Sign out on this phone", color: .danger) { model.signOut() }
+                .padding(.top, 4)
+            Text("Your picks stay on the board. Signing back in needs \(Biometry.label) or your code.")
+                .sans(12).foregroundStyle(Color.ink3)
+        }
+    }
+}
+
+/// The name chip's sheet: who am I picking as, and nothing else to read.
+struct EntrySwitcherSheet: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+    @State private var adding = false
 
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.white.ignoresSafeArea()
                 ScrollView {
-                    VStack(alignment: .leading, spacing: 16) {
-                        HStack(spacing: 4) {
-                            Text("Picking as").sans(14).foregroundStyle(Color.ink2)
-                            Text(model.player?.name ?? "").sans(14, weight: .bold)
-                        }
-
-                        if !others.isEmpty {
-                            VStack(alignment: .leading, spacing: 8) {
-                                SectionLabel(text: "Your other entries")
-                                FlowLayout(spacing: 8) {
-                                    ForEach(others) { p in
-                                        Button {
-                                            model.switchTo(p.id)
-                                            dismiss()
-                                        } label: {
-                                            HStack(spacing: 4) {
-                                                Text(p.name)
-                                                if p.isManagedEntry { Text("YOURS").sans(10, weight: .bold).foregroundStyle(Color.ink3) }
-                                            }
-                                            .sans(14, weight: .bold)
-                                            .padding(.horizontal, 12)
-                                            .padding(.vertical, 9)
-                                            .background(Capsule().fill(Color.white))
-                                            .overlay(Capsule().strokeBorder(Color.ink, lineWidth: 2))
-                                        }
-                                        .buttonStyle(.plain)
-                                    }
+                    VStack(alignment: .leading, spacing: 12) {
+                        ForEach(model.people) { p in
+                            let active = p.id == model.player?.id
+                            Button {
+                                if !active { model.switchTo(p.id) }
+                                dismiss()
+                            } label: {
+                                HStack(spacing: 10) {
+                                    Image(systemName: active ? "largecircle.fill.circle" : "circle")
+                                        .font(.system(size: 20, weight: .bold))
+                                        .foregroundStyle(active ? Color.turf : Color.ink3)
+                                    Text(p.name).font(TallyFont.display(17))
+                                    if p.isManagedEntry { Chip(text: "you manage", size: 10) }
+                                    Spacer()
                                 }
+                                .padding(12)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
                             }
+                            .buttonStyle(.plain)
+                            .cardFlat()
                         }
-
-                        Text("Add entries for your kids, family, or friends. Each gets their own picks and score, all managed by your account.")
-                            .sans(14).foregroundStyle(Color.ink2)
-
-                        PasskeyRow(hasPasskey: (boot?.myPasskeys ?? 0) > 0)
 
                         if adding {
                             AddEntryForm(onDone: { identity in
                                 adding = false
                                 model.setPlayer(identity)
+                                model.tab = .picks
                                 dismiss()
                             }, onCancel: { adding = false })
                         } else {
-                            VStack(alignment: .leading, spacing: 10) {
-                                DashedDivider()
-                                if showCode, let code = boot?.myCode {
-                                    DeviceCodeCard(code: code, name: accountName, accountId: boot?.account?.id)
-                                } else {
-                                    LinkButton(title: "Play on another device →") { showCode = true }
-                                        .disabled(boot?.myCode == nil)
-                                }
-                                HStack(spacing: 8) {
-                                    Button("Add an entry") { adding = true }.buttonStyle(.tally(.plain, size: .small))
-                                    Button("I'm someone new") {
-                                        model.welcomeStartsNew = true
-                                        model.showWelcome = true
-                                        dismiss()
-                                    }.buttonStyle(.tally(.plain, size: .small))
-                                }
-                                if let roster = boot?.players, roster.count > model.people.count {
-                                    SomeoneElse(roster: roster.filter { r in !model.people.contains { $0.id == r.id } }) { id in
-                                        model.pendingClaim = PendingClaim(playerId: id, code: nil)
-                                        model.showWelcome = true
-                                        dismiss()
-                                    }
-                                }
-                            }
+                            Button("Add an entry") { adding = true }
+                                .buttonStyle(.tally(.plain, size: .small))
+                                .padding(.top, 2)
+                            Text("Pick for someone who isn't going to install anything.")
+                                .sans(12).foregroundStyle(Color.ink2)
                         }
 
-                        DashedDivider().padding(.top, 6)
-                        VStack(alignment: .leading, spacing: 10) {
-                            SectionLabel(text: "More")
-                            HStack(spacing: 8) {
-                                Button {
-                                    dismiss()
-                                    model.showAdmin = true
-                                } label: { Label("Commissioner", systemImage: "key.fill") }
-                                .buttonStyle(.tally(.plain, size: .small))
-                                Button {
-                                    dismiss()
-                                    model.showPools = true
-                                } label: { Label("Pools", systemImage: "square.grid.2x2.fill") }
-                                .buttonStyle(.tally(.plain, size: .small))
-                            }
-                            LinkButton(title: "Sign out on this phone", color: .danger) {
-                                model.signOut()
-                                dismiss()
-                            }
+                        DashedDivider().padding(.top, 8)
+                        Button {
+                            model.tab = .account
+                            dismiss()
+                        } label: {
+                            Label("Account settings", systemImage: "person.crop.circle")
                         }
+                        .buttonStyle(.tally(.plain, size: .small))
                     }
                     .padding(20)
                 }
             }
-            .navigationTitle("Your account")
+            .navigationTitle("Picking as")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button("Close") { dismiss() }
-                }
-            }
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
         }
-        .presentationDetents([.large])
+        .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
     }
 }
@@ -143,8 +204,8 @@ struct AddEntryForm: View {
         VStack(alignment: .leading, spacing: 8) {
             DashedDivider()
             Text("Add an entry").display(15)
-            Text("Choose the name everyone will see on the board. No separate sign-in needed.").sans(14).foregroundStyle(Color.ink2)
-            Text("Entry name").sans(14, weight: .bold)
+            Text("Choose the name everyone will see on the board. No separate sign-in needed.")
+                .sans(14).foregroundStyle(Color.ink2)
             TextField("e.g. Parker", text: $name)
                 .tallyField()
                 .textInputAutocapitalization(.words)
@@ -153,10 +214,10 @@ struct AddEntryForm: View {
                 .disabled(busy)
             if let error { Text(error).sans(14, weight: .semibold).foregroundStyle(Color.danger) }
             HStack(spacing: 10) {
-                Button(busy ? "Adding…" : "Add entry & make picks") { Task { await submit() } }
-                    .buttonStyle(.tally(.primary))
+                Button(busy ? "Adding…" : "Add & make picks") { Task { await submit() } }
+                    .buttonStyle(.tally(.primary, size: .small))
                     .disabled(busy || name.trimmingCharacters(in: .whitespaces).isEmpty)
-                Button("Cancel", action: onCancel).buttonStyle(.tally(.plain)).disabled(busy)
+                Button("Cancel", action: onCancel).buttonStyle(.tally(.plain, size: .small)).disabled(busy)
             }
         }
         .onAppear { focused = true }
@@ -186,7 +247,6 @@ struct PasskeyRow: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            DashedDivider()
             if done || hasPasskey {
                 Label("\(Biometry.label) is on — it opens this app and the website.", systemImage: Biometry.symbolName)
                     .sans(14).foregroundStyle(Color.ink2)
@@ -195,6 +255,9 @@ struct PasskeyRow: View {
                     .buttonStyle(.tally(.plain, size: .small))
                     .disabled(busy)
                 Text("Optional. Opens your account on a new phone, a laptop, or playtally.app without a code.")
+                    .sans(12).foregroundStyle(Color.ink2)
+            } else {
+                Text("This device has no biometrics, so your code is the way onto another one.")
                     .sans(12).foregroundStyle(Color.ink2)
             }
         }
@@ -233,13 +296,11 @@ struct DeviceCodeCard: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            SectionLabel(text: "Play on another device")
             if let link {
                 ShareLink(item: link) {
                     Label("Send myself a sign-in link", systemImage: "square.and.arrow.up")
                 }
                 .buttonStyle(.tally(.primary, size: .small, fullWidth: true))
-                .padding(.top, 2)
                 Text("Text or AirDrop it to yourself. One tap signs that device in as \(name). Treat it like a password.")
                     .sans(12).foregroundStyle(Color.ink2)
             }
