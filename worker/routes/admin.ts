@@ -12,11 +12,13 @@ import type {
   AdminWeekResponse,
 } from "../../shared/api.ts";
 import { generateCode } from "../../shared/codes.ts";
-import { hashToken, newToken } from "../auth.ts";
+import { hashToken, isLockedOut, lockUntil, MAX_ADMIN_ATTEMPTS, newToken, secretEquals } from "../auth.ts";
+import { callerIp } from "../env.ts";
 import {
   addDevice,
   adminDeviceCounts,
   adminWrittenPickKeys,
+  clearRateLimit,
   deletePlayer,
   deviceCounts,
   findPlayerByKey,
@@ -29,7 +31,9 @@ import {
   listPlayers,
   listWeekGames,
   listWeekPicks,
+  noteRateLimit,
   ownerOfEntry,
+  rateLimit,
   playerStats,
   publicPlayer,
   renamePlayer,
@@ -45,11 +49,31 @@ import { parseWeek, toGameDTO } from "./public.ts";
 
 export const adminRoutes = new Hono<AppEnv>();
 
+/**
+ * The PIN opens the results, the roster, and a device token for any player in the pool, so it is
+ * worth as much as every account put together — and the pool's URL is meant to be shared widely.
+ * Guessing is therefore limited the same way a claim code is: a handful of tries, then a cool-off.
+ * The counter is per caller rather than global, so nobody can lock the commissioner out by
+ * hammering the endpoint.
+ */
 adminRoutes.use("*", async (c, next) => {
   const expected = c.env.ADMIN_PIN;
   if (!expected) throw new ApiError(503, "ADMIN_DISABLED", "Set the ADMIN_PIN secret to enable admin");
+  const now = c.get("now");
+  const key = `admin:${callerIp(c.req.raw.headers)}`;
+  const seen = await rateLimit(c.env.DB, key, now);
+  if (isLockedOut(seen.resetAt, now)) {
+    throw new ApiError(429, "PIN_LOCKED", "Too many wrong PINs. Try again in a few minutes.");
+  }
+
   const given = c.req.header("x-admin-pin") ?? "";
-  if (given !== expected) throw new ApiError(401, "BAD_PIN", "Wrong PIN");
+  if (!secretEquals(given, expected)) {
+    const fails = seen.count + 1;
+    const locked = fails >= MAX_ADMIN_ATTEMPTS ? lockUntil(now) : null;
+    await noteRateLimit(c.env.DB, key, locked ? 0 : fails, locked, now);
+    throw new ApiError(401, "BAD_PIN", locked ? "Too many wrong PINs. Try again in a few minutes." : "Wrong PIN");
+  }
+  if (seen.count > 0) await clearRateLimit(c.env.DB, key);
   await next();
 });
 

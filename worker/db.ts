@@ -289,6 +289,36 @@ export async function clearClaimFailures(db: D1Database, playerId: string): Prom
   await db.prepare("UPDATE players SET claim_attempts = 0, claim_locked_until = NULL WHERE id = ?").bind(playerId).run();
 }
 
+export interface RateLimitState {
+  count: number;
+  resetAt: string | null;
+}
+
+/** Reads a counter, treating an expired window as a fresh one. */
+export async function rateLimit(db: D1Database, key: string, now: string): Promise<RateLimitState> {
+  const row = await db
+    .prepare("SELECT count, reset_at FROM rate_limits WHERE key = ?")
+    .bind(key)
+    .first<{ count: number; reset_at: string | null }>();
+  if (!row) return { count: 0, resetAt: null };
+  if (row.reset_at && Date.parse(row.reset_at) <= Date.parse(now)) return { count: 0, resetAt: null };
+  return { count: row.count, resetAt: row.reset_at };
+}
+
+export async function noteRateLimit(db: D1Database, key: string, count: number, resetAt: string | null, now: string): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO rate_limits (key, count, reset_at, last_at) VALUES (?1, ?2, ?3, ?4)
+       ON CONFLICT(key) DO UPDATE SET count = ?2, reset_at = ?3, last_at = ?4`,
+    )
+    .bind(key, count, resetAt, now)
+    .run();
+}
+
+export async function clearRateLimit(db: D1Database, key: string): Promise<void> {
+  await db.prepare("DELETE FROM rate_limits WHERE key = ?").bind(key).run();
+}
+
 export async function touchPlayer(db: D1Database, id: string, now: string): Promise<void> {
   await db.prepare("UPDATE players SET last_seen_at = ? WHERE id = ?").bind(now, id).run();
 }

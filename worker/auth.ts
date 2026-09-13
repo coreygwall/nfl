@@ -20,6 +20,17 @@ export function newToken(): string {
 export const MAX_CLAIM_ATTEMPTS = 8;
 export const CLAIM_LOCK_MINUTES = 15;
 
+/** The admin PIN gets the same treatment, per caller. */
+export const MAX_ADMIN_ATTEMPTS = 8;
+
+/** Compares without giving away how much of the secret matched. */
+export function secretEquals(a: string, b: string): boolean {
+  if (a.length !== b.length) return false;
+  let diff = 0;
+  for (let i = 0; i < a.length; i++) diff |= a.charCodeAt(i) ^ b.charCodeAt(i);
+  return diff === 0;
+}
+
 export function lockUntil(now: string): string {
   return new Date(Date.parse(now) + CLAIM_LOCK_MINUTES * 60_000).toISOString();
 }

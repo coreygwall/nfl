@@ -23,3 +23,8 @@ export type AppEnv = {
 };
 
 export const isDev = (env: Env): boolean => env.ENVIRONMENT === "dev";
+
+/** Best-effort caller identity for rate limits. Cloudflare sets cf-connecting-ip at the edge. */
+export function callerIp(headers: Headers): string {
+  return headers.get("cf-connecting-ip") ?? headers.get("x-forwarded-for")?.split(",")[0]?.trim() ?? "unknown";
+}

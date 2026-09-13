@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { motion } from "motion/react";
 import { api, ApiClientError } from "../api/client.ts";
 import { useAdminPlayerMutation, useAdminPlayers, useAdminPullResults, useAdminResetAccess, useAdminSetReady, useAdminSetResult, useAdminStatus, useAdminSync, useAdminWeek, useBootstrap } from "../api/queries.ts";
@@ -36,15 +36,15 @@ export function Admin() {
         }}
       />
     );
-  return (
-    <AdminPanel
-      pin={pin}
-      onSignOut={() => {
-        sessionStorage.removeItem(PIN_KEY);
-        setPin(null);
-      }}
-    />
-  );
+  const drop = () => {
+    try {
+      sessionStorage.removeItem(PIN_KEY);
+    } catch {
+      /* ignore */
+    }
+    setPin(null);
+  };
+  return <AdminPanel pin={pin} onSignOut={drop} onPinRejected={drop} />;
 }
 
 function PinGate({ onOk }: { onOk: (pin: string) => void }) {
@@ -91,11 +91,18 @@ function PinGate({ onOk }: { onOk: (pin: string) => void }) {
   );
 }
 
-function AdminPanel({ pin, onSignOut }: { pin: string; onSignOut: () => void }) {
+function AdminPanel({ pin, onSignOut, onPinRejected }: { pin: string; onSignOut: () => void; onPinRejected: () => void }) {
   const boot = useBootstrap();
   const [tab, setTab] = useState<"results" | "players" | "tools">("results");
   const [week, setWeek] = useState<number | null>(null);
   const activeWeek = week ?? boot.data?.boardWeek ?? 1;
+  // A PIN that stopped working — rotated secret, mistyped once and remembered — must not keep
+  // being replayed: every retry counts against the lockout. Ask for it again instead.
+  const players = useAdminPlayers(pin);
+  useEffect(() => {
+    const err = players.error;
+    if (err instanceof ApiClientError && (err.code === "BAD_PIN" || err.code === "PIN_LOCKED")) onPinRejected();
+  }, [players.error, onPinRejected]);
   return (
     <div className="mx-auto w-full max-w-[860px] lg:max-w-[1060px]">
       <Segmented

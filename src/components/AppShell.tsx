@@ -7,7 +7,7 @@ import { useChrome } from "./Chrome.tsx";
 import { ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Football, Swap, Trophy, X } from "./Icons.tsx";
 import { useToast } from "./Toast.tsx";
 import { useOnline } from "../lib/online.ts";
-import { api } from "../api/client.ts";
+import { api, ApiClientError } from "../api/client.ts";
 import type { Identity } from "../lib/identity.ts";
 import type { RosterPlayer } from "../../shared/api.ts";
 import { formatCode } from "../../shared/codes.ts";
@@ -44,12 +44,27 @@ export function AppShell() {
     syncEntries(boot.data.account.id, boot.data.myEntries, player?.token);
   }, [boot.data, player?.token, syncEntries]);
 
+  // An entry only exists while the account that owns it still does. If the commissioner removes
+  // it, every request from this device 403s — so drop it and fall back to the account rather than
+  // leaving the app stuck behind an error that retrying can never clear.
+  // An account carries its own id here, so this is specifically "a name my account picks for".
+  const isManagedEntry = !!player?.accountId && player.accountId !== player.id;
+  useEffect(() => {
+    const err = boot.error;
+    if (!(err instanceof ApiClientError) || err.code !== "ENTRY_FORBIDDEN" || !player || !isManagedEntry) return;
+    const name = player.name;
+    forget(player.id);
+    toast(`${name}'s entry isn't on this account any more.`, "error");
+  }, [boot.error, player, isManagedEntry, forget, toast]);
+
   // Devices that signed in before codes existed hold a name but no token, and no cookie either.
   // Claim one silently if the name is still free; otherwise send them to the code screen.
   const claim = useClaimPlayer();
   const upgrading = useRef(false);
   useEffect(() => {
     if (!player || player.token || upgrading.current) return;
+    // A managed entry has no code of its own to claim with; its account is the way back in.
+    if (isManagedEntry) return;
     if (!boot.data || boot.data.me !== null) return;
     upgrading.current = true;
     claim

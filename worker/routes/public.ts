@@ -1,5 +1,6 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../env.ts";
+import { callerIp } from "../env.ts";
 import { ApiError, badRequest, notFound } from "../errors.ts";
 import { nameKey, validateName } from "../../shared/names.ts";
 import { codesMatch, generateCode } from "../../shared/codes.ts";
@@ -36,7 +37,9 @@ import {
   listPlayers,
   listWeekGames,
   listWeekPicks,
+  noteRateLimit,
   publicPlayer,
+  rateLimit,
   replacePicks,
   touchPlayer,
 } from "../db.ts";
@@ -52,6 +55,16 @@ export function parseWeek(raw: string | undefined): number {
 }
 
 const MAX_PLAYERS = 200;
+/** One account picking for its household, not a way to fill the roster from one phone. */
+const MAX_ENTRIES = 12;
+/**
+ * The pool's link gets texted around and posted, so the signup form is open to anyone holding it.
+ * The number sits between the two cases that matter: a room full of friends joining over one wifi
+ * at kickoff, which must never be turned away, and a script filling all 200 seats before anyone
+ * real arrives, which must. Cloudflare sets the address at the edge, so it is the caller's own.
+ */
+const SIGNUPS_PER_HOUR = 20;
+const SIGNUP_WINDOW_MINUTES = 60;
 
 /** Registers a new device for a player and returns the token only this response will carry. */
 async function issueToken(db: D1Database, playerId: string, now: string): Promise<string> {
@@ -105,6 +118,12 @@ publicRoutes.post("/entries", async (c) => {
     throw new ApiError(409, "NAME_TAKEN", "That name is already in the pool. Use a different entry name.");
   }
   if (await countPlayers(c.env.DB) >= MAX_PLAYERS) throw new ApiError(403, "POOL_FULL", "The pool is full.");
+  const owned = await c.env.DB.prepare("SELECT count(*) AS n FROM entry_owners WHERE owner_id = ?")
+    .bind(account.id)
+    .first<{ n: number }>();
+  if ((owned?.n ?? 0) >= MAX_ENTRIES) {
+    throw new ApiError(403, "TOO_MANY_ENTRIES", `One account can manage ${MAX_ENTRIES} entries. Ask the commissioner if you need more.`);
+  }
   const player = { id: crypto.randomUUID(), name: check.name };
   await c.env.DB.batch([
     c.env.DB.prepare("INSERT INTO players (id, name, name_key, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?)")
@@ -127,6 +146,12 @@ publicRoutes.post("/players", async (c) => {
   if ((await countPlayers(c.env.DB)) >= MAX_PLAYERS) {
     throw new ApiError(403, "POOL_FULL", "The pool is full. Ask the commissioner to make room.");
   }
+  const now = c.get("now");
+  const limitKey = `signup:${callerIp(c.req.raw.headers)}`;
+  const seen = await rateLimit(c.env.DB, limitKey, now);
+  if (seen.count >= SIGNUPS_PER_HOUR) {
+    throw new ApiError(429, "TOO_MANY_SIGNUPS", "That's a lot of new names from one place. Try again in a bit.");
+  }
   const player = { id: crypto.randomUUID(), name: check.name };
   const code = generateCode();
   try {
@@ -138,6 +163,13 @@ publicRoutes.post("/players", async (c) => {
     const res: CreatePlayerResponse = { player: publicPlayer(winner), created: false };
     return c.json(res, 200);
   }
+  await noteRateLimit(
+    c.env.DB,
+    limitKey,
+    seen.count + 1,
+    seen.resetAt ?? new Date(Date.parse(now) + SIGNUP_WINDOW_MINUTES * 60_000).toISOString(),
+    now,
+  );
   const token = await issueToken(c.env.DB, player.id, c.get("now"));
   const res: CreatePlayerResponse = { player, created: true, token, code };
   c.header("set-cookie", sessionCookie(token, c.req.url));

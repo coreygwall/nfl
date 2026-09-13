@@ -10,6 +10,8 @@ interface Opts {
   method?: string;
   now?: string;
   pin?: string;
+  /** Signups are counted per caller, so each person in a test needs their own address. */
+  ip?: string;
 }
 
 async function api<T = any>(path: string, opts: Opts = {}): Promise<{ status: number; body: T }> {
@@ -18,6 +20,7 @@ async function api<T = any>(path: string, opts: Opts = {}): Promise<{ status: nu
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (opts.token) headers["x-player-token"] = opts.token;
   if (opts.pin) headers["x-admin-pin"] = opts.pin;
+  if (opts.ip) headers["cf-connecting-ip"] = opts.ip;
   const res = await SELF.fetch(url, {
     method: opts.method ?? (opts.body !== undefined ? "POST" : "GET"),
     headers,
@@ -28,8 +31,9 @@ async function api<T = any>(path: string, opts: Opts = {}): Promise<{ status: nu
 
 let seq = 0;
 async function join(prefix = "Claimer") {
-  const name = `${prefix} ${Date.now().toString(36)}${(seq++).toString(36)}`;
-  const { status, body } = await api("/players", { body: { name } });
+  const n = seq++;
+  const name = `${prefix} ${Date.now().toString(36)}${n.toString(36)}`;
+  const { status, body } = await api("/players", { body: { name }, ip: `198.51.100.${(n % 250) + 1}` });
   expect(status).toBe(201);
   return { id: body.player.id as string, name, token: body.token as string, code: body.code as string };
 }

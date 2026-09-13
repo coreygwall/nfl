@@ -280,6 +280,32 @@ test("a player who shows up Sunday night can still pick what's left", async ({ p
   await expect(page.getByText("Locked in")).toBeVisible();
 });
 
+test("an entry removed by the commissioner doesn't strand the device that held it", async ({ page }) => {
+  await page.goto(`/welcome?now=${BEFORE}`);
+  await page.getByPlaceholder("Your name").fill("Dana");
+  await page.getByRole("button", { name: "Let's go" }).click();
+  await expect(page).toHaveURL(/\/week\/1$/);
+
+  await page.getByRole("button", { name: "Switch player" }).click();
+  await page.getByRole("button", { name: "Add an entry" }).click();
+  await page.getByLabel("Entry name").fill("Robin");
+  await page.getByRole("button", { name: "Add entry & make picks" }).click();
+  const chip = page.getByRole("button", { name: "Switch player" });
+  await expect(chip).toContainText("Robin");
+
+  // The commissioner clears Robin out of the roster while this phone is still picking as Robin.
+  const roster = await page.request.get("/api/admin/players", { headers: { "x-admin-pin": "1234" } });
+  const robin = ((await roster.json()) as { players: { id: string; name: string }[] }).players.find((p) => p.name === "Robin")!;
+  expect((await page.request.delete(`/api/admin/players/${robin.id}`, { headers: { "x-admin-pin": "1234" } })).status()).toBe(200);
+
+  // Every request from this device is now refused. It should land back on the account rather than
+  // on an error with a retry button that can never work.
+  await page.reload();
+  await expect(chip).toContainText("Dana");
+  await expect(page.getByText("isn't on this account any more")).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Pick 5 winners/ })).toBeVisible();
+});
+
 test("the landing page explains a pool without linking into one", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /Simple, fun games/ })).toBeVisible();
