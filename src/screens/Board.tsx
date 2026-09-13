@@ -35,7 +35,7 @@ export function Board({ tab }: { tab: "week" | "season" }) {
               label="Week or season"
               pillId="board-range"
               options={[
-                { value: "week", label: "This week", short: "Week" },
+                { value: "week", label: "Week" },
                 { value: "season", label: "Season" },
               ]}
               onChange={(v) => nav(v === "week" ? `/board/week/${boardWeek}${keepSort}` : `/board/season${keepSort}`)}

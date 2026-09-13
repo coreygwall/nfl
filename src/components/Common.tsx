@@ -62,8 +62,7 @@ export function Segmented<T extends string>({
   pillId = "segmented-pill",
 }: {
   value: T;
-  /** `short` is used where the full label would not fit a phone; it must still stand alone. */
-  options: { value: T; label: string; short?: string }[];
+  options: { value: T; label: string }[];
   onChange: (v: T) => void;
   label?: string;
   /** Distinct per control, so two on one screen don't animate into each other. */
@@ -102,8 +101,7 @@ export function Segmented<T extends string>({
               animate={{ scale: active ? 1 : 0.97, opacity: active ? 1 : 0.82 }}
               transition={{ type: "spring", stiffness: 500, damping: 32 }}
             >
-              <span className={o.short ? "sm:hidden" : ""}>{o.short ?? o.label}</span>
-              {o.short && <span className="hidden sm:inline">{o.label}</span>}
+              {o.label}
             </motion.span>
           </motion.button>
         );
