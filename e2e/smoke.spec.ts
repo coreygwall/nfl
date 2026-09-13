@@ -5,14 +5,29 @@ const AFTER_OPENER = "2026-09-10T03:00:00Z"; // NE @ SEA kicked off
 
 const pick = (page: Page, team: string) => page.getByRole("button", { name: `Pick ${team}` }).click();
 
+/** Make this browser advertise the built-in biometric authenticator the signup offer requires. */
+const enablePlatformBiometrics = (page: Page) => page.addInitScript(() => {
+  if (typeof PublicKeyCredential !== "function") return;
+  Object.defineProperty(PublicKeyCredential, "isUserVerifyingPlatformAuthenticatorAvailable", {
+    configurable: true,
+    value: async () => true,
+  });
+});
+
 /** Alex's claim code, read off the first device in one test and typed into the next. */
 let alexCode = "";
 
 test.describe.serial("pool flow", () => {
   test("new player picks five, ranks, locks in", async ({ page }) => {
+    await enablePlatformBiometrics(page);
     await page.goto(`/welcome?now=${BEFORE}`);
     await page.getByPlaceholder("Your name").fill("Corey");
     await page.getByRole("button", { name: "Let's go" }).click();
+    const welcome = page.getByRole("dialog", { name: "You’re all set" });
+    await expect(welcome.getByText("you won’t need to sign in again here")).toBeVisible();
+    await expect(welcome.getByText("Want to use another device?")).toBeVisible();
+    await expect(welcome.getByText(/passkey/i)).toBeHidden();
+    await welcome.getByRole("button", { name: "Not now — start picking" }).click();
     await expect(page).toHaveURL(/\/week\/1$/);
     await expect(page.locator('header img[src="/icon.svg"]')).toBeVisible();
     await expect(page.getByRole("link", { name: "Tally — High Five" })).toBeVisible();
@@ -51,6 +66,7 @@ test.describe.serial("pool flow", () => {
   });
 
   test("a second player is guarded against stealing a name, can't see hidden picks, admin scores the week", async ({ page }) => {
+    await enablePlatformBiometrics(page);
     // First run on a new device asks for a name; the roster is one link away.
     await page.goto(`/welcome?now=${BEFORE}`);
     await expect(page.getByRole("heading", { name: "What should we call you?" })).toBeVisible();
@@ -72,6 +88,7 @@ test.describe.serial("pool flow", () => {
     await expect(page.getByRole("button", { name: "Join as this name" })).toBeDisabled();
     await page.getByPlaceholder(/Corey/).fill("Alex");
     await page.getByRole("button", { name: "Join as this name" }).click();
+    await page.getByRole("dialog", { name: "You’re all set" }).getByRole("button", { name: "Not now — start picking" }).click();
     await expect(page).toHaveURL(/\/week\/1$/);
 
     for (const t of ["New England Patriots", "Los Angeles Rams", "Houston Texans"]) await pick(page, t);
@@ -242,9 +259,11 @@ test("one phone can pick for the whole family, and the code stays out of the way
 test("a player who shows up Sunday night can still pick what's left", async ({ page }) => {
   // Only the Sunday night and Monday night games have yet to kick off.
   const SUNDAY_NIGHT = "2026-09-13T22:00:00Z";
+  await enablePlatformBiometrics(page);
   await page.goto(`/welcome?now=${SUNDAY_NIGHT}`);
   await page.getByPlaceholder("Your name").fill("Sunday Nighter");
   await page.getByRole("button", { name: "Let's go" }).click();
+  await page.getByRole("dialog", { name: "You’re all set" }).getByRole("button", { name: "Not now — start picking" }).click();
 
   // The ask scales to what is actually still available — no dead five-slot tray.
   await expect(page.getByRole("heading", { name: "Pick 2 winners" })).toBeVisible();
@@ -334,11 +353,15 @@ test("Face ID: turn it on, lose the device's memory, and sign back in with no ty
       automaticPresenceSimulation: true,
     },
   });
+  await enablePlatformBiometrics(page);
 
   const name = `Face ${Date.now().toString(36)}`;
   await page.goto(`/p/high-five/welcome?now=${BEFORE}`);
   await page.getByPlaceholder("Your name").fill(name);
   await page.getByRole("button", { name: "Let's go" }).click();
+  const welcome = page.getByRole("dialog", { name: "You’re all set" });
+  await welcome.getByRole("button", { name: "Set up Face ID or fingerprint" }).click();
+  await expect(page).toHaveURL(/\/week\/1$/);
   await expect(page.getByRole("button", { name: "Switch player" })).toContainText(name);
 
   // Add two children before registering the account passkey while picking as a child.
@@ -351,13 +374,6 @@ test("Face ID: turn it on, lose the device's memory, and sign back in with no ty
     await expect(page.getByRole("button", { name: "Switch player" })).toContainText(childName);
   }
 
-  // Opt in — it is a button in the account sheet, never a wall in front of the app.
-  await page.getByRole("button", { name: "Switch player" }).click();
-  const sheet = page.getByRole("dialog", { name: "Your account" });
-  await sheet.getByRole("button", { name: "Turn on Face ID" }).click();
-  await expect(sheet.getByText("Face ID is on for this account.")).toBeVisible();
-  await sheet.getByRole("button", { name: "Close" }).click();
-
   // Now forget everything this device knows: no token, no cookie, as if it were a new phone.
   await context.clearCookies();
   await page.evaluate(() => {
@@ -367,12 +383,13 @@ test("Face ID: turn it on, lose the device's memory, and sign back in with no ty
   await page.goto(`/p/high-five/welcome?now=${BEFORE}`);
   await expect(page.getByRole("heading", { name: "What should we call you?" })).toBeVisible();
 
-  await page.getByRole("button", { name: "Sign in with Face ID" }).click();
+  await page.getByRole("button", { name: "Sign in with Face ID or fingerprint" }).click();
   await expect(page).toHaveURL(/\/week\/1$/);
   await expect(page.getByRole("button", { name: "Switch player" })).toContainText(name);
 
   // Both children follow the passkey onto the recovered device.
   await page.getByRole("button", { name: "Switch player" }).click();
+  const sheet = page.getByRole("dialog", { name: "Your account" });
   await expect(sheet.getByRole("button", { name: `Child A ${name}`, exact: true })).toBeVisible();
   await sheet.getByRole("button", { name: `Child B ${name}`, exact: true }).click();
   await expect(page.getByRole("button", { name: "Switch player" })).toContainText(`Child B ${name}`);

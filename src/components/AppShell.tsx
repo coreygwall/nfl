@@ -394,7 +394,7 @@ function PasskeyRow({ hasPasskey }: { hasPasskey: boolean }) {
   if (done || hasPasskey) {
     return (
       <p className="mt-4 flex items-center gap-2 border-t-2 border-dashed border-line pt-4 text-sm text-ink-2">
-        <Check size={16} className="text-turf" /> Face ID is on for this account.
+        <Check size={16} className="text-turf" /> Face ID or fingerprint is on for this account.
       </p>
     );
   }
@@ -403,7 +403,7 @@ function PasskeyRow({ hasPasskey }: { hasPasskey: boolean }) {
     try {
       await addPasskey();
       setDone(true);
-      toast("Face ID is on. Next device just needs your face.", "success");
+      toast("Face ID or fingerprint is ready for your account.", "success");
       void qc.invalidateQueries({ queryKey: ["bootstrap"] });
     } catch (err) {
       if (!wasCancelled(err)) toast(err instanceof Error ? err.message : "Couldn't set that up.", "error");
@@ -414,7 +414,7 @@ function PasskeyRow({ hasPasskey }: { hasPasskey: boolean }) {
   return (
     <div className="mt-4 border-t-2 border-dashed border-line pt-4">
       <button className="btn btn-sm" disabled={busy} onClick={() => void turnOn()}>
-        {busy ? "Waiting…" : "Turn on Face ID"}
+        {busy ? "Waiting…" : "Set up Face ID or fingerprint"}
       </button>
       <p className="mt-1.5 text-xs text-ink-2">Optional. Signs you in on a new phone without a code.</p>
     </div>

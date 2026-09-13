@@ -13,7 +13,7 @@ import type { Abbr } from "../../shared/teams.ts";
 import { ErrorState, Spinner } from "../components/Common.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
 import { useToast } from "../components/Toast.tsx";
-import { passkeysSupported, signInWithPasskey, wasCancelled } from "../lib/passkey.ts";
+import { addPasskey, dismissOffer, offerDismissed, passkeysSupported, platformBiometricsSupported, signInWithPasskey, wasCancelled } from "../lib/passkey.ts";
 
 /** Every team, in a fixed shuffle so the strip reads as a jumble rather than a division list. */
 const MARQUEE_TEAMS: Abbr[] = [
@@ -39,6 +39,7 @@ export function Welcome() {
   /** The roster entry we are claiming, or that a typed name collided with. */
   const [target, setTarget] = useState<Player | null>(null);
   const [shake, setShake] = useState(0);
+  const [biometricOffer, setBiometricOffer] = useState<Identity | null>(null);
 
   const players = boot.data?.players ?? [];
   const taken = useMemo(() => new Map(players.map((p) => [nameKey(p.name), p])), [players]);
@@ -81,6 +82,16 @@ export function Welcome() {
     nav(next, { replace: true });
   };
 
+  const welcomeNewPlayer = async (p: Identity) => {
+    setPlayer(p);
+    toast(`Welcome to the pool, ${p.name}!`, "success");
+    if (!offerDismissed(p.id) && await platformBiometricsSupported()) {
+      setBiometricOffer(p);
+      return;
+    }
+    nav(next, { replace: true });
+  };
+
   /** Tapping a name on the roster: unclaimed names come free, claimed ones want the code. */
   const tapRoster = async (p: RosterPlayer) => {
     setError(null);
@@ -116,8 +127,7 @@ export function Welcome() {
     try {
       const res = await create.mutateAsync(check.name);
       if (res.created && res.token) {
-        toast(`Welcome to the pool, ${res.player.name}!`, "success");
-        go({ ...res.player, token: res.token });
+        await welcomeNewPlayer({ ...res.player, token: res.token });
       } else {
         // Someone claimed it between our roster load and this submit.
         setTarget(res.player);
@@ -130,6 +140,7 @@ export function Welcome() {
   };
 
   return (
+    <>
     <div className="mx-auto w-full max-w-[560px] lg:max-w-[1060px]">
       <TeamMarquee />
       <div className="lg:grid lg:min-h-[calc(100dvh-420px)] lg:grid-cols-[minmax(0,1fr)_400px] lg:items-center lg:gap-12">
@@ -342,6 +353,83 @@ export function Welcome() {
         </div>
       </div>
     </div>
+    <AnimatePresence>
+      {biometricOffer && (
+        <BiometricOffer
+          player={biometricOffer}
+          onDone={() => {
+            dismissOffer(biometricOffer.id);
+            setBiometricOffer(null);
+            nav(next, { replace: true });
+          }}
+        />
+      )}
+    </AnimatePresence>
+    </>
+  );
+}
+
+/** A plain-language, one-time offer immediately after a successful signup. */
+function BiometricOffer({ player, onDone }: { player: Identity; onDone: () => void }) {
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
+
+  const turnOn = async () => {
+    setBusy(true);
+    setError(null);
+    try {
+      await addPasskey();
+      toast("Face ID or fingerprint is ready on your account.", "success");
+      onDone();
+    } catch (err) {
+      if (!wasCancelled(err)) setError(err instanceof Error ? err.message : "Couldn't set that up right now.");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <motion.div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-ink/45 p-0 sm:items-center sm:p-4"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      onClick={onDone}
+      onKeyDown={(event) => { if (event.key === "Escape") onDone(); }}
+    >
+      <motion.div
+        role="dialog"
+        aria-modal="true"
+        aria-labelledby="biometric-offer-title"
+        className="card w-full max-w-[460px] rounded-b-none p-6 pb-[max(env(safe-area-inset-bottom),24px)] sm:rounded-b-card"
+        initial={{ y: 56, scale: 0.98 }}
+        animate={{ y: 0, scale: 1 }}
+        exit={{ y: 56, opacity: 0 }}
+        transition={{ type: "spring", stiffness: 400, damping: 32 }}
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl border-2 border-ink bg-flag text-2xl font-black" aria-hidden="true">✓</div>
+        <h2 id="biometric-offer-title" className="font-display text-2xl font-extrabold">You’re all set</h2>
+        <p className="mt-1 text-sm leading-relaxed text-ink-2">
+          We’ll remember <b className="text-ink">{player.name}</b> on this device, so you won’t need to sign in again here.
+        </p>
+        <div className="card-flat mt-5 bg-flag-soft p-4">
+          <h3 className="font-display font-extrabold">Want to use another device?</h3>
+          <p className="mt-1 text-sm leading-relaxed text-ink-2">
+            Set up Face ID or fingerprint now to open your account on a new phone, tablet, or computer without a code.
+          </p>
+        </div>
+        {error && <p role="alert" className="mt-3 text-sm font-semibold text-danger">{error}</p>}
+        <button autoFocus className="btn btn-turf mt-5 min-h-12 w-full" disabled={busy} onClick={() => void turnOn()}>
+          {busy ? "Waiting for you…" : "Set up Face ID or fingerprint"}
+        </button>
+        <button className="btn mt-2 min-h-12 w-full" disabled={busy} onClick={onDone}>
+          Not now — start picking
+        </button>
+        <p className="mt-3 text-center text-xs text-ink-3">You can always turn this on later from your account.</p>
+      </motion.div>
+    </motion.div>
   );
 }
 
@@ -365,7 +453,7 @@ function PasskeySignIn({ onSignedIn }: { onSignedIn: (p: Identity) => void }) {
   return (
     <div className="mb-4 border-b-2 border-dashed border-line pb-4">
       <button className="btn btn-sm w-full" disabled={busy} onClick={() => void go()}>
-        {busy ? "Waiting…" : "Sign in with Face ID"}
+        {busy ? "Waiting…" : "Sign in with Face ID or fingerprint"}
       </button>
       {error && <p className="mt-2 text-xs text-ink-2">{error}</p>}
     </div>

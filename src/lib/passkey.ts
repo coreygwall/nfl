@@ -8,6 +8,18 @@ export function passkeysSupported(): boolean {
   return typeof window !== "undefined" && typeof window.PublicKeyCredential === "function";
 }
 
+/** Whether this device can fulfill biometric-focused copy with a built-in authenticator. */
+export async function platformBiometricsSupported(): Promise<boolean> {
+  if (!passkeysSupported()) return false;
+  const check = window.PublicKeyCredential.isUserVerifyingPlatformAuthenticatorAvailable;
+  if (typeof check !== "function") return false;
+  try {
+    return await check.call(window.PublicKeyCredential);
+  } catch {
+    return false;
+  }
+}
+
 const DISMISS_KEY = "nflpool.passkey-offer-dismissed";
 
 export function offerDismissed(playerId: string): boolean {
