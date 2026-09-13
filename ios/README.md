@@ -37,12 +37,33 @@ publish it before the first install.
    (`webcredentials:playtally.app`, `applinks:playtally.app`).
    The copy adapts to the hardware — `Biometry.label` reads `LAContext.biometryType`, so a
    Touch ID iPad says "Touch ID" rather than lying about Face ID.
-2. **Note your Team ID** (Xcode → Settings → Accounts → your team, or developer.apple.com →
-   Membership). It looks like `ABCDE12345`.
+2. **Note your Team ID** — ten characters, like `ABCDE12345`. The reliable place is
+   [developer.apple.com](https://developer.apple.com/account) → *Account* → *Membership details*.
+   Xcode → *Settings* → *Accounts* → your team shows it too, and once Xcode has made a
+   provisioning profile it is the prefix of the App ID in *Signing & Capabilities*.
 3. **Tell the domain about the app.** In `wrangler.jsonc` set
-   `"APPLE_APP_IDS": "ABCDE12345.app.playtally.ios"` and push. The Worker then serves
-   `https://playtally.app/.well-known/apple-app-site-association` naming the app; check it in
-   a browser. Without this, Face ID in the app fails silently and pool links open in Safari.
+   `"APPLE_APP_IDS": "ABCDE12345.app.playtally.ios"`, then get that onto **production** — the
+   branch Cloudflare deploys from, which today is `claude/nfl-pool-app-9tv2om`. A preview URL is
+   not enough: the entitlements name `playtally.app`, so that is the only host iOS will ask.
+   Check it landed:
+
+   ```sh
+   curl -s https://playtally.app/.well-known/apple-app-site-association
+   ```
+
+   Your app id should appear under both `webcredentials` and `applinks`. Without this, Face ID in
+   the app fails silently and pool links open in Safari.
+
+   **The Team ID is not a secret.** Every app that uses associated domains publishes it in this
+   same file, so committing it is normal and safe.
+
+   **If you are testing before it is live, or you change it:** iOS reads this through Apple's CDN
+   and caches the result at install time, so a stale answer can outlast the fix. Two ways out —
+   delete and reinstall the app, or bypass the CDN during development by appending
+   `?mode=developer` to both entries in `Tally/Tally.entitlements`
+   (`webcredentials:playtally.app?mode=developer`) and switching on *Associated Domains
+   Development* in Settings → Developer on the device. Take the suffix back off before you
+   archive for TestFlight.
 4. **Run on your phone** (⌘R with your iPhone selected). Sign in with Face ID if you set it up
    on the web, or with your name and code. Make a pick; check the board on the site.
 5. **TestFlight.** Product → Archive → Distribute → App Store Connect → Upload. In App Store
