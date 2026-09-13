@@ -138,12 +138,20 @@ private struct SlotView: View {
 
     private var team: Team? { slot.team.flatMap { NFL.shared.team($0) } }
 
+    /// A loss is red, not merely faded — from a lock screen, at a glance, grey says "nothing here"
+    /// and that is not what happened. A tie stays neutral: no points, but not wrong either.
     private var fill: Color {
         switch slot.state {
         case .won, .live: team.map { Color(hex: $0.primary) } ?? Tone.line
-        case .lost, .tied: Tone.line.opacity(0.35)
+        case .lost: Tone.dangerSoft
+        case .tied: Tone.line.opacity(0.35)
         case .waiting: team.map { Color(hex: $0.primary).opacity(0.75) } ?? .clear
         }
+    }
+
+    /// The abbreviation has to sit on whatever `fill` turned out to be.
+    private var lettering: Color {
+        slot.state == .lost ? Tone.danger : .white
     }
 
     var body: some View {
@@ -161,7 +169,7 @@ private struct SlotView: View {
                 } else {
                     Text(team?.display ?? "")
                         .font(.system(size: size * 0.32, weight: .black, design: .rounded))
-                        .foregroundStyle(.white)
+                        .foregroundStyle(lettering)
                         .minimumScaleFactor(0.6)
                         .lineLimit(1)
                         .padding(.horizontal, 2)
@@ -172,7 +180,13 @@ private struct SlotView: View {
                 }
             }
             .frame(width: size, height: size)
-            .opacity(slot.state == .lost || slot.state == .tied ? 0.45 : 1)
+            .opacity(slot.state == .tied ? 0.45 : 1)
+            .overlay {
+                if slot.state == .lost {
+                    RoundedRectangle(cornerRadius: size * 0.28, style: .continuous)
+                        .strokeBorder(Tone.danger.opacity(0.55), lineWidth: 2)
+                }
+            }
             .overlay(alignment: .topTrailing) {
                 if slot.state == .won {
                     Image(systemName: "checkmark")
@@ -188,7 +202,7 @@ private struct SlotView: View {
             Text(slot.state == .lost || slot.state == .tied ? "0" : "\(slot.stake)")
                 .font(.system(size: size * 0.26, weight: .bold, design: .rounded))
                 .monospacedDigit()
-                .foregroundStyle(slot.state == .won ? Tone.turf : .secondary)
+                .foregroundStyle(slot.state == .won ? Tone.turf : slot.state == .lost ? Tone.danger : .secondary)
         }
     }
 }
@@ -211,7 +225,8 @@ private struct Pips: View {
         switch state {
         case .won: Tone.turf
         case .live: Tone.flag
-        case .lost, .tied: Tone.line
+        case .lost: Tone.danger
+        case .tied: Tone.line
         case .waiting: Tone.line.opacity(0.4)
         }
     }
@@ -229,6 +244,8 @@ private enum Tone {
     static let turf = Color(hex: "#0B7A3B")
     static let flag = Color(hex: "#FFD23F")
     static let line = Color(hex: "#D9D0C0")
+    static let danger = Color(hex: "#D7263D")
+    static let dangerSoft = Color(hex: "#FDE2E6")
 }
 
 private extension Color {

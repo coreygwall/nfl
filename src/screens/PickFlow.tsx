@@ -827,7 +827,7 @@ function ReviewStep({
           {rows.map(({ p, g, outcome, pts }) => (
             <li key={p.gameId} className={`flex items-center gap-3 rounded-2xl border-2 p-2 ${outcomeStyle(outcome)}`}>
               <RankBadge rank={p.rank} size="sm" />
-              <TeamSticker abbr={p.team} size={40} flat dimmed={outcome === "loss" || outcome === "tie"} />
+              <TeamSticker abbr={p.team} size={40} flat lost={outcome === "loss"} dimmed={outcome === "tie"} />
               <MatchupText pick={p} game={g} />
               <span className="ml-auto shrink-0 text-right">
                 <OutcomeTag outcome={outcome} pts={pts} />
@@ -893,7 +893,7 @@ export function outcomeStyle(outcome: string): string {
     case "win":
       return "border-turf bg-turf-soft";
     case "loss":
-      return "border-danger/60 bg-danger-soft/60";
+      return "border-danger/55 bg-danger-soft";
     case "tie":
       return "border-line bg-paper-2";
     case "live":

@@ -144,9 +144,10 @@ extension WeekActivityAttributes.ContentState {
     }
 }
 
-// ActivityKit exists on iOS and not on the Mac, where `swift test` runs this package. The types
-// above are plain Codable structs so they compile either way; only the conformance is conditional.
-#if canImport(ActivityKit)
+// ActivityKit imports on the Mac, where `swift test` runs this package, but every type in it is
+// marked unavailable there — so the guard has to be the platform, not `canImport`. The types above
+// are plain Codable structs and compile either way; only the conformance is conditional.
+#if os(iOS)
 import ActivityKit
 
 extension WeekActivityAttributes: ActivityAttributes {}

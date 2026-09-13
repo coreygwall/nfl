@@ -321,11 +321,18 @@ struct PickChip: View {
         let value: String
     }
 
-    /// Colour carries the state, so nothing has to say "pending" — plain means not finished.
+    /**
+     Colour carries the state, so nothing has to say "pending" — plain means not finished.
+
+     A loss is red rather than merely faded. Grey reads as "nothing happened here", which is what a
+     rank nobody took looks like; a pick that went down is a different thing and should be legible
+     as one from across the row. A tie stays neutral: it scored nothing, but it was not wrong.
+     */
     private var style: Style {
         switch pick.outcome {
         case .win: return Style(border: .turf, fill: .turfSoft, badgeFill: .turf, badgeText: .white, value: "\(pick.points)")
-        case .loss, .tie: return Style(border: .line, fill: .paper2, badgeFill: .white, badgeText: .ink3, value: "0")
+        case .loss: return Style(border: Color.danger.opacity(0.55), fill: .dangerSoft, badgeFill: .white, badgeText: .danger, value: "0")
+        case .tie: return Style(border: .line, fill: .paper2, badgeFill: .white, badgeText: .ink3, value: "0")
         case .pending: return Style(border: Color.ink.opacity(0.25), fill: .white, badgeFill: .white, badgeText: .ink, value: "\(Scoring.points(forRank: pick.rank))")
         }
     }
@@ -335,7 +342,7 @@ struct PickChip: View {
         let stake = Scoring.points(forRank: pick.rank)
         let s = style
         HStack(spacing: PillFit.Chip.gap) {
-            TeamSticker(team: team, size: PillFit.Chip.logo, dimmed: pick.outcome == .loss, flat: true)
+            TeamSticker(team: team, size: PillFit.Chip.logo, lost: pick.outcome == .loss, flat: true)
             Text(s.value)
                 .font(TallyFont.display(11))
                 .monospacedDigit()

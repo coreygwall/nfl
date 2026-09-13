@@ -366,11 +366,14 @@ function EmptySlot({ rank, locked }: { rank: number; locked: boolean }) {
 function PickChip({ pick }: { pick: ScoredPick }) {
   const stake = 6 - pick.rank;
   const t = TEAMS[pick.team];
+  // A loss is red rather than merely faded. Grey reads as "nothing happened here", which is what a
+  // rank nobody took looks like; a pick that went down is a different thing and should be legible
+  // as one from across the row. A tie stays neutral: it scored nothing, but it was not wrong.
   const [tone, badge, value, said] =
     pick.outcome === "win"
       ? ["border-turf bg-turf-soft", "bg-turf text-white", `${pick.points}`, `won ${pick.points} points`]
       : pick.outcome === "loss"
-        ? ["border-line bg-paper-2", "bg-white text-ink-3", "0", "got nothing"]
+        ? ["border-danger/55 bg-danger-soft", "bg-white text-danger", "0", "got nothing"]
         : pick.outcome === "tie"
           ? ["border-line bg-paper-2", "bg-white text-ink-3", "0", "tied, so no points"]
           : ["border-ink/25 bg-white", "bg-white text-ink", `${stake}`, `still playing, worth ${stake} points`];
@@ -379,7 +382,7 @@ function PickChip({ pick }: { pick: ScoredPick }) {
       className={`${SLOT} ${tone}`}
       title={`${t.city} ${t.nickname} — ${said}`}
     >
-      <TeamSticker abbr={pick.team} size={24} flat dimmed={pick.outcome === "loss"} />
+      <TeamSticker abbr={pick.team} size={24} flat lost={pick.outcome === "loss"} />
       <span
         className={`${SLOT_BADGE} ${badge}`}
         aria-label={`${t.nickname}, ${said}`}

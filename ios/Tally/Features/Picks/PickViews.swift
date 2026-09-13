@@ -196,7 +196,7 @@ enum OutcomeStyle {
     static func fill(_ o: PickOutcome) -> Color {
         switch o {
         case .win: return .turfSoft
-        case .loss: return Color.dangerSoft.opacity(0.6)
+        case .loss: return .dangerSoft
         case .tie: return .paper2
         case .live: return .flagSoft
         case .pending: return .white
@@ -206,7 +206,7 @@ enum OutcomeStyle {
     static func border(_ o: PickOutcome) -> Color {
         switch o {
         case .win: return .turf
-        case .loss: return Color.danger.opacity(0.6)
+        case .loss: return Color.danger.opacity(0.55)
         case .tie, .pending: return .line
         case .live: return .flag
         }
