@@ -17,24 +17,26 @@ struct BiometricOfferSheet: View {
                 .background(RoundedRectangle(cornerRadius: 14).fill(Color.flag))
                 .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.ink, lineWidth: 2))
             Text("You're all set").display(26)
-            (Text("We'll remember ") + Text(player.name).bold() + Text(" on this phone, so you won't need to sign in again here."))
+            (Text("We'll remember ") + Text(player.name).bold() + Text(" on this phone, so you won't be asked again here."))
                 .sans(14).foregroundStyle(Color.ink2)
-            Button("Start picking →", action: onDone)
-                .buttonStyle(.tally(.turf, fullWidth: true))
-                .disabled(busy)
-                .padding(.top, 8)
-            DashedDivider().padding(.top, 8)
-            Text("Want to use another device?").display(16)
-            Text("Set up Face ID now to open your account on a new phone, tablet, or the website without a code. You can always turn it on later from your account.")
+            // The one tap here is what makes every other surface free afterwards: this app on a
+            // new phone, and playtally.app in a browser, both open on a look with nothing typed.
+            // So it leads, and getting straight to picking waits quietly underneath.
+            Text("\(Biometry.label) does the rest").display(16).padding(.top, 10)
+            Text("Turn it on and your account opens on a new phone, a laptop, or playtally.app with nothing to type and no code to find. You can always do this later from your account.")
                 .sans(14).foregroundStyle(Color.ink2)
             if let error { Text(error).sans(14, weight: .semibold).foregroundStyle(Color.danger) }
             Button {
                 Task { await turnOn() }
             } label: {
-                Label(busy ? "Waiting for you…" : "Set up Face ID", systemImage: "faceid")
+                Label(busy ? "Waiting for you…" : "Turn on \(Biometry.label)", systemImage: Biometry.symbolName)
             }
-            .buttonStyle(.tally(.plain, size: .small, fullWidth: true))
+            .buttonStyle(.tally(.turf, fullWidth: true))
             .disabled(busy)
+            .padding(.top, 4)
+            Button("Not now — start picking →", action: onDone)
+                .buttonStyle(.tally(.ghost, size: .small, fullWidth: true))
+                .disabled(busy)
         }
         .padding(24)
         .frame(maxWidth: .infinity, alignment: .leading)
@@ -50,7 +52,7 @@ struct BiometricOfferSheet: View {
         defer { busy = false }
         do {
             _ = try await PasskeyFlows.addPasskey(service: model.service, passkeys: model.passkeys)
-            model.toast("Face ID is ready on your account.", kind: .success)
+            model.toast("\(Biometry.label) is ready on your account.", kind: .success)
             onDone()
         } catch {
             let e = PasskeyService.translate(error)

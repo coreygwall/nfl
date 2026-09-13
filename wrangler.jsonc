@@ -40,7 +40,10 @@
     // The iOS app, as Apple knows it: <team id>.<bundle id>, comma-separated if there is more than
     // one (a TestFlight build and a release build share an id; a second app would not). Empty
     // until the app exists in App Store Connect; see ios/README.md.
-    "APPLE_APP_IDS": ""
+    "APPLE_APP_IDS": "",
+    // The App Store listing id (digits only, from the app's App Store URL). Setting it turns on
+    // Safari's "Open in the app" banner on the website. Empty until the app is listed.
+    "APPLE_APP_STORE_ID": ""
   },
   "observability": { "enabled": true }
 }

@@ -5,7 +5,7 @@ import { isDev } from "./env.ts";
 import { ApiError } from "./errors.ts";
 import { getPlayer, playerForToken, publicPlayer } from "./db.ts";
 import { hashToken, tokenFromCookie } from "./auth.ts";
-import { withAbsoluteUrls, withUnfurlTags } from "./unfurl.ts";
+import { withAbsoluteUrls, withAppBanner, withUnfurlTags } from "./unfurl.ts";
 import { appleAppSiteAssociation } from "./apple.ts";
 import { ensureReady, SCHEDULE_VERSION, syncResultsFromSource, syncScheduleFromSource } from "./ready.ts";
 import { publicRoutes } from "./routes/public.ts";
@@ -119,9 +119,10 @@ app.notFound(async (c) => {
     const doc = await c.env.ASSETS.fetch(new Request(new URL("/index.html", url.origin), { headers: c.req.raw.headers }));
     if (!doc.ok) return doc;
     const page = new Response(doc.body, doc);
-    return isPool
+    const tagged = isPool
       ? withUnfurlTags(page, url.origin, { appName, poolName, poolType, slug })
       : withAbsoluteUrls(page, url.origin);
+    return withAppBanner(tagged, c.env.APPLE_APP_STORE_ID, url.toString());
   }
 
   const res = await c.env.ASSETS.fetch(c.req.raw);

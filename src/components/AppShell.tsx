@@ -11,6 +11,7 @@ import { api, ApiClientError } from "../api/client.ts";
 import type { Identity } from "../lib/identity.ts";
 import type { RosterPlayer } from "../../shared/api.ts";
 import { formatCode } from "../../shared/codes.ts";
+import { poolUrl } from "../lib/basename.ts";
 import { isVulgar, VULGAR_MESSAGE } from "../../shared/profanity.ts";
 import { addPasskey, passkeysSupported, wasCancelled } from "../lib/passkey.ts";
 import { useQueryClient } from "@tanstack/react-query";
@@ -214,6 +215,7 @@ export function AppShell() {
               people={people}
               roster={boot.data?.players ?? []}
               accountName={boot.data?.account?.name ?? player?.name ?? ""}
+              accountId={boot.data?.account?.id ?? null}
               myCode={boot.data?.myCode ?? null}
               hasPasskey={(boot.data?.myPasskeys ?? 0) > 0}
               onSwitch={(id) => {
@@ -253,6 +255,7 @@ function AccountSheet({
   roster,
   myCode,
   accountName,
+  accountId,
   hasPasskey,
   onSwitch,
   onAdded,
@@ -264,6 +267,7 @@ function AccountSheet({
   roster: RosterPlayer[];
   myCode: string | null;
   accountName: string;
+  accountId: string | null;
   hasPasskey: boolean;
   onSwitch: (id: string) => void;
   onAdded: (p: Identity) => void;
@@ -311,10 +315,10 @@ function AccountSheet({
       ) : (
         <div className="mt-5 space-y-2 border-t-2 border-dashed border-line pt-4">
           {showCode && myCode ? (
-            <DeviceCode code={myCode} name={accountName} />
+            <DeviceCode code={myCode} name={accountName} accountId={accountId} />
           ) : (
             <button className="text-sm font-bold underline" onClick={() => setShowCode(true)} disabled={!myCode}>
-              Pick on another device →
+              Play on another device →
             </button>
           )}
           <div className="flex flex-wrap gap-2 pt-1">
@@ -415,7 +419,7 @@ function PasskeyRow({ hasPasskey }: { hasPasskey: boolean }) {
   if (done || hasPasskey) {
     return (
       <p className="mt-4 flex items-center gap-2 border-t-2 border-dashed border-line pt-4 text-sm text-ink-2">
-        <Check size={16} className="text-turf" /> Face ID or fingerprint is on for this account.
+        <Check size={16} className="text-turf" /> Face ID or fingerprint is on — it signs you in here and in the Tally app.
       </p>
     );
   }
@@ -437,37 +441,70 @@ function PasskeyRow({ hasPasskey }: { hasPasskey: boolean }) {
       <button className="btn btn-sm" disabled={busy} onClick={() => void turnOn()}>
         {busy ? "Waiting…" : "Set up Face ID or fingerprint"}
       </button>
-      <p className="mt-1.5 text-xs text-ink-2">Optional. Signs you in on a new phone without a code.</p>
+      <p className="mt-1.5 text-xs text-ink-2">
+        Optional. Opens your account on a new phone, a laptop, or the Tally iOS app without a code.
+      </p>
     </div>
   );
 }
 
-/** Your claim code, for putting this name on another device. */
-function DeviceCode({ code, name }: { code: string; name: string }) {
+/**
+ * Getting onto a second device. The link is the easy path — one tap signs that device in, and on
+ * an iPhone with the app installed it opens the app rather than the browser. The code stays
+ * underneath for anyone reading it to someone across the room.
+ */
+function DeviceCode({ code, name, accountId }: { code: string; name: string; accountId: string | null }) {
   const [copied, setCopied] = useState(false);
   const toast = useToast();
-  const copy = async () => {
+  const link = accountId ? poolUrl(`/welcome?claim=${accountId}&code=${code}`) : null;
+
+  const copy = async (text: string, done: string) => {
     try {
-      await navigator.clipboard.writeText(formatCode(code));
+      await navigator.clipboard.writeText(text);
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
+      toast(done, "success");
     } catch {
       toast("Couldn't copy — write it down instead.", "error");
     }
   };
+
+  const send = async () => {
+    if (!link) return;
+    try {
+      if (navigator.share) {
+        await navigator.share({ url: link });
+        return;
+      }
+      await copy(link, "Sign-in link copied. Open it on your other device.");
+    } catch {
+      /* share sheet dismissed */
+    }
+  };
+
   return (
     <div className="card-flat bg-flag-soft p-3">
-      <h3 className="font-display text-sm font-extrabold uppercase tracking-wider text-ink-3">Your device code</h3>
-      <div className="mt-1 flex items-center gap-2">
-        <span className="font-display flex-1 text-2xl font-extrabold tracking-[0.12em]">{formatCode(code)}</span>
-        <button className="btn btn-sm shrink-0" onClick={() => void copy()}>
-          {copied ? "Copied" : "Copy"}
-        </button>
+      <h3 className="font-display text-sm font-extrabold uppercase tracking-wider text-ink-3">Play on another device</h3>
+      {link && (
+        <>
+          <button className="btn btn-sm btn-primary mt-2 w-full" onClick={() => void send()}>
+            Send myself a sign-in link
+          </button>
+          <p className="mt-1.5 text-xs text-ink-2">
+            Text or AirDrop it to yourself. One tap signs that device in as <b>{name}</b> — and opens the Tally app if you
+            have it. Treat it like a password.
+          </p>
+        </>
+      )}
+      <div className="mt-3 border-t-2 border-dashed border-line pt-2">
+        <span className="text-[11px] font-bold uppercase tracking-wider text-ink-3">Or type this code</span>
+        <div className="mt-1 flex items-center gap-2">
+          <span className="font-display flex-1 text-2xl font-extrabold tracking-[0.12em]">{formatCode(code)}</span>
+          <button className="btn btn-sm shrink-0" onClick={() => void copy(formatCode(code), "Code copied.")}>
+            {copied ? "Copied" : "Copy"}
+          </button>
+        </div>
       </div>
-      <p className="mt-1.5 text-xs text-ink-2">
-        Enter this on another phone or laptop to pick as <b>{name}</b> there. Anyone with it can pick as you, so keep it to
-        yourself.
-      </p>
     </div>
   );
 }

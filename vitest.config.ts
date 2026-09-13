@@ -17,7 +17,7 @@ export default defineConfig({
           cloudflareTest({
             wrangler: { configPath: "./wrangler.jsonc" },
             miniflare: {
-              bindings: { ENVIRONMENT: "dev", ADMIN_PIN: "1234", POOL_NAME: "Test Pool", APPLE_APP_IDS: "ABCDE12345.app.playtally.ios, bad-id" },
+              bindings: { ENVIRONMENT: "dev", ADMIN_PIN: "1234", POOL_NAME: "Test Pool", APPLE_APP_IDS: "ABCDE12345.app.playtally.ios, bad-id", APPLE_APP_STORE_ID: "6499999999" },
             },
           }),
         ],

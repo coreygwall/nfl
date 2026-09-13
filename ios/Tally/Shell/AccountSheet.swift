@@ -69,9 +69,9 @@ struct AccountSheet: View {
                             VStack(alignment: .leading, spacing: 10) {
                                 DashedDivider()
                                 if showCode, let code = boot?.myCode {
-                                    DeviceCodeCard(code: code, name: accountName)
+                                    DeviceCodeCard(code: code, name: accountName, accountId: boot?.account?.id)
                                 } else {
-                                    LinkButton(title: "Pick on another device →") { showCode = true }
+                                    LinkButton(title: "Play on another device →") { showCode = true }
                                         .disabled(boot?.myCode == nil)
                                 }
                                 HStack(spacing: 8) {
@@ -188,13 +188,14 @@ struct PasskeyRow: View {
         VStack(alignment: .leading, spacing: 8) {
             DashedDivider()
             if done || hasPasskey {
-                Label("Face ID is on for this account.", systemImage: "faceid")
+                Label("\(Biometry.label) is on — it opens this app and the website.", systemImage: Biometry.symbolName)
                     .sans(14).foregroundStyle(Color.ink2)
-            } else {
-                Button(busy ? "Waiting…" : "Set up Face ID") { Task { await turnOn() } }
+            } else if Biometry.available {
+                Button(busy ? "Waiting…" : "Set up \(Biometry.label)") { Task { await turnOn() } }
                     .buttonStyle(.tally(.plain, size: .small))
                     .disabled(busy)
-                Text("Optional. Signs you in on a new phone — or on the website — without a code.").sans(12).foregroundStyle(Color.ink2)
+                Text("Optional. Opens your account on a new phone, a laptop, or playtally.app without a code.")
+                    .sans(12).foregroundStyle(Color.ink2)
             }
         }
     }
@@ -205,7 +206,7 @@ struct PasskeyRow: View {
         do {
             _ = try await PasskeyFlows.addPasskey(service: model.service, passkeys: model.passkeys)
             done = true
-            model.toast("Face ID is ready for your account.", kind: .success)
+            model.toast("\(Biometry.label) is ready for your account.", kind: .success)
             await model.refreshBootstrap()
         } catch {
             let e = PasskeyService.translate(error)
@@ -214,15 +215,36 @@ struct PasskeyRow: View {
     }
 }
 
-/// Your claim code, for putting this name on another device.
+/**
+ Getting onto a second device. The link is the easy path — one tap signs that device in, and it
+ opens this app rather than the browser on any iPhone that has it. The code stays underneath for
+ reading aloud to someone across the room.
+ */
 struct DeviceCodeCard: View {
+    @Environment(AppModel.self) private var model
     let code: String
     let name: String
+    let accountId: String?
     @State private var copied = false
+
+    private var link: URL? {
+        accountId.map { model.pool.webURL(path: "/welcome?claim=\($0)&code=\(code)") }
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 6) {
-            SectionLabel(text: "Your device code")
+            SectionLabel(text: "Play on another device")
+            if let link {
+                ShareLink(item: link) {
+                    Label("Send myself a sign-in link", systemImage: "square.and.arrow.up")
+                }
+                .buttonStyle(.tally(.primary, size: .small, fullWidth: true))
+                .padding(.top, 2)
+                Text("Text or AirDrop it to yourself. One tap signs that device in as \(name). Treat it like a password.")
+                    .sans(12).foregroundStyle(Color.ink2)
+            }
+            DashedDivider().padding(.top, 6)
+            Text("OR TYPE THIS CODE").sans(10, weight: .bold).foregroundStyle(Color.ink3)
             HStack {
                 Text(Codes.format(code)).font(TallyFont.display(24)).tracking(3)
                 Spacer()
@@ -233,8 +255,6 @@ struct DeviceCodeCard: View {
                 }
                 .buttonStyle(.tally(.plain, size: .small))
             }
-            Text("Enter this on another phone or laptop to pick as \(name) there. Anyone with it can pick as you, so keep it to yourself.")
-                .sans(12).foregroundStyle(Color.ink2)
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -1,5 +1,53 @@
-import Foundation
 import AuthenticationServices
+import Foundation
+import LocalAuthentication
+
+/**
+ What this device calls its own biometrics. Copy that hard-codes "Face ID" is simply wrong on a
+ Touch ID iPad, and this app asks people to trust that button, so it should say the true thing.
+ */
+public enum Biometry {
+    /// `biometryType` is only populated once a policy has been evaluated, and the enum's cases
+    /// differ by platform — so the lookup is kept to iOS, which is the only place it is shown.
+    #if os(iOS)
+    private static var kind: LABiometryType {
+        let context = LAContext()
+        _ = context.canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)
+        return context.biometryType
+    }
+    #endif
+
+    /// "Face ID", "Touch ID" — or a neutral phrase where there is no sensor to name.
+    public static var label: String {
+        #if os(iOS)
+        switch kind {
+        case .faceID: return "Face ID"
+        case .touchID: return "Touch ID"
+        default: return "your passkey"
+        }
+        #else
+        return "your passkey"
+        #endif
+    }
+
+    /// The SF Symbol that matches the sensor.
+    public static var symbolName: String {
+        #if os(iOS)
+        switch kind {
+        case .faceID: return "faceid"
+        case .touchID: return "touchid"
+        default: return "key.fill"
+        }
+        #else
+        return "key.fill"
+        #endif
+    }
+
+    /// True when there is biometric hardware to offer at all.
+    public static var available: Bool {
+        LAContext().canEvaluatePolicy(.deviceOwnerAuthenticationWithBiometrics, error: nil)
+    }
+}
 
 public enum PasskeyError: Error, LocalizedError, Equatable {
     /// The person waved the sheet away. Not a failure; never shown as one.
@@ -81,13 +129,20 @@ public final class PasskeyService: NSObject {
 
     // MARK: Sign in
 
-    /// No identity yet: the credential names the player, so nothing is typed.
-    public func assert(_ options: PasskeyAuthenticationOptions) async throws -> PasskeyCredentialJSON {
+    /**
+     No identity yet: the credential names the player, so nothing is typed.
+
+     `onlyIfAvailable` is what lets the app try this the moment it opens. With it, the system
+     sheet appears only when this device actually holds a passkey for the domain — made here or
+     in Safari on playtally.app — and otherwise the request fails at once with nothing shown.
+     So a returning player sees Face ID and is in; a brand-new one sees the name form, undisturbed.
+     */
+    public func assert(_ options: PasskeyAuthenticationOptions, onlyIfAvailable: Bool = false) async throws -> PasskeyCredentialJSON {
         guard let challenge = Base64URL.decode(options.challenge) else { throw PasskeyError.malformedOptions }
         let provider = ASAuthorizationPlatformPublicKeyCredentialProvider(relyingPartyIdentifier: options.rpId)
         let request = provider.createCredentialAssertionRequest(challenge: challenge)
         request.userVerificationPreference = .preferred
-        let authorization = try await perform([request])
+        let authorization = try await perform([request], options: onlyIfAvailable ? .preferImmediatelyAvailableCredentials : [])
         guard let credential = authorization.credential as? ASAuthorizationPlatformPublicKeyCredentialAssertion else {
             throw PasskeyError.failed("That passkey couldn't be used.")
         }
@@ -111,7 +166,10 @@ public final class PasskeyService: NSObject {
 
     // MARK: Plumbing
 
-    private func perform(_ requests: [ASAuthorizationRequest]) async throws -> ASAuthorization {
+    private func perform(
+        _ requests: [ASAuthorizationRequest],
+        options: ASAuthorizationController.RequestOptions = []
+    ) async throws -> ASAuthorization {
         if continuation != nil { throw PasskeyError.failed("Another sign-in is already in progress.") }
         return try await withCheckedThrowingContinuation { continuation in
             self.continuation = continuation
@@ -119,7 +177,7 @@ public final class PasskeyService: NSObject {
             controller.delegate = self
             controller.presentationContextProvider = self
             self.controller = controller
-            controller.performRequests()
+            controller.performRequests(options: options)
         }
     }
 
@@ -174,10 +232,12 @@ public enum PasskeyFlows {
     }
 
     /// Signs in with a passkey. The credential says who you are, so there is no name to type.
+    /// With `onlyIfAvailable`, a device holding no passkey fails silently instead of showing a
+    /// dead end — which is what makes this safe to run unprompted when the app opens.
     @MainActor
-    public static func signIn(service: PoolService, passkeys: PasskeyService) async throws -> Identity {
+    public static func signIn(service: PoolService, passkeys: PasskeyService, onlyIfAvailable: Bool = false) async throws -> Identity {
         let options = try await service.passkeyAuthenticationOptions()
-        let credential = try await passkeys.assert(options.options)
+        let credential = try await passkeys.assert(options.options, onlyIfAvailable: onlyIfAvailable)
         let res = try await service.finishPasskeyAuthentication(challengeId: options.challengeId, credential: credential)
         return Identity(player: res.player, token: res.token, accountId: res.player.id)
     }

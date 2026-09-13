@@ -35,6 +35,8 @@ publish it before the first install.
    `app.playtally.ios` (change it there and in `project.yml` if you want another). The
    *Associated Domains* capability is already in `Tally/Tally.entitlements`
    (`webcredentials:playtally.app`, `applinks:playtally.app`).
+   The copy adapts to the hardware — `Biometry.label` reads `LAContext.biometryType`, so a
+   Touch ID iPad says "Touch ID" rather than lying about Face ID.
 2. **Note your Team ID** (Xcode → Settings → Accounts → your team, or developer.apple.com →
    Membership). It looks like `ABCDE12345`.
 3. **Tell the domain about the app.** In `wrangler.jsonc` set
@@ -65,6 +67,14 @@ header. The app does exactly that. The token lives in the Keychain (`SessionStor
 every request (`APIClient`), and is never backed up to another device — a new phone signs in
 again, which is the point.
 
+**The goal is that nobody signs in twice.** Once an account has a passkey, opening the app *is*
+the sign-in: `WelcomeView` fires one silent assertion on launch with
+`.preferImmediatelyAvailableCredentials`, which shows the system Face ID sheet only if this device
+actually holds a passkey for the domain, and fails invisibly otherwise. A returning player sees
+Face ID and lands on their picks; a brand-new one sees the name form and never knows a request
+happened. Because that only pays off if people *have* a passkey, one is offered after **every**
+sign-in that did not already use one — new name, device code, or sign-in link — not just at signup.
+
 Three doors, all the same endpoints the site calls:
 
 | Door | What the app does | Where |
@@ -73,7 +83,14 @@ Three doors, all the same endpoints the site calls:
 | **Name + code** | Roster tap → code → claim. Unclaimed names come free, as on the web. | `WelcomeView`, `PoolService.claim` |
 | **Sign-in link** | The commissioner's `…/welcome?claim=<id>&code=<code>` link, tapped in Messages, opens the app (universal link) and signs the phone in. | `AppModel.open(_:)` |
 
-Adding Face ID from the app registers a passkey for the domain, so it also works in Safari.
+Adding Face ID from the app registers a passkey for the domain, so it also works in Safari — and
+the reverse, which is the whole point. The web mirrors the automatic half with conditional UI: its
+name field carries `autocomplete="username webauthn"`, so a saved passkey sits in that field's own
+suggestions and signing in is tapping your own name.
+
+For anyone who never turns Face ID on, **Send myself a sign-in link** (account sheet → Play on
+another device) is the short path: one tap on the receiving device signs it in, and on an iPhone
+with the app installed the universal link opens the app rather than Safari.
 The Worker change that makes this possible is small: `expectedOrigin` accepts
 `https://playtally.app` as well as the page origin (identical in production), and the
 association file is served at the path Apple reads.

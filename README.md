@@ -17,7 +17,8 @@ results entered by the commissioner in about a minute a week.
 | Standings | Points, then correct picks, then 5-point hits, then name. Ties share a place. |
 | Weeks | Regular season, weeks 1–18. The Picks tab opens to the earliest week that still has an unstarted game. |
 | Identity | Type your name on first visit; the device is handed a token and a short **device code**. The token rides in `localStorage` *and* in a long-lived `HttpOnly` cookie, so a browser that clears one still knows you — you stay signed in indefinitely. The code claims the same name on a second device and stays hidden behind **Pick on another device** until you need it. A claimed name cannot be taken without the code; a name nobody holds is claimed by the first device that asks, which is how everyone who joined before codes existed keeps their place. |
-| Face ID / Touch ID | Optional, and offered rather than required: tap your name → **Turn on Face ID**. After that a new phone signs in from the **Sign in with Face ID** button with nothing typed — the passkey is discoverable, so the credential names the player. A passkey belongs to the domain it was created on (`worker/routes/passkeys.ts` takes the relying party from the request), so one made on `workers.dev` will not be offered on `playtally.app`; the device code covers that, and every browser without biometrics. |
+| Face ID / Touch ID | Offered on the way past after every sign-in, and never required. Turning it on is the one step that makes every other surface free: the **iOS app tries it the moment it opens** and signs you straight in, and on the web the passkey waits in the name field's own suggestions (`autocomplete="username webauthn"`), so a returning player taps their name rather than hunting for a code. The credential names the player, so nothing is typed either way. A passkey belongs to the domain it was created on (`worker/routes/passkeys.ts` takes the relying party from the request), so one made on `workers.dev` is not offered on `playtally.app`; the device code covers that, and every browser without biometrics. |
+| Moving to a second device | Tap your name → **Play on another device** → **Send myself a sign-in link**. Texting or AirDropping that link signs the next device in with one tap — and opens the iOS app rather than the browser on any iPhone that has it. The code is still there underneath for reading aloud. |
 | Picking for others | Anyone can add entries their account manages (account sheet → **Add an entry**) — for kids, a partner, a friend who won't install anything. Each entry gets its own picks, its own row on the board and no sign-in of its own: the account's passkey or code is the way back in, and up to 12 hang off one account. Switching between them is one tap. The commissioner can also put an existing player on their own phone with the admin PIN; those devices are marked admin-issued, so the CSV export's `entered_by` column reads `commissioner` rather than `player`. |
 | Limits | The two doors a stranger with the link can push on are counted per caller (`migrations/0007_rate_limits.sql`): 8 wrong admin PINs earns a 15-minute cool-off, and 20 new names an hour from one address is the ceiling. A room full of friends joining over one wifi never reaches it; a script trying to fill all 200 seats does. The counter is per caller, so nobody can lock the commissioner out by hammering the PIN. |
 
@@ -86,6 +87,10 @@ way round. Two things on this side make that work:
   Connect, before the first TestFlight install.
 - `worker/routes/passkeys.ts` accepts `https://<host>` as a credential origin alongside the page
   origin, because a native app signs the domain rather than a page.
+- `APPLE_APP_STORE_ID` in `wrangler.jsonc` turns on Safari's "Open in the app" banner
+  (`worker/unfurl.ts`). A pool link pasted into the address bar never fires a universal link, so
+  without the banner someone who has the app still ends up in the browser. Leave it empty until
+  the app has an App Store listing; an empty one makes Safari log an error and show nothing.
 
 ## How the URLs are laid out
 

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type FormEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router";
 import { AnimatePresence, motion } from "motion/react";
 import { useBootstrap, useClaimPlayer, useCreatePlayer } from "../api/queries.ts";
@@ -14,7 +14,7 @@ import type { Abbr } from "../../shared/teams.ts";
 import { ErrorState, Spinner } from "../components/Common.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
 import { useToast } from "../components/Toast.tsx";
-import { addPasskey, dismissOffer, offerDismissed, passkeysSupported, platformBiometricsSupported, signInWithPasskey, wasCancelled } from "../lib/passkey.ts";
+import { addPasskey, autofillSupported, cancelAutofill, dismissOffer, offerDismissed, passkeysSupported, platformBiometricsSupported, signInWithAutofill, signInWithPasskey, wasCancelled } from "../lib/passkey.ts";
 
 /** Every team, in a fixed shuffle so the strip reads as a jumble rather than a division list. */
 const MARQUEE_TEAMS: Abbr[] = [
@@ -65,7 +65,7 @@ export function Welcome() {
       .then((r) => {
         // Don't leave the code sitting in the address bar or the back stack.
         window.history.replaceState(null, "", "/welcome");
-        go({ ...r.player, token: r.token }, true);
+        void go({ ...r.player, token: r.token }, { returning: true });
       })
       .catch(() => {
         window.history.replaceState(null, "", `/welcome?claim=${found.id}`);
@@ -77,20 +77,47 @@ export function Welcome() {
     if (mode === "roster" && boot.data && players.length === 0) setMode("new");
   }, [mode, boot.data, players.length]);
 
-  const go = (p: Identity, returning = false) => {
-    setPlayer(p);
-    if (returning) toast(`Picking as ${p.name}. Not you? Use the name chip up top to switch.`);
-    nav(next, { replace: true });
-  };
+  // Passkey autofill, started once the name field is actually on screen. It shows nothing by
+  // itself; it just means a returning player's account is waiting in that field's suggestions.
+  // The ceremony has to outlive a background bootstrap refetch, so it is only torn down when the
+  // screen itself goes away — cleaning up on every dependency change would cancel it after a minute.
+  const autofillStarted = useRef(false);
+  useEffect(() => () => cancelAutofill(), []);
+  useEffect(() => {
+    if (autofillStarted.current) return;
+    if (!boot.data || claimId || player?.token || mode !== "new") return;
+    autofillStarted.current = true;
+    void (async () => {
+      if (!(await autofillSupported())) return;
+      try {
+        const identity = await signInWithAutofill();
+        await go(identity, { returning: true, offerPasskey: false });
+      } catch {
+        /* Nothing was picked, the screen went away, or this browser had nothing to offer. */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [boot.data, claimId, player?.token, mode]);
 
-  const welcomeNewPlayer = async (p: Identity) => {
+  /**
+   * Every way in ends here. Anyone who did *not* arrive by passkey is offered one on the way
+   * past, because that single step is what makes the next device — another phone, a laptop, the
+   * iOS app — open with a look and nothing typed. Someone who already signed in with a passkey
+   * has one, so they are waved through.
+   */
+  const go = async (p: Identity, opts: { returning?: boolean; offerPasskey?: boolean } = {}) => {
     setPlayer(p);
-    toast(`Welcome to the pool, ${p.name}!`, "success");
-    if (!offerDismissed(p.id) && await platformBiometricsSupported()) {
+    if (opts.returning) toast(`Picking as ${p.name}. Not you? Use the name chip up top to switch.`);
+    if (opts.offerPasskey !== false && !offerDismissed(p.id) && (await platformBiometricsSupported())) {
       setBiometricOffer(p);
       return;
     }
     nav(next, { replace: true });
+  };
+
+  const welcomeNewPlayer = async (p: Identity) => {
+    toast(`Welcome to the pool, ${p.name}!`, "success");
+    await go(p);
   };
 
   /** Tapping a name on the roster: unclaimed names come free, claimed ones want the code. */
@@ -100,7 +127,7 @@ export function Welcome() {
     if (!p.claimed) {
       try {
         const r = await claim.mutateAsync({ id: p.id });
-        go({ ...r.player, token: r.token }, true);
+        await go({ ...r.player, token: r.token }, { returning: true });
         return;
       } catch {
         /* Someone claimed it between the roster loading and this tap: fall through to the code. */
@@ -183,7 +210,7 @@ export function Welcome() {
                       pending={claim.isPending}
                       onSubmit={async (code) => {
                         const r = await claim.mutateAsync({ id: target.id, code });
-                        go({ ...r.player, token: r.token }, true);
+                        await go({ ...r.player, token: r.token }, { returning: true });
                       }}
                       onBack={() => {
                         setMode(players.length > 0 ? "roster" : "new");
@@ -359,7 +386,7 @@ export function Welcome() {
               </AnimatePresence>
               {/* Almost everyone here is signing up, so the name and its button lead; Face ID sits
                   underneath with the other way back in for someone who already has a name. */}
-              <PasskeySignIn onSignedIn={(p) => go(p, true)} />
+              <PasskeySignIn onSignedIn={(p) => void go(p, { returning: true, offerPasskey: false })} />
             </div>
           )}
         </div>
@@ -426,20 +453,20 @@ function BiometricOffer({ player, onDone }: { player: Identity; onDone: () => vo
         <p className="mt-1 text-sm leading-relaxed text-ink-2">
           We’ll remember <b className="text-ink">{player.name}</b> on this device, so you won’t need to sign in again here.
         </p>
-        {/* They came here to pick, and this device already remembers them — so getting on with it
-            is the main button, and the second-device story waits underneath for whoever wants it. */}
-        <button autoFocus className="btn btn-turf mt-5 min-h-12 w-full" disabled={busy} onClick={onDone}>
-          Start picking →
-        </button>
-        <div className="mt-5 border-t-2 border-dashed border-line pt-4">
-          <h3 className="font-display font-extrabold">Want to use another device?</h3>
+        {/* The one tap here is what makes every other surface free afterwards — another phone, a
+            laptop, the iOS app — so it leads, and getting straight to picking waits underneath. */}
+        <div className="mt-5">
+          <h3 className="font-display text-lg font-extrabold">Face ID does the rest</h3>
           <p className="mt-1 text-sm leading-relaxed text-ink-2">
-            Set up Face ID or fingerprint now to open your account on a new phone, tablet, or computer without a code.
-            You can always turn it on later from your account.
+            Turn it on and your account opens anywhere else you play — another phone, a laptop, or the Tally iOS app —
+            with nothing to type and no code to find. You can always do this later from your account.
           </p>
           {error && <p role="alert" className="mt-3 text-sm font-semibold text-danger">{error}</p>}
-          <button className="btn btn-sm mt-3 w-full" disabled={busy} onClick={() => void turnOn()}>
-            {busy ? "Waiting for you…" : "Set up Face ID or fingerprint"}
+          <button autoFocus className="btn btn-turf mt-4 min-h-12 w-full" disabled={busy} onClick={() => void turnOn()}>
+            {busy ? "Waiting for you…" : "Turn on Face ID or fingerprint"}
+          </button>
+          <button className="btn btn-ghost btn-sm mt-2 w-full text-ink-2" disabled={busy} onClick={onDone}>
+            Not now — start picking →
           </button>
         </div>
       </motion.div>
@@ -459,7 +486,7 @@ function PasskeySignIn({ onSignedIn }: { onSignedIn: (p: Identity) => void }) {
       onSignedIn(await signInWithPasskey());
     } catch (err) {
       // Cancelling the sheet is not a failure, and neither is having no passkey yet.
-      if (!wasCancelled(err)) setError("No passkey for this device yet — use your name below.");
+      if (!wasCancelled(err)) setError("No passkey on this device yet — use your name below, and we'll offer to set one up.");
     } finally {
       setBusy(false);
     }
@@ -567,7 +594,8 @@ const NameInput = ({
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
       maxLength={24}
-      autoComplete="name"
+      // "webauthn" is what lets a saved passkey appear in this field's suggestions.
+      autoComplete="username webauthn"
       autoCapitalize="words"
       aria-label="Your name"
       className="card-flat w-full px-4 py-3 text-lg outline-none focus:shadow-hard"

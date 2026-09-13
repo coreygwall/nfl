@@ -72,6 +72,8 @@ final class AppModel {
     var showWelcome = false
     var welcomeStartsNew = false
     var pendingClaim: PendingClaim?
+    /// One unprompted passkey attempt per launch, so opening the app is the whole sign-in.
+    var triedAutoPasskey = false
     var toasts: [Toast] = []
     /// The pick tray, when the picks screen wants one floating over the tab bar (its `useHideNav`).
     var tray: PickTrayState?

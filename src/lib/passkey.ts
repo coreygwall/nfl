@@ -1,4 +1,4 @@
-import { startAuthentication, startRegistration } from "@simplewebauthn/browser";
+import { browserSupportsWebAuthnAutofill, startAuthentication, startRegistration, WebAuthnAbortService } from "@simplewebauthn/browser";
 import { api } from "../api/client.ts";
 import type { PasskeyAuthResponse, PasskeyOptionsResponse } from "../../shared/api.ts";
 import type { Identity } from "./identity.ts";
@@ -53,6 +53,44 @@ export async function signInWithPasskey(): Promise<Identity> {
   const response = await startAuthentication({ optionsJSON: options as never });
   const res = await api<PasskeyAuthResponse>("/passkeys/auth", { body: { challengeId, response } });
   return { ...res.player, token: res.token };
+}
+
+/** Whether this browser can offer a passkey from inside a field's autofill menu. */
+export async function autofillSupported(): Promise<boolean> {
+  if (!passkeysSupported()) return false;
+  try {
+    return await browserSupportsWebAuthnAutofill();
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * The quiet half of signing in: a passkey request that waits in the background and puts the
+ * account at the top of the name field's suggestions. Nothing is shown to someone who has no
+ * passkey, and the promise only settles if they pick it — so a returning player signs in by
+ * tapping their own name instead of finding the code they wrote down in August.
+ *
+ * The field it fills has to say `autocomplete="username webauthn"`, which is why the name input
+ * on the welcome screen carries that rather than plain `name`.
+ */
+export async function signInWithAutofill(): Promise<Identity> {
+  const { challengeId, options } = await api<PasskeyOptionsResponse>("/passkeys/auth/options", { body: {} });
+  const response = await startAuthentication({ optionsJSON: options as never, useBrowserAutofill: true });
+  const res = await api<PasskeyAuthResponse>("/passkeys/auth", { body: { challengeId, response } });
+  return { ...res.player, token: res.token };
+}
+
+/**
+ * Drops a waiting autofill request. Leaving the screen is the main reason; tapping the explicit
+ * button is not, because starting a new ceremony cancels the old one on its own.
+ */
+export function cancelAutofill(): void {
+  try {
+    WebAuthnAbortService.cancelCeremony();
+  } catch {
+    /* nothing was pending */
+  }
 }
 
 /** True when the person waved the prompt away rather than something going wrong. */

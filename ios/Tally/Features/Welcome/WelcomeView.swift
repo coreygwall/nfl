@@ -58,6 +58,9 @@ struct WelcomeView: View {
                     .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { showRules = false } } }
             }
         }
+        .task {
+            await attemptAutomaticSignIn()
+        }
         .onAppear {
             if model.welcomeStartsNew { mode = .new; model.welcomeStartsNew = false }
         }
@@ -230,19 +233,37 @@ struct WelcomeView: View {
         model.showWelcome = false
     }
 
-    private func go(_ identity: Identity, returning: Bool) {
+    /// Every way in ends here. Anyone who did *not* arrive by passkey is offered one on the way
+    /// past, because that single step is what makes the next device — and the website — open
+    /// with a look and nothing typed.
+    private func go(_ identity: Identity, returning: Bool, offerPasskey: Bool = true) {
         model.setPlayer(identity)
         if returning { model.toast("Picking as \(identity.name). Not you? Tap your name up top to switch.") }
+        if offerPasskey, Biometry.available, !PasskeyOffer.dismissed(identity.id) {
+            biometricOffer = identity
+            return
+        }
         finish()
     }
 
     private func welcomeNewPlayer(_ identity: Identity) {
-        model.setPlayer(identity)
         model.toast("Welcome to the pool, \(identity.name)!", kind: .success)
-        if !PasskeyOffer.dismissed(identity.id) {
-            biometricOffer = identity
-        } else {
-            finish()
+        go(identity, returning: false)
+    }
+
+    /// One quiet attempt as the app opens. If this phone holds a passkey for the pool's domain —
+    /// created here or in Safari on the website — the system shows Face ID and that is the
+    /// entire sign-in. If it holds none, nothing appears and the name form is already on screen.
+    private func attemptAutomaticSignIn() async {
+        guard model.player == nil, model.pendingClaim == nil, !model.welcomeStartsNew, !model.triedAutoPasskey else { return }
+        model.triedAutoPasskey = true
+        do {
+            let identity = try await PasskeyFlows.signIn(service: model.service, passkeys: model.passkeys, onlyIfAvailable: true)
+            model.setPlayer(identity)
+            model.toast("Welcome back, \(identity.name).", kind: .success)
+            model.showWelcome = false
+        } catch {
+            // No passkey on this device, or it was waved away. Nothing to report.
         }
     }
 
@@ -347,7 +368,7 @@ struct PasskeySignIn: View {
             Button {
                 Task { await go() }
             } label: {
-                Label(busy ? "Waiting…" : "Sign in with Face ID", systemImage: "faceid")
+                Label(busy ? "Waiting…" : "Sign in with \(Biometry.label)", systemImage: Biometry.symbolName)
             }
             .buttonStyle(.tally(.plain, size: .small, fullWidth: true))
             .disabled(busy)
@@ -369,7 +390,7 @@ struct PasskeySignIn: View {
         } catch {
             // Cancelling the sheet is not a failure, and neither is having no passkey yet.
             let e = PasskeyService.translate(error)
-            if e != .cancelled { self.error = "No passkey for this phone yet — use your name above." }
+            if e != .cancelled { self.error = "No passkey on this phone yet — use your name above, and we'll offer to set one up." }
         }
     }
 }
