@@ -19,9 +19,11 @@ jobs:
         run: swift test
       - name: Build the app for the simulator
         working-directory: ios
+        # The full log is thousands of lines; only the diagnostics and the verdict are shown, and
+        # the step fails on xcodebuild's own status rather than the filter's.
         run: |
           xcodebuild build \
             -project Tally.xcodeproj -scheme Tally \
             -destination 'generic/platform=iOS Simulator' \
-            CODE_SIGNING_ALLOWED=NO \
-            | tail -40
+            CODE_SIGNING_ALLOWED=NO 2>&1 | tee build.log | grep -E "error:|BUILD (SUCCEEDED|FAILED)" || true
+          test "${PIPESTATUS[0]}" -eq 0
