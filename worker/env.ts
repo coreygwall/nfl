@@ -9,6 +9,10 @@ export interface Env {
   POOL_TYPE?: string;
   POOL_SLUG?: string;
   POOL_NAME?: string;
+  /** Apple app ids (TEAMID.bundle.id, comma-separated) allowed to share passkeys and open pool links. */
+  APPLE_APP_IDS?: string;
+  /** App Store listing id, which turns on Safari's "Open in the app" banner. */
+  APPLE_APP_STORE_ID?: string;
 }
 
 export type AppEnv = {

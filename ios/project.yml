@@ -1,0 +1,49 @@
+# XcodeGen fallback for Tally.xcodeproj. The checked-in project is the source of truth and opens
+# in Xcode 26 as is; if it ever fails to open (a pbxproj is unforgiving of a hand edit), regenerate
+# it from this file instead of repairing it by hand:
+#
+#     brew install xcodegen && cd ios && xcodegen generate
+#
+# Both describe the same thing: one app target from the Tally folder, depending on the local
+# TallyKit package, signed with your team, iOS 26 and up.
+name: Tally
+options:
+  bundleIdPrefix: app.playtally
+  deploymentTarget:
+    iOS: "26.0"
+  createIntermediateGroups: true
+  generateEmptyDirectories: true
+packages:
+  TallyKit:
+    path: TallyKit
+targets:
+  Tally:
+    type: application
+    platform: iOS
+    sources:
+      - path: Tally
+    dependencies:
+      - package: TallyKit
+    entitlements:
+      path: Tally/Tally.entitlements
+    info:
+      path: Build/Info.plist
+      properties:
+        CFBundleDisplayName: Tally
+        LSApplicationCategoryType: public.app-category.sports
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+        UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]
+        UISupportedInterfaceOrientations~ipad: [UIInterfaceOrientationPortrait, UIInterfaceOrientationPortraitUpsideDown, UIInterfaceOrientationLandscapeLeft, UIInterfaceOrientationLandscapeRight]
+        UIUserInterfaceStyle: Light
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: app.playtally.ios
+        MARKETING_VERSION: "1.0"
+        CURRENT_PROJECT_VERSION: 1
+        SWIFT_VERSION: "5.0"
+        SWIFT_STRICT_CONCURRENCY: minimal
+        TARGETED_DEVICE_FAMILY: "1,2"
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_STYLE: Automatic

@@ -34,10 +34,16 @@ export const passkeyRoutes = new Hono<AppEnv>();
 
 const CHALLENGE_MINUTES = 5;
 
-/** Relying party = the host being served. */
+/**
+ * Relying party = the host being served. A browser signs the page's origin into the credential;
+ * the iOS app, which has no page, signs `https://<rpID>` — the same string on playtally.app, a
+ * different one only on localhost with a port. Both are accepted so the native app and the web
+ * share one set of passkeys (worker/apple.ts is what lets Apple hand them across).
+ */
 function rp(c: { req: { url: string } }, appName: string) {
   const url = new URL(c.req.url);
-  return { id: url.hostname, origin: url.origin, name: appName };
+  const origins = [...new Set([url.origin, `https://${url.hostname}`])];
+  return { id: url.hostname, origin: origins, name: appName };
 }
 
 const base64url = (b: Uint8Array) => {

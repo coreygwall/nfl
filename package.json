@@ -16,6 +16,7 @@
     "schedule:build": "node scripts/build-schedule.ts",
     "logos:extract": "node scripts/extract-logos.ts",
     "og:build": "node scripts/build-og.ts",
+    "ios:assets": "node scripts/build-ios-assets.ts && python3 scripts/build-ios-fonts.py",
     "db:migrate:local": "wrangler d1 migrations apply DB --local"
   },
   "dependencies": {

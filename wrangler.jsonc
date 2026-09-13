@@ -12,7 +12,7 @@
     "not_found_handling": "single-page-application",
     // The Worker decides what every page route is: Tally's own tags at /, the pool's at /p/*,
     // and a redirect for the root-level paths the pool used to live at.
-    "run_worker_first": ["/api/*", "/", "/p/*", "/welcome", "/rules", "/week/*", "/board", "/board/*", "/admin"]
+    "run_worker_first": ["/api/*", "/", "/p/*", "/welcome", "/rules", "/week/*", "/board", "/board/*", "/admin", "/.well-known/*", "/apple-app-site-association"]
   },
   "d1_databases": [
     {
@@ -36,7 +36,14 @@
     "APP_NAME": "Tally",
     "POOL_TYPE": "High Five",
     "POOL_SLUG": "high-five",
-    "POOL_NAME": "High Five"
+    "POOL_NAME": "High Five",
+    // The iOS app, as Apple knows it: <team id>.<bundle id>, comma-separated if there is more than
+    // one (a TestFlight build and a release build share an id; a second app would not). Empty
+    // until the app exists in App Store Connect; see ios/README.md.
+    "APPLE_APP_IDS": "8445LWRG3B.app.playtally.ios",
+    // The App Store listing id (digits only, from the app's App Store URL). Setting it turns on
+    // Safari's "Open in the app" banner on the website. Empty until the app is listed.
+    "APPLE_APP_STORE_ID": ""
   },
   "observability": { "enabled": true }
 }

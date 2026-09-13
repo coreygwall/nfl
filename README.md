@@ -18,7 +18,8 @@ results entered by the commissioner in about a minute a week.
 | Two prizes | Every week has its own winner on that week's points. The season race is the running total from `SEASON_START_WEEK` (`shared/week.ts`, currently **week 2**) onward, so a pool that opens partway through week 1 starts everyone level. Week 1 still crowns a weekly winner; it just does not carry forward, and the season board hides it. |
 | Weeks | Regular season, weeks 1–18. The Picks tab opens to the earliest week that still has an unstarted game. |
 | Identity | Type your name on first visit; the device is handed a token and a short **device code**. The token rides in `localStorage` *and* in a long-lived `HttpOnly` cookie, so a browser that clears one still knows you — you stay signed in indefinitely. The code claims the same name on a second device and stays hidden behind **Pick on another device** until you need it. A claimed name cannot be taken without the code; a name nobody holds is claimed by the first device that asks, which is how everyone who joined before codes existed keeps their place. |
-| Face ID / Touch ID | Optional, and offered rather than required: tap your name → **Turn on Face ID**. After that a new phone signs in from the **Sign in with Face ID** button with nothing typed — the passkey is discoverable, so the credential names the player. A passkey belongs to the domain it was created on (`worker/routes/passkeys.ts` takes the relying party from the request), so one made on `workers.dev` will not be offered on `playtally.app`; the device code covers that, and every browser without biometrics. |
+| Face ID / Touch ID | Offered on the way past after every sign-in, and never required. Turning it on is the one step that makes every other surface free: the **iOS app tries it the moment it opens** and signs you straight in, and on the web the passkey waits in the name field's own suggestions (`autocomplete="username webauthn"`), so a returning player taps their name rather than hunting for a code. The credential names the player, so nothing is typed either way. A passkey belongs to the domain it was created on (`worker/routes/passkeys.ts` takes the relying party from the request), so one made on `workers.dev` is not offered on `playtally.app`; the device code covers that, and every browser without biometrics. |
+| Moving to a second device | Tap your name → **Play on another device** → **Send myself a sign-in link**. Texting or AirDropping that link signs the next device in with one tap — and opens the iOS app rather than the browser on any iPhone that has it. The code is still there underneath for reading aloud. |
 | Picking for others | Anyone can add entries their account manages (account sheet → **Add an entry**) — for kids, a partner, a friend who won't install anything. Each entry gets its own picks, its own row on the board and no sign-in of its own: the account's passkey or code is the way back in, and up to 12 hang off one account. Switching between them is one tap. The commissioner can also put an existing player on their own phone with the admin PIN; those devices are marked admin-issued, so the CSV export's `entered_by` column reads `commissioner` rather than `player`. |
 | Limits | The two doors a stranger with the link can push on are counted per caller (`migrations/0007_rate_limits.sql`): 8 wrong admin PINs earns a 15-minute cool-off, and 20 new names an hour from one address is the ceiling. A room full of friends joining over one wifi never reaches it; a script trying to fill all 200 seats does. The counter is per caller, so nobody can lock the commissioner out by hammering the PIN. |
 
@@ -33,6 +34,7 @@ database heals on its own.)
 2. Worker name **`nfl`** (must match `name` in `wrangler.jsonc`, and Cloudflare defaults it to the repo name). Build command `npm run build`. Deploy command `npx wrangler deploy` (the default). Root directory `/`.
 3. After the first deploy: Worker → **Settings** → **Variables and Secrets** → add a **secret** `ADMIN_PIN` (the commissioner PIN). Redeploy or push again.
 4. Optional: **Settings → Builds** → enable non-production branch builds to get a preview URL on every pull request.
+   When the iOS app is set up, `APPLE_APP_IDS` in `wrangler.jsonc` names it (see [`ios/README.md`](ios/README.md)).
 5. Share `https://playtally.app/p/high-five` (or the `workers.dev` URL, which still works). Pool name and slug are `POOL_NAME` and `POOL_SLUG` in `wrangler.jsonc`.
 
 From a laptop instead: `npx wrangler login && npm run deploy && npx wrangler secret put ADMIN_PIN`.
@@ -72,6 +74,24 @@ Send people the pool's URL — `https://playtally.app/p/<slug>`. It unfurls in i
 Worker fills in the absolute image URL and `POOL_NAME` at request time, so no config is needed when the host
 changes. `npm run og:build` regenerates the image. First-time visitors land on a welcome page that asks for a name,
 with the rules in three steps and a full `/rules` page one tap away. The roster is capped at 200 names.
+
+## The iOS app
+
+`ios/` is a native SwiftUI app for the same pool — see [`ios/README.md`](ios/README.md) for the
+runbook (TestFlight in an afternoon) and the architecture. It talks to this Worker's API and
+shares its accounts: a passkey made on the website signs into the app with Face ID and the other
+way round. Two things on this side make that work:
+
+- `worker/apple.ts` serves `/.well-known/apple-app-site-association`, which tells Apple the app
+  may use the domain's passkeys and open `/p/*` links. The app is named by `APPLE_APP_IDS` in
+  `wrangler.jsonc` (`<team id>.app.playtally.ios`) — set it once the app exists in App Store
+  Connect, before the first TestFlight install.
+- `worker/routes/passkeys.ts` accepts `https://<host>` as a credential origin alongside the page
+  origin, because a native app signs the domain rather than a page.
+- `APPLE_APP_STORE_ID` in `wrangler.jsonc` turns on Safari's "Open in the app" banner
+  (`worker/unfurl.ts`). A pool link pasted into the address bar never fires a universal link, so
+  without the banner someone who has the app still ends up in the browser. Leave it empty until
+  the app has an App Store listing; an empty one makes Safari log an error and show nothing.
 
 ## How the URLs are laid out
 
@@ -183,6 +203,7 @@ Time travel in dev: add `?now=2026-09-13T20:00:00Z` to any URL. The client forwa
 | `npm run typecheck` | Type-checks the client and the Worker |
 | `npm run schedule:build` | Regenerates the schedule JSON from nflverse (`games.csv`) |
 | `npm run logos:extract` | Rebuilds `public/logos` from the npm package plus `scripts/custom-logos/` (tight-cropped, with a baked die-cut outline) |
+| `npm run ios:assets` | Rebuilds the iOS asset catalogue (team stickers, icon) and the static font files from the web's own sources |
 | `npm run deploy` | `vite build` + `wrangler deploy` |
 
 ## How it's put together
@@ -192,7 +213,8 @@ shared/     pure rules shared by client and Worker: validatePicks (locks, frozen
 worker/     Hono API on Cloudflare Workers + D1; self-bootstraps schema + schedule; admin routes behind ADMIN_PIN
 src/        React 19 + Vite + Tailwind 4 + motion; TanStack Query for data; react-router
 migrations/ D1 schema (players, games, picks, meta)
-scripts/    schedule builder, logo extractor
+scripts/    schedule builder, logo extractor, iOS asset + font builders
+ios/        the native app: TallyKit (Swift package: API, rules, auth) + the SwiftUI app
 public/logos  32 team stickers (30 vectors from react-nfl-logos, Browns + Titans as PNG, Commanders drawn here)
 ```
 

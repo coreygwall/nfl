@@ -63,3 +63,25 @@ export function withAbsoluteUrls(res: Response, origin: string): Response {
     .on('meta[name="twitter:image"]', absolute(origin))
     .transform(res);
 }
+
+/**
+ * iOS Safari's "Open in the app" banner, at the top of the page. It is the missing step between
+ * the two surfaces: a pool link pasted into the address bar does not trigger a universal link,
+ * so without this someone with the app installed still ends up in the browser.
+ *
+ * `app-argument` hands over the exact page, so the app opens on the pool they were looking at.
+ * The tag is left off entirely until APPLE_APP_STORE_ID names a real App Store listing — an
+ * empty one makes Safari log an error and show nothing.
+ */
+export function withAppBanner(res: Response, appStoreId: string | undefined, pageUrl: string): Response {
+  const id = (appStoreId ?? "").trim();
+  if (!/^\d+$/.test(id)) return res;
+  const argument = pageUrl.replace(/"/g, "%22");
+  return new HTMLRewriter()
+    .on("head", {
+      element(el) {
+        el.append(`<meta name="apple-itunes-app" content="app-id=${id}, app-argument=${argument}">`, { html: true });
+      },
+    })
+    .transform(res);
+}

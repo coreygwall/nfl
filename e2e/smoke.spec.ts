@@ -21,16 +21,20 @@ test.describe.serial("pool flow", () => {
   test("new player picks five, ranks, locks in", async ({ page }) => {
     await enablePlatformBiometrics(page);
     await page.goto(`/welcome?now=${BEFORE}`);
+    // The name field doubles as the passkey field: without "webauthn" in its autocomplete, a
+    // returning player's passkey never appears in the browser's suggestions and nobody notices.
+    await expect(page.getByPlaceholder("Your name")).toHaveAttribute("autocomplete", "username webauthn");
     await page.getByPlaceholder("Your name").fill("Corey");
     await page.getByRole("button", { name: "Let's go" }).click();
     const welcome = page.getByRole("dialog", { name: "You’re all set" });
     await expect(welcome.getByText("you won’t need to sign in again here")).toBeVisible();
-    await expect(welcome.getByText("Want to use another device?")).toBeVisible();
+    await expect(welcome.getByText("Face ID does the rest")).toBeVisible();
     await expect(welcome.getByText(/passkey/i)).toBeHidden();
-    // Picking leads; the second-device offer sits under it rather than in front of it.
+    // Turning it on leads, because that one tap is what makes every other device and the iOS app
+    // free afterwards. Getting straight to picking stays available, just underneath.
     const buttons = await welcome.getByRole("button").allInnerTexts();
-    expect(buttons.indexOf("Start picking →")).toBeLessThan(buttons.indexOf("Set up Face ID or fingerprint"));
-    await welcome.getByRole("button", { name: "Start picking →" }).click();
+    expect(buttons.indexOf("Turn on Face ID or fingerprint")).toBeLessThan(buttons.indexOf("Not now — start picking →"));
+    await welcome.getByRole("button", { name: "Not now — start picking →" }).click();
     await expect(page).toHaveURL(/\/week\/1$/);
     await expect(page.locator('header img[src="/icon.svg"]')).toBeVisible();
     await expect(page.getByRole("link", { name: "Tally — High Five" })).toBeVisible();
@@ -91,7 +95,7 @@ test.describe.serial("pool flow", () => {
     await expect(page.getByRole("button", { name: "Join as this name" })).toBeDisabled();
     await page.getByPlaceholder(/Corey/).fill("Alex");
     await page.getByRole("button", { name: "Join as this name" }).click();
-    await page.getByRole("dialog", { name: "You’re all set" }).getByRole("button", { name: "Start picking →" }).click();
+    await page.getByRole("dialog", { name: "You’re all set" }).getByRole("button", { name: "Not now — start picking →" }).click();
     await expect(page).toHaveURL(/\/week\/1$/);
 
     for (const t of ["New England Patriots", "Los Angeles Rams", "Houston Texans"]) await pick(page, t);
@@ -101,7 +105,7 @@ test.describe.serial("pool flow", () => {
     // The code that moves this name to another device is under the name chip, one tap in.
     await page.getByRole("button", { name: "Switch player" }).click();
     const sheet = page.getByRole("dialog", { name: "Your account" });
-    await sheet.getByRole("button", { name: /Pick on another device/ }).click();
+    await sheet.getByRole("button", { name: /Play on another device/ }).click();
     alexCode = (await sheet.getByText(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/).innerText()).trim();
     expect(alexCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
     await sheet.getByRole("button", { name: "Close" }).click();
@@ -230,7 +234,7 @@ test("one phone can pick for the whole family, and the code stays out of the way
   await page.getByRole("button", { name: "Switch player" }).click();
   const sheet = page.getByRole("dialog", { name: "Your account" });
   await expect(sheet.getByText(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/)).toBeHidden();
-  await sheet.getByRole("button", { name: /Pick on another device/ }).click();
+  await sheet.getByRole("button", { name: /Play on another device/ }).click();
   await expect(sheet.getByText(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/)).toBeVisible();
 
   // Any account can create a child entry: no PIN, code, or separate sign-in.
@@ -273,7 +277,7 @@ test("a player who shows up Sunday night can still pick what's left", async ({ p
   await page.goto(`/welcome?now=${SUNDAY_NIGHT}`);
   await page.getByPlaceholder("Your name").fill("Sunday Nighter");
   await page.getByRole("button", { name: "Let's go" }).click();
-  await page.getByRole("dialog", { name: "You’re all set" }).getByRole("button", { name: "Start picking →" }).click();
+  await page.getByRole("dialog", { name: "You’re all set" }).getByRole("button", { name: "Not now — start picking →" }).click();
 
   // The ask scales to what is actually still available — no dead five-slot tray.
   await expect(page.getByRole("heading", { name: "Pick 2 winners" })).toBeVisible();
@@ -396,7 +400,7 @@ test("Face ID: turn it on, lose the device's memory, and sign back in with no ty
   await page.getByPlaceholder("Your name").fill(name);
   await page.getByRole("button", { name: "Let's go" }).click();
   const welcome = page.getByRole("dialog", { name: "You’re all set" });
-  await welcome.getByRole("button", { name: "Set up Face ID or fingerprint" }).click();
+  await welcome.getByRole("button", { name: "Turn on Face ID or fingerprint" }).click();
   await expect(page).toHaveURL(/\/week\/1$/);
   await expect(page.getByRole("button", { name: "Switch player" })).toContainText(name);
 
