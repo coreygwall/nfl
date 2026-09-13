@@ -409,7 +409,7 @@ private struct PoolBadge: View {
                 .background(Circle().fill(Color.flag))
                 .overlay(Circle().strokeBorder(Color.ink, lineWidth: 2))
             VStack(alignment: .leading, spacing: 1) {
-                Text("YOU'RE JOINING").font(TallyFont.body(10, weight: .bold)).tracking(1.2).foregroundStyle(Color.ink3)
+                Text("YOU'RE JOINING").font(TallyFont.sans(10, weight: .bold)).tracking(1.2).foregroundStyle(Color.ink3)
                 Text(poolName).font(TallyFont.display(18)).lineLimit(1)
             }
             Spacer(minLength: 4)
@@ -556,7 +556,7 @@ struct NameInput: View {
 
     var body: some View {
         TextField(placeholder, text: $text)
-            .tallyField(font: TallyFont.body(18))
+            .tallyField(font: TallyFont.sans(18))
             .textInputAutocapitalization(.words)
             .textContentType(.name)
             .autocorrectionDisabled()

@@ -76,18 +76,18 @@ struct PoolScreen<Content: View>: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         if !model.online { OfflineBanner() }
+                        Lockup(poolName: model.poolName)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 10)
                         content
                             .padding(.horizontal, 16)
-                            .padding(.top, 12)
+                            .padding(.top, 14)
                             .padding(.bottom, 120)
                     }
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Lockup(poolName: model.poolName)
-                }
-                .modifier(BareToolbarItem())
                 if let week {
                     ToolbarItem(placement: .topBarTrailing) {
                         WeekMenu(week: week, max: model.maxWeek, onChange: onWeek)
