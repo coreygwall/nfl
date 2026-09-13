@@ -115,6 +115,7 @@ public struct PickCount: Codable, Hashable, Sendable {
     public let away: Int
     public let home: Int
     public var total: Int { away + home }
+    public init(away: Int, home: Int) { self.away = away; self.home = home }
 }
 
 public struct WeekResponse: Codable, Sendable {
