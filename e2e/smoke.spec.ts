@@ -27,7 +27,10 @@ test.describe.serial("pool flow", () => {
     await expect(welcome.getByText("you won’t need to sign in again here")).toBeVisible();
     await expect(welcome.getByText("Want to use another device?")).toBeVisible();
     await expect(welcome.getByText(/passkey/i)).toBeHidden();
-    await welcome.getByRole("button", { name: "Not now — start picking" }).click();
+    // Picking leads; the second-device offer sits under it rather than in front of it.
+    const buttons = await welcome.getByRole("button").allInnerTexts();
+    expect(buttons.indexOf("Start picking →")).toBeLessThan(buttons.indexOf("Set up Face ID or fingerprint"));
+    await welcome.getByRole("button", { name: "Start picking →" }).click();
     await expect(page).toHaveURL(/\/week\/1$/);
     await expect(page.locator('header img[src="/icon.svg"]')).toBeVisible();
     await expect(page.getByRole("link", { name: "Tally — High Five" })).toBeVisible();
@@ -88,7 +91,7 @@ test.describe.serial("pool flow", () => {
     await expect(page.getByRole("button", { name: "Join as this name" })).toBeDisabled();
     await page.getByPlaceholder(/Corey/).fill("Alex");
     await page.getByRole("button", { name: "Join as this name" }).click();
-    await page.getByRole("dialog", { name: "You’re all set" }).getByRole("button", { name: "Not now — start picking" }).click();
+    await page.getByRole("dialog", { name: "You’re all set" }).getByRole("button", { name: "Start picking →" }).click();
     await expect(page).toHaveURL(/\/week\/1$/);
 
     for (const t of ["New England Patriots", "Los Angeles Rams", "Houston Texans"]) await pick(page, t);
@@ -263,7 +266,7 @@ test("a player who shows up Sunday night can still pick what's left", async ({ p
   await page.goto(`/welcome?now=${SUNDAY_NIGHT}`);
   await page.getByPlaceholder("Your name").fill("Sunday Nighter");
   await page.getByRole("button", { name: "Let's go" }).click();
-  await page.getByRole("dialog", { name: "You’re all set" }).getByRole("button", { name: "Not now — start picking" }).click();
+  await page.getByRole("dialog", { name: "You’re all set" }).getByRole("button", { name: "Start picking →" }).click();
 
   // The ask scales to what is actually still available — no dead five-slot tray.
   await expect(page.getByRole("heading", { name: "Pick 2 winners" })).toBeVisible();

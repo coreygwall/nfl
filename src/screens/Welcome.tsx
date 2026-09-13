@@ -305,7 +305,10 @@ export function Welcome() {
                   <Panel key="new">
                     <form onSubmit={submitName}>
                       <h2 className="font-display text-xl font-extrabold">What should we call you?</h2>
-                      <p className="mb-3 text-sm text-ink-2">This is how you'll show up on the board.</p>
+                      <p className="mb-3 text-sm text-ink-2">
+                        This is how you'll show up on the board. One account each — you can add entries for your kids
+                        or friends from it later.
+                      </p>
                       <NameInput
                         value={name}
                         onChange={(v) => {
@@ -423,20 +426,22 @@ function BiometricOffer({ player, onDone }: { player: Identity; onDone: () => vo
         <p className="mt-1 text-sm leading-relaxed text-ink-2">
           We’ll remember <b className="text-ink">{player.name}</b> on this device, so you won’t need to sign in again here.
         </p>
-        <div className="card-flat mt-5 bg-flag-soft p-4">
+        {/* They came here to pick, and this device already remembers them — so getting on with it
+            is the main button, and the second-device story waits underneath for whoever wants it. */}
+        <button autoFocus className="btn btn-turf mt-5 min-h-12 w-full" disabled={busy} onClick={onDone}>
+          Start picking →
+        </button>
+        <div className="mt-5 border-t-2 border-dashed border-line pt-4">
           <h3 className="font-display font-extrabold">Want to use another device?</h3>
           <p className="mt-1 text-sm leading-relaxed text-ink-2">
             Set up Face ID or fingerprint now to open your account on a new phone, tablet, or computer without a code.
+            You can always turn it on later from your account.
           </p>
+          {error && <p role="alert" className="mt-3 text-sm font-semibold text-danger">{error}</p>}
+          <button className="btn btn-sm mt-3 w-full" disabled={busy} onClick={() => void turnOn()}>
+            {busy ? "Waiting for you…" : "Set up Face ID or fingerprint"}
+          </button>
         </div>
-        {error && <p role="alert" className="mt-3 text-sm font-semibold text-danger">{error}</p>}
-        <button autoFocus className="btn btn-turf mt-5 min-h-12 w-full" disabled={busy} onClick={() => void turnOn()}>
-          {busy ? "Waiting for you…" : "Set up Face ID or fingerprint"}
-        </button>
-        <button className="btn mt-2 min-h-12 w-full" disabled={busy} onClick={onDone}>
-          Not now — start picking
-        </button>
-        <p className="mt-3 text-center text-xs text-ink-3">You can always turn this on later from your account.</p>
       </motion.div>
     </motion.div>
   );
