@@ -30,9 +30,9 @@ export function Landing() {
   return (
     <div className="flex min-h-dvh flex-col">
       <header className="border-b-2 border-ink bg-paper/90 backdrop-blur">
-        <div className="mx-auto flex w-full max-w-[1080px] items-center gap-2.5 px-5 py-3.5 sm:px-8">
-          <img src="/icon.svg" alt="" className="h-9 w-9" />
-          <span className="font-display text-[1.6rem] font-extrabold leading-none tracking-tight">Tally</span>
+        <div className="mx-auto flex w-full max-w-[1080px] items-center gap-2.5 px-5 py-3 sm:px-8 sm:py-3.5">
+          <img src="/icon.svg" alt="" className="h-10 w-10 shrink-0 sm:h-11 sm:w-11" />
+          <span className="font-display text-[1.55rem] font-extrabold leading-none tracking-tight sm:text-[1.8rem]">Tally</span>
           <span className="ml-auto text-[13px] font-bold text-ink-2">iOS app coming soon</span>
         </div>
       </header>
