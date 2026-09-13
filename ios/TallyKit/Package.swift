@@ -10,7 +10,7 @@ import PackageDescription
 let package = Package(
     name: "TallyKit",
     // macOS is listed so `swift test` runs on a Mac without a simulator; the app itself is iOS.
-    platforms: [.iOS(.v18), .macOS(.v14)],
+    platforms: [.iOS(.v17), .macOS(.v14)],
     products: [
         .library(name: "TallyKit", targets: ["TallyKit"]),
     ],
