@@ -438,7 +438,7 @@ struct NameInput: View {
 
     var body: some View {
         TextField(placeholder, text: $text)
-            .tallyField(font: TallyFont.body(18))
+            .tallyField(font: TallyFont.sans(18))
             .textInputAutocapitalization(.words)
             .textContentType(.name)
             .autocorrectionDisabled()

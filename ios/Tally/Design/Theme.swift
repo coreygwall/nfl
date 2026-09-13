@@ -64,7 +64,7 @@ enum TallyFont {
         return FontRegistrar.available(name) ? .custom(name, size: size) : .system(size: size, weight: fallback, design: .rounded)
     }
 
-    static func body(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
+    static func sans(_ size: CGFloat, weight: Font.Weight = .regular) -> Font {
         let name: String
         switch weight {
         case .heavy, .black, .bold: name = weight == .bold ? "Inter-Bold" : "Inter-ExtraBold"
@@ -101,7 +101,7 @@ extension View {
     }
 
     func sans(_ size: CGFloat, weight: Font.Weight = .regular) -> some View {
-        font(TallyFont.body(size, weight: weight))
+        font(TallyFont.sans(size, weight: weight))
     }
 }
 

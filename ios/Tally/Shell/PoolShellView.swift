@@ -118,7 +118,7 @@ struct Lockup: View {
                 .frame(width: 34, height: 34)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Tally").font(TallyFont.display(21)).foregroundStyle(Color.ink)
-                Text(poolName.uppercased()).font(TallyFont.body(9, weight: .bold)).tracking(1.4).foregroundStyle(Color.ink2).lineLimit(1)
+                Text(poolName.uppercased()).font(TallyFont.sans(9, weight: .bold)).tracking(1.4).foregroundStyle(Color.ink2).lineLimit(1)
             }
         }
         .accessibilityElement(children: .combine)

@@ -52,7 +52,7 @@ struct PoolsView: View {
                             SectionLabel(text: "Join another pool")
                             Text("Paste the link your commissioner sent. Tapping one in Messages opens it here too.").sans(14).foregroundStyle(Color.ink2)
                             TextField("https://playtally.app/p/…", text: $link)
-                                .tallyField(font: TallyFont.body(15))
+                                .tallyField(font: TallyFont.sans(15))
                                 .textInputAutocapitalization(.never)
                                 .autocorrectionDisabled()
                                 .keyboardType(.URL)

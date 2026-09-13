@@ -292,7 +292,7 @@ struct ReviewStep: View {
                     Spacer()
                     VStack(alignment: .trailing, spacing: 0) {
                         Text("\(points)").font(TallyFont.display(40)).monospacedDigit()
-                        Text("POINTS").font(TallyFont.body(10, weight: .bold)).tracking(1).foregroundStyle(Color.ink3)
+                        Text("POINTS").font(TallyFont.sans(10, weight: .bold)).tracking(1).foregroundStyle(Color.ink3)
                     }
                 }
                 VStack(spacing: 8) {

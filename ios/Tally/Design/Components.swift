@@ -128,7 +128,7 @@ struct Chip: View {
 
     var body: some View {
         Text(text)
-            .font(display ? TallyFont.display(size, weight: .extraBold) : TallyFont.body(size, weight: .bold))
+            .font(display ? TallyFont.display(size, weight: .extraBold) : TallyFont.sans(size, weight: .bold))
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
             .background(Capsule().fill(fill))

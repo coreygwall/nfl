@@ -62,7 +62,7 @@ struct PinGate: View {
             Text("Commissioner's office").display(24)
             Text("Enter the admin PIN to record results.").sans(14).foregroundStyle(Color.ink2)
             SecureField("PIN", text: $pin)
-                .tallyField(font: TallyFont.body(18))
+                .tallyField(font: TallyFont.sans(18))
                 .keyboardType(.numberPad)
                 .focused($focused)
                 .shake(shake)

@@ -199,7 +199,7 @@ struct BoardRowCard<Detail: View>: View {
                     Spacer()
                     VStack(alignment: .trailing, spacing: 0) {
                         Text("\(points)").font(TallyFont.display(30)).monospacedDigit().contentTransition(.numericText())
-                        Text("PTS").font(TallyFont.body(10, weight: .bold)).tracking(1).foregroundStyle(Color.ink3)
+                        Text("PTS").font(TallyFont.sans(10, weight: .bold)).tracking(1).foregroundStyle(Color.ink3)
                     }
                 }
                 .padding(12)
