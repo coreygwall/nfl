@@ -277,7 +277,7 @@ function WeekRowItem({ row, index, open, onToggle, isMe, week, started }: { row:
                 </p>
               ) : (
                 <>
-                  <ul className="flex flex-wrap gap-2">
+                  <ul className="flex flex-wrap gap-1.5">
                     {row.picks.map((p) => (
                       <PickChip key={p.gameId} pick={p} />
                     ))}
@@ -297,21 +297,33 @@ function WeekRowItem({ row, index, open, onToggle, isMe, week, started }: { row:
   );
 }
 
+/**
+ * One pick, small enough that all five sit on one line of a phone. The number is the points: what
+ * the pick is worth while the game is still going, what it actually earned once it is over. Colour
+ * carries the state, so nothing has to say "pending" — plain means it has not finished.
+ */
 function PickChip({ pick }: { pick: ScoredPick }) {
-  const tone =
+  const stake = 6 - pick.rank;
+  const t = TEAMS[pick.team];
+  const [tone, badge, value, said] =
     pick.outcome === "win"
-      ? "border-turf bg-turf-soft"
+      ? ["border-turf bg-turf-soft", "bg-turf text-white", `${pick.points}`, `won ${pick.points} points`]
       : pick.outcome === "loss"
-        ? "border-danger/60 bg-danger-soft/70"
+        ? ["border-line bg-paper-2", "bg-white text-ink-3", "0", "got nothing"]
         : pick.outcome === "tie"
-          ? "border-line bg-paper-2"
-          : "border-line bg-white";
+          ? ["border-line bg-paper-2", "bg-white text-ink-3", "0", "tied, so no points"]
+          : ["border-ink/25 bg-white", "bg-white text-ink", `${stake}`, `still playing, worth ${stake} points`];
   return (
-    <li className={`flex items-center gap-2 rounded-xl border-2 py-1 pl-1 pr-2 ${tone}`} title={`${TEAMS[pick.team].city} ${TEAMS[pick.team].nickname}`}>
-      <TeamSticker abbr={pick.team} size={30} flat dimmed={pick.outcome === "loss"} />
-      <RankBadge rank={pick.rank} size="sm" />
-      <span className="font-display text-sm font-extrabold tabular">
-        {pick.outcome === "win" ? `+${pick.points}` : pick.outcome === "loss" ? "0" : pick.outcome === "tie" ? "tie" : "…"}
+    <li
+      className={`flex items-center gap-0.5 rounded-full border-2 py-0.5 pl-0.5 pr-1 ${tone}`}
+      title={`${t.city} ${t.nickname} — ${said}`}
+    >
+      <TeamSticker abbr={pick.team} size={26} flat dimmed={pick.outcome === "loss"} />
+      <span
+        className={`font-display flex h-[18px] min-w-[18px] items-center justify-center rounded-full text-[11px] font-extrabold leading-none tabular ${badge}`}
+        aria-label={`${t.nickname}, ${said}`}
+      >
+        {value}
       </span>
     </li>
   );

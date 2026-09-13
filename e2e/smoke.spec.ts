@@ -171,7 +171,8 @@ test.describe.serial("pool flow", () => {
     await expect(corey).toContainText("4");
     await corey.click();
     await expect(page.getByText("4 more picks revealed at kickoff")).toBeVisible();
-    await expect(page.getByText("+4")).toBeVisible();
+    // The chip says what the pick was worth, and says it in words for anyone who cannot see colour.
+    await expect(page.getByTitle(/Seattle Seahawks — won 4 points/)).toBeVisible();
 
     // Sorting by potential reorders without renaming anyone's standing.
     await page.getByRole("tab", { name: "Potential" }).click();
