@@ -325,23 +325,31 @@ function PickSlots({ picks, hiddenRanks }: { picks: ScoredPick[]; hiddenRanks: n
   );
 }
 
+/**
+ * A capsule holding a logo has to leave more room at its ends than one holding text. Text sits in
+ * the middle of the pill where the cap has not started curving; a logo is a square, and its corners
+ * land exactly where the cap curves away. At 26px in a 30px pill they hung outside the outline
+ * altogether. 24px of logo, 3px of vertical padding and 7px/5px at the ends keeps every corner
+ * inside the curve. The iOS app works the same numbers out in `PillFit`.
+ */
+const SLOT = "flex items-center gap-[3px] rounded-full border-2 py-[3px] pl-[7px] pr-[5px]";
+const SLOT_ICON = "flex h-6 w-6 items-center justify-center";
+const SLOT_BADGE =
+  "font-display flex h-[18px] min-w-[18px] items-center justify-center rounded-full text-[11px] font-extrabold leading-none tabular";
+
 function EmptySlot({ rank, locked }: { rank: number; locked: boolean }) {
   const stake = 6 - rank;
   const said = locked ? `A hidden pick worth ${stake} points, revealed at kickoff` : `No pick worth ${stake} points`;
   return (
     <li
-      className={`flex items-center gap-0.5 rounded-full border-2 py-0.5 pl-0.5 pr-1 ${
-        locked ? "border-ink/25 bg-white" : "border-dashed border-line bg-paper-2/50"
-      }`}
+      className={`${SLOT} ${locked ? "border-ink/25 bg-white" : "border-dashed border-line bg-paper-2/50"}`}
       title={said}
     >
-      <span className="flex h-[26px] w-[26px] items-center justify-center" aria-hidden="true">
+      <span className={SLOT_ICON} aria-hidden="true">
         {locked ? <Lock size={13} className="text-ink-2" /> : <span className="text-[13px] font-bold text-ink-3">–</span>}
       </span>
       <span
-        className={`font-display flex h-[18px] min-w-[18px] items-center justify-center rounded-full text-[11px] font-extrabold leading-none tabular ${
-          locked ? "bg-white text-ink" : "text-ink-3"
-        }`}
+        className={`${SLOT_BADGE} ${locked ? "bg-white text-ink" : "text-ink-3"}`}
         aria-label={said}
       >
         {stake}
@@ -368,12 +376,12 @@ function PickChip({ pick }: { pick: ScoredPick }) {
           : ["border-ink/25 bg-white", "bg-white text-ink", `${stake}`, `still playing, worth ${stake} points`];
   return (
     <li
-      className={`flex items-center gap-0.5 rounded-full border-2 py-0.5 pl-0.5 pr-1 ${tone}`}
+      className={`${SLOT} ${tone}`}
       title={`${t.city} ${t.nickname} — ${said}`}
     >
-      <TeamSticker abbr={pick.team} size={26} flat dimmed={pick.outcome === "loss"} />
+      <TeamSticker abbr={pick.team} size={24} flat dimmed={pick.outcome === "loss"} />
       <span
-        className={`font-display flex h-[18px] min-w-[18px] items-center justify-center rounded-full text-[11px] font-extrabold leading-none tabular ${badge}`}
+        className={`${SLOT_BADGE} ${badge}`}
         aria-label={`${t.nickname}, ${said}`}
       >
         {value}

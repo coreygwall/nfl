@@ -278,7 +278,7 @@ struct EmptySlotChip: View {
 
     var body: some View {
         let said = locked ? "A hidden pick worth \(points) points, revealed at kickoff" : "No pick worth \(points) points"
-        HStack(spacing: 2) {
+        HStack(spacing: PillFit.Chip.gap) {
             Group {
                 if locked {
                     Image(systemName: "lock.fill").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.ink2)
@@ -286,15 +286,17 @@ struct EmptySlotChip: View {
                     Text("–").sans(13, weight: .bold).foregroundStyle(Color.ink3)
                 }
             }
-            .frame(width: 26, height: 26)
+            .frame(width: PillFit.Chip.logo, height: PillFit.Chip.logo)
             Text("\(points)")
                 .font(TallyFont.display(11))
                 .monospacedDigit()
                 .foregroundStyle(locked ? Color.ink : Color.ink3)
-                .frame(minWidth: 18, minHeight: 18)
+                .frame(minWidth: PillFit.Chip.badge, minHeight: PillFit.Chip.badge)
                 .background(Circle().fill(locked ? Color.white : Color.clear))
         }
-        .padding(.leading, 2).padding(.trailing, 4).padding(.vertical, 2)
+        .padding(.leading, PillFit.Chip.leading)
+        .padding(.trailing, PillFit.Chip.trailing)
+        .padding(.vertical, PillFit.Chip.vertical)
         .background(Capsule().fill(locked ? Color.white : Color.paper2.opacity(0.5)))
         .overlay(
             Capsule().strokeBorder(
@@ -332,16 +334,18 @@ struct PickChip: View {
         let team = model.sport.teamOrPlaceholder(pick.team)
         let stake = Scoring.points(forRank: pick.rank)
         let s = style
-        HStack(spacing: 2) {
-            TeamSticker(team: team, size: 26, dimmed: pick.outcome == .loss, flat: true)
+        HStack(spacing: PillFit.Chip.gap) {
+            TeamSticker(team: team, size: PillFit.Chip.logo, dimmed: pick.outcome == .loss, flat: true)
             Text(s.value)
                 .font(TallyFont.display(11))
                 .monospacedDigit()
                 .foregroundStyle(s.badgeText)
-                .frame(minWidth: 18, minHeight: 18)
+                .frame(minWidth: PillFit.Chip.badge, minHeight: PillFit.Chip.badge)
                 .background(Circle().fill(s.badgeFill))
         }
-        .padding(.leading, 2).padding(.trailing, 4).padding(.vertical, 2)
+        .padding(.leading, PillFit.Chip.leading)
+        .padding(.trailing, PillFit.Chip.trailing)
+        .padding(.vertical, PillFit.Chip.vertical)
         .background(Capsule().fill(s.fill))
         .overlay(Capsule().strokeBorder(s.border, lineWidth: 2))
         .accessibilityLabel("\(team.nickname), \(pick.outcome == .win ? "won \(pick.points) points" : pick.outcome == .pending ? "still playing, worth \(stake) points" : "got nothing")")

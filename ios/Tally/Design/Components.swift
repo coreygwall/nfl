@@ -120,6 +120,40 @@ struct LinkButton: View {
 
 // MARK: Chips and badges
 
+/// How much room a capsule has to leave at its ends.
+///
+/// A line of text can sit close to a capsule's edge because text is short in the middle of the
+/// pill, where the cap has not started curving yet. A logo cannot: it is a square, and its corners
+/// land exactly where the cap curves away, so with text-sized padding they hang outside the
+/// outline. These are the numbers that keep a square clear of the curve — worked out once here
+/// rather than guessed at each chip.
+enum PillFit {
+    /// Height of a capsule holding `content`-tall content with `vertical` padding and a border.
+    static func height(content: CGFloat, vertical: CGFloat, border: CGFloat = 2) -> CGFloat {
+        content + vertical * 2 + border * 2
+    }
+
+    /// Leading/trailing padding that keeps a `content` x `content` square inside the cap, with a
+    /// little air so it reads as deliberate rather than as a near miss.
+    static func end(content: CGFloat, vertical: CGFloat, border: CGFloat = 2, air: CGFloat = 2) -> CGFloat {
+        let r = content / 2 + vertical + border
+        let half = content / 2
+        let bite = r - (r * r - half * half).squareRoot()
+        return (bite + air).rounded()
+    }
+
+    /// The pick and empty chips share these so that five of them, in any mix, line up.
+    enum Chip {
+        static let logo: CGFloat = 24
+        static let badge: CGFloat = 18
+        static let vertical: CGFloat = 3
+        static let gap: CGFloat = 3
+        static var leading: CGFloat { PillFit.end(content: logo, vertical: vertical) }
+        static var trailing: CGFloat { PillFit.end(content: badge, vertical: (logo - badge) / 2 + vertical) }
+    }
+}
+
+
 struct Chip: View {
     let text: String
     var fill: Color = .white

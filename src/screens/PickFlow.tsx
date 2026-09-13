@@ -515,11 +515,13 @@ function PickTray({
                         exit={{ scale: 0, rotate: 20 }}
                         transition={{ type: "spring", stiffness: 600, damping: 22 }}
                         onClick={() => !isFrozen && onRemove(p.gameId)}
-                        className="relative h-9 w-9"
+                        /* 30 inside a 40px slot: the slot is rounded-xl, so a bigger square would
+                           have its corners hanging over the dashes. */
+                        className="relative h-[30px] w-[30px]"
                       >
-                        <TeamSticker abbr={p.team} size={36} flat />
+                        <TeamSticker abbr={p.team} size={30} flat />
                         {isFrozen && (
-                          <span className="absolute -bottom-1 -right-1 rounded-full bg-ink p-0.5 text-paper">
+                          <span className="absolute -bottom-0.5 -right-0.5 rounded-full bg-ink p-0.5 text-paper">
                             <Lock size={10} />
                           </span>
                         )}

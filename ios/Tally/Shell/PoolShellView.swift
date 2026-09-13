@@ -44,20 +44,8 @@ struct PoolShellView: View {
                 }
             }
         }
-        .modifier(TabBarBehaviour())
         .sheet(isPresented: $model.showEntrySwitcher) {
             EntrySwitcherSheet()
-        }
-    }
-}
-
-private struct TabBarBehaviour: ViewModifier {
-    @ViewBuilder
-    func body(content: Content) -> some View {
-        if #available(iOS 26.0, *) {
-            content.tabBarMinimizeBehavior(.onScrollDown)
-        } else {
-            content
         }
     }
 }
