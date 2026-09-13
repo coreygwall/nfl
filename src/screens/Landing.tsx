@@ -45,7 +45,7 @@ export function Landing() {
           </h1>
           <p className="mt-5 max-w-[46ch] text-[clamp(1.05rem,2.4vw,1.3rem)] leading-snug text-ink-2">
             Tally hosts the pools you already argue about — and a few you haven't tried yet. Pick a game, share one
-            link, and everyone's in. No accounts, no downloads, no spreadsheet.
+            link, and everyone's in. Nothing to install, nothing to keep in a spreadsheet.
           </p>
           <ul className="mt-6 flex flex-wrap gap-2">
             {FACTS.map((fact) => (

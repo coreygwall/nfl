@@ -30,7 +30,7 @@ const setContent = (value: string) => ({
 
 export function withUnfurlTags(res: Response, origin: string, pool: PoolMeta): Response {
   const title = `${pool.poolName} — a ${pool.appName} pool`;
-  const description = poolTypeByName(pool.poolType)?.blurb ?? `A ${pool.appName} pool. No signup, just your name.`;
+  const description = poolTypeByName(pool.poolType)?.blurb ?? `A ${pool.appName} pool — play it with your friends.`;
   return new HTMLRewriter()
     // Installed to a home screen, a pool is its own app: its name, opening at its own path.
     .on('link[rel="manifest"]', {

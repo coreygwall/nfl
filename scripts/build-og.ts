@@ -15,21 +15,32 @@ interface Card {
   chip: string;
   head: string;
   body: string;
+  /** The confidence ladder, drawn rather than described. */
+  ladder?: boolean;
+  /** Team stickers suit a pool that is about the NFL; the brand card is not about one sport. */
+  art: "stickers" | "mark";
 }
 
-/** The pool's own card, and the one the Tally link unfurls with. */
+/**
+ * The pool's own card, and the one the Tally link unfurls with. iMessage renders these small and
+ * puts the page title underneath, so the job is to be legible at thumbnail size and to say what
+ * the game *is* — hence the ladder, which explains High Five faster than a sentence can.
+ */
 const cards: Card[] = [
   {
     file: "og.jpg",
     chip: "🏈 High Five · a Tally pool",
     head: "Pick five.<br>Rank them.",
-    body: "Pick five winners a week and rank them 1–5. Nail your #1 for 5 points. No signup — just your name.",
+    body: "Most points over the season wins.",
+    ladder: true,
+    art: "stickers",
   },
   {
     file: "og-tally.jpg",
     chip: "Tally",
-    head: "Games to play<br>with your friends.",
+    head: "Games to play<br>with friends.",
     body: "Pick a pool, share one link, and everyone's in. Simple, free, and nothing to install.",
+    art: "mark",
   },
 ];
 
@@ -39,8 +50,15 @@ const template = (c: Card) => `<!doctype html><html><head><style>
 html,body{margin:0}
 body{width:1200px;height:630px;background:#F6F1E8;background-image:radial-gradient(rgba(20,18,15,.07) 1.5px,transparent 1.5px);background-size:26px 26px;font-family:InterV,system-ui,sans-serif;color:#14120F;position:relative;overflow:hidden}
 .chip{position:absolute;left:72px;top:64px;display:inline-flex;align-items:center;gap:10px;border:3px solid #14120F;border-radius:999px;background:#FFD23F;padding:8px 20px;font-family:Bricolage;font-weight:800;font-size:26px}
-h1{position:absolute;left:72px;top:150px;margin:0;font-family:Bricolage;font-weight:800;font-size:124px;line-height:.92;letter-spacing:-.02em;font-variation-settings:"wdth" 96}
-p{position:absolute;left:72px;top:420px;margin:0;width:640px;font-size:30px;line-height:1.25;color:#5B554B}
+h1{position:absolute;left:72px;top:150px;margin:0;width:700px;font-family:Bricolage;font-weight:800;font-size:124px;line-height:.92;letter-spacing:-.02em;font-variation-settings:"wdth" 96}
+h1.sm{font-size:88px;top:182px;white-space:nowrap}
+.mark{position:absolute;right:110px;top:205px;width:300px;height:300px;filter:drop-shadow(0 16px 18px rgba(20,18,15,.25))}
+p{position:absolute;left:72px;top:398px;margin:0;width:620px;font-size:30px;line-height:1.25;color:#5B554B}
+.ladder{position:absolute;left:72px;top:458px;display:flex;gap:16px}
+.b{width:84px;height:84px;border:4px solid #14120F;border-radius:20px;background:#fff;display:flex;flex-direction:column;align-items:center;justify-content:center;font-family:Bricolage;font-weight:800;line-height:1}
+.b.top{background:#FFD23F}
+.b .n{font-size:38px}
+.b .u{margin-top:4px;font-size:13px;font-weight:700;letter-spacing:.08em;color:#5B554B}
 .row{position:absolute;right:56px;top:96px;width:380px;display:flex;flex-wrap:wrap;gap:22px;justify-content:center;align-content:flex-start}
 .s{width:150px;height:150px;display:flex;align-items:center;justify-content:center;filter:drop-shadow(0 10px 10px rgba(20,18,15,.22))}
 .s img{max-width:150px;max-height:150px}
@@ -48,9 +66,12 @@ p{position:absolute;left:72px;top:420px;margin:0;width:640px;font-size:30px;line
 </style></head><body>
 <div class="frame"></div>
 <div class="chip">${c.chip}</div>
-<h1>${c.head}</h1>
+<h1${c.art === "mark" ? ' class="sm"' : ""}>${c.head}</h1>
 <p>${c.body}</p>
-<div class="row">${stickers.map(([a, r]) => `<div class="s" style="transform:rotate(${r}deg)"><img src="${logo(a, existsSync(path.join(ROOT, "public/logos", a + ".svg")) ? "svg" : "png")}"></div>`).join("")}</div>
+${c.ladder ? `<div class="ladder">${[5, 4, 3, 2, 1].map((n) => `<div class="b${n === 5 ? " top" : ""}"><span class="n">${n}</span><span class="u">PTS</span></div>`).join("")}</div>` : ""}
+${c.art === "stickers"
+  ? `<div class="row">${stickers.map(([a, r]) => `<div class="s" style="transform:rotate(${r}deg)"><img src="${logo(a, existsSync(path.join(ROOT, "public/logos", a + ".svg")) ? "svg" : "png")}"></div>`).join("")}</div>`
+  : `<img class="mark" src="file://${path.join(ROOT, "public/icon.svg")}">`}
 </body></html>`;
 
 const executablePath = process.env.PW_CHROMIUM_PATH ?? ["/opt/pw-browsers/chromium"].find((p) => existsSync(p));

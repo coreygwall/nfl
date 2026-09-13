@@ -56,7 +56,7 @@ describe("link unfurl tags", () => {
 
     // An unknown pool type still gets a sentence rather than the site's own pitch.
     const other = await withUnfurlTags(html(), "https://pool.example.com", pool({ poolType: "Shuffleboard" })).text();
-    expect(other).toContain('property="og:description" content="A Tally pool. No signup, just your name."');
+    expect(other).toContain('property="og:description" content="A Tally pool — play it with your friends."');
   });
 
   it("leaves the site's own page saying Tally, and only absolutises its URLs", async () => {

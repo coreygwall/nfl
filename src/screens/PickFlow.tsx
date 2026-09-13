@@ -143,10 +143,11 @@ function PickFlowInner({ week }: { week: number }) {
 
   const share = async () => {
     const url = poolUrl();
-    const title = boot.data?.poolName ?? "High Five";
     try {
       if (navigator.share) {
-        await navigator.share({ title, text: `Join our NFL pool — pick five games a week and rank them.`, url });
+        // The link alone: iMessage and the rest turn it into the card, and anything passed as
+        // `text` would be typed into the message body on top of it.
+        await navigator.share({ url });
         return;
       }
       await navigator.clipboard.writeText(url);
