@@ -42,4 +42,14 @@ enum Format {
     static func plural(_ n: Int, _ singular: String, _ plural: String? = nil) -> String {
         n == 1 ? "\(n) \(singular)" : "\(n) \(plural ?? singular + "s")"
     }
+
+    /// "Corey", "Corey and Sam", "Corey, Sam and Parker" — for the handful of places a tie has to
+    /// be read out loud.
+    static func list(_ items: [String]) -> String {
+        switch items.count {
+        case 0: return ""
+        case 1: return items[0]
+        default: return "\(items.dropLast().joined(separator: ", ")) and \(items[items.count - 1])"
+        }
+    }
 }

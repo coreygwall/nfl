@@ -44,6 +44,8 @@ struct WeekBoardView: View {
     let sort: BoardSort
     @State private var board: Loadable<WeekBoardResponse> = .idle
     @State private var open: String?
+    @State private var celebrating = false
+    @State private var confetti = 0
 
     var body: some View {
         Group {
@@ -53,6 +55,7 @@ struct WeekBoardView: View {
             case .loaded(let data): content(data)
             }
         }
+        .overlay { if confetti > 0 { ConfettiView(trigger: confetti).allowsHitTesting(false) } }
         .task(id: week) { await load() }
         .task {
             while !Task.isCancelled {
@@ -64,13 +67,87 @@ struct WeekBoardView: View {
 
     private func load(quiet: Bool = false) async {
         if !quiet, board.value == nil { board = .loading }
-        do { board = .loaded(try await model.service.weekBoard(week)) } catch { if board.value == nil { board = .failed(error.asAPIError) } }
+        do {
+            let fresh = try await model.service.weekBoard(week)
+            board = .loaded(fresh)
+            react(to: fresh)
+        } catch {
+            if board.value == nil { board = .failed(error.asAPIError) }
+        }
+    }
+
+    /// Winners of the week: everyone level at the top, once every game has a result.
+    private func winners(_ data: WeekBoardResponse) -> [WeekRow] {
+        guard data.gameCount > 0, data.finalCount == data.gameCount else { return [] }
+        return data.rows.filter { $0.place == 1 && $0.picksMade > 0 }
+    }
+
+    /**
+     Feel what just changed.
+
+     The board reloads itself every minute, and almost every reload says nothing. This works out
+     which ones do — a pick settling, the week ending — and marks them. The first look at a week
+     only sets a baseline, so opening the app late on a Sunday does not replay the whole afternoon
+     in haptics; the week finishing is the exception, and gets its celebration however late you
+     arrive, exactly once.
+     */
+    private func react(to data: WeekBoardResponse) {
+        guard let me = model.player?.id, let mine = data.rows.first(where: { $0.playerId == me }) else { return }
+        let top = winners(data)
+        let watch = WeekWatch(
+            week: week,
+            outcomes: Dictionary(mine.picks.map { ($0.gameId, $0.outcome.rawValue) }, uniquingKeysWith: { a, _ in a }),
+            points: mine.points,
+            place: mine.place,
+            finished: data.gameCount > 0 && data.finalCount == data.gameCount,
+            field: data.rows.count,
+            sharedFirst: top.count > 1
+        )
+        let teams = Dictionary(mine.picks.map { ($0.gameId, $0.team) }, uniquingKeysWith: { a, _ in a })
+        let ranks = Dictionary(mine.picks.map { ($0.gameId, $0.rank) }, uniquingKeysWith: { a, _ in a })
+        let found = watch.milestones(
+            since: MilestoneStore.lastSeen(playerId: me, week: week),
+            teamsByGame: teams,
+            ranksByGame: ranks
+        )
+        MilestoneStore.record(watch, playerId: me)
+
+        for milestone in found {
+            switch milestone {
+            case .pickWon: Haptics.won()
+            case .pickLost: Haptics.lost()
+            case .finishedWeek: Haptics.weekSettled()
+            case .wonWeek, .tookSeasonLead: break // Handled below, which also covers arriving late.
+            }
+        }
+
+        // The win is claimed rather than reacted to, so it lands once whether you were watching when
+        // the last whistle went or opened the app on Tuesday.
+        guard watch.finished, mine.place == 1, mine.picksMade > 0 else { return }
+        guard MilestoneStore.claimCelebration(CelebrationLog.key(playerId: me, "week-\(week)")) else { return }
+        celebrating = true
+        confetti += 1
+        Haptics.wonTheWeek()
     }
 
     @ViewBuilder
     private func content(_ data: WeekBoardResponse) -> some View {
         let started = data.lockedCount > 0
+        let top = winners(data)
+        let iWon = top.contains { $0.playerId == model.player?.id }
         VStack(alignment: .leading, spacing: 10) {
+            // Your own week, first, once. A card rather than a sheet: nobody should have to tap
+            // "OK" to acknowledge their own good week, and this can be scrolled straight past.
+            if celebrating, let mine = top.first(where: { $0.playerId == model.player?.id }) {
+                WeekWinnerCard(week: week, points: mine.points, shared: top.count > 1) {
+                    withAnimation(.easeOut(duration: 0.2)) { celebrating = false }
+                }
+                .transition(.scale(scale: 0.9).combined(with: .opacity))
+            }
+            // Then who took it, for everyone, for as long as the week is on screen.
+            if !top.isEmpty {
+                WeekWinnerBanner(week: week, winners: top.map(\.name), points: top[0].points, isMe: iWon)
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(data.lockedCount == 0
                      ? "Nothing has kicked off yet · \(data.rows.filter { $0.picksMade > 0 }.count) of \(data.rows.count) have picked"
@@ -88,7 +165,9 @@ struct WeekBoardView: View {
                 }
             } else {
                 ForEach(rowsSorted(data.rows, by: sort)) { row in
+                    let won = !top.isEmpty && row.place == 1 && row.picksMade > 0
                     BoardRowCard(place: row.place, name: row.name, isMe: row.playerId == model.player?.id, points: row.points, muted: !started,
+                                 crowned: won,
                                  subtitle: row.picksMade == 0 ? "No picks"
                                     : !started ? "\(Format.plural(row.picksMade, "pick")) in · up to \(row.possible)"
                                     : "\(row.correct) of \(row.picksMade) right · up to \(row.possible)",
@@ -144,7 +223,20 @@ struct SeasonBoardView: View {
 
     private func load(quiet: Bool = false) async {
         if !quiet, board.value == nil { board = .loading }
-        do { board = .loaded(try await model.service.seasonBoard()) } catch { if board.value == nil { board = .failed(error.asAPIError) } }
+        do {
+            let fresh = try await model.service.seasonBoard()
+            board = .loaded(fresh)
+            // Going top of the table is the one season change worth feeling. Slipping down is not:
+            // the app should not be the thing that rubs it in.
+            if let me = model.player?.id, !fresh.notStarted,
+               let mine = fresh.rows.first(where: { $0.playerId == me }), mine.weeksPlayed > 0,
+               MilestoneStore.noteSeasonPlace(mine.place, playerId: me) {
+                Haptics.tookTheLead()
+                model.toast("Top of the season table.")
+            }
+        } catch {
+            if board.value == nil { board = .failed(error.asAPIError) }
+        }
     }
 
     @ViewBuilder
@@ -197,6 +289,9 @@ struct BoardRowCard<Detail: View>: View {
     let isMe: Bool
     let points: Int
     let muted: Bool
+    /// Took the week. Only ever true once the week is over, so it reads as a result rather than a
+    /// lead — "top of the table right now" is what the place badge is for.
+    var crowned = false
     let subtitle: String
     let open: Bool
     let onToggle: () -> Void
@@ -206,11 +301,12 @@ struct BoardRowCard<Detail: View>: View {
         VStack(spacing: 0) {
             Button(action: onToggle) {
                 HStack(spacing: 12) {
-                    PlaceBadge(place: place, muted: muted)
+                    PlaceBadge(place: place, muted: muted, crowned: crowned)
                     VStack(alignment: .leading, spacing: 2) {
                         HStack(spacing: 6) {
                             Text(name).font(TallyFont.display(17)).lineLimit(1)
                             if isMe { Chip(text: "you", size: 10) }
+                            if crowned { Chip(text: "winner", fill: .flag, size: 10) }
                         }
                         Text(subtitle).sans(12).foregroundStyle(Color.ink2).lineLimit(1)
                     }
@@ -237,7 +333,7 @@ struct BoardRowCard<Detail: View>: View {
         }
         // No .clipped() here: the card's own offset shadow lives outside its bounds, and clipping
         // sliced it off on the highlighted row.
-        .modifier(TallyCard(hard: isMe, fill: isMe ? .flagSoft : .white, border: .ink, radius: TallyRadius.card, dashed: false))
+        .modifier(TallyCard(hard: isMe || crowned, fill: isMe || crowned ? .flagSoft : .white, border: .ink, radius: TallyRadius.card, dashed: false))
     }
 }
 

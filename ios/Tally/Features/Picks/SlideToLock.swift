@@ -8,6 +8,9 @@ struct SlideToLock: View {
 
     @State private var offset: CGFloat = 0
     @State private var fired = false
+    /// Which quarter of the travel the knob has reached, so the ticks come at thresholds rather
+    /// than on every pixel of the drag.
+    @State private var notch = 0
     private let height: CGFloat = 56
     private let knob: CGFloat = 48
 
@@ -33,21 +36,34 @@ struct SlideToLock: View {
                         DragGesture(minimumDistance: 1)
                             .onChanged { value in
                                 guard !disabled, !pending, !fired else { return }
-                                offset = min(max(value.translation.width, 0), travel)
+                                let next = min(max(value.translation.width, 0), travel)
+                                offset = next
+                                // Off the new offset, not off `progress` — that one was worked out
+                                // when the view was last drawn, so it is a frame behind the thumb.
+                                let reach = min(max(next / travel, 0), 1)
+                                let quarter = Int(reach * 4)
+                                if quarter != notch {
+                                    notch = quarter
+                                    if quarter > 0 { Haptics.slide(progress: reach) }
+                                }
                             }
                             .onEnded { _ in
                                 guard !disabled, !pending, !fired else { return }
                                 if offset >= travel * 0.92 {
                                     fired = true
-                                    Haptics.success()
+                                    // The bolt going home. The celebration waits until the picks
+                                    // have actually saved — see `submit()`.
+                                    Haptics.pick()
                                     withAnimation(.spring(response: 0.25, dampingFraction: 0.8)) { offset = travel }
                                     onSubmit()
                                     Task {
                                         try? await Task.sleep(for: .seconds(1.2))
                                         withAnimation { offset = 0 }
                                         fired = false
+                                        notch = 0
                                     }
                                 } else {
+                                    notch = 0
                                     withAnimation(.spring(response: 0.35, dampingFraction: 0.7)) { offset = 0 }
                                 }
                             }

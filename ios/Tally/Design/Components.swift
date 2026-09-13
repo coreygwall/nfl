@@ -205,16 +205,28 @@ struct PlaceBadge: View {
     let place: Int
     var small = false
     var muted = false
+    /// Won it, rather than merely leading it. The number gives way to a trophy — the place is the
+    /// same either way, and at the end of a week the result is the more interesting fact.
+    var crowned = false
 
     var body: some View {
         let tone: Color = muted ? .paper2 : place == 1 ? .flag : place == 2 ? .paper3 : place == 3 ? .bronze : .white
-        Text("\(place)")
-            .font(TallyFont.display(small ? 12 : 14))
-            .monospacedDigit()
-            .foregroundStyle(muted ? Color.ink3 : Color.ink)
-            .frame(width: small ? 28 : 36, height: small ? 28 : 36)
-            .background(Circle().fill(tone))
-            .overlay(Circle().strokeBorder(Color.ink, lineWidth: 2))
+        Group {
+            if crowned {
+                Image(systemName: "trophy.fill")
+                    .font(.system(size: small ? 12 : 16, weight: .bold))
+                    .foregroundStyle(Color.ink)
+            } else {
+                Text("\(place)")
+                    .font(TallyFont.display(small ? 12 : 14))
+                    .monospacedDigit()
+                    .foregroundStyle(muted ? Color.ink3 : Color.ink)
+            }
+        }
+        .frame(width: small ? 28 : 36, height: small ? 28 : 36)
+        .background(Circle().fill(tone))
+        .overlay(Circle().strokeBorder(Color.ink, lineWidth: 2))
+        .accessibilityLabel(crowned ? "Winner" : "Place \(place)")
     }
 }
 

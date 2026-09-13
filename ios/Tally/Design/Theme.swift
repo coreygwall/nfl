@@ -105,10 +105,3 @@ extension View {
     }
 }
 
-/// A tiny tap: the web calls `navigator.vibrate(6)` at the same moments.
-enum Haptics {
-    static func tap() { UIImpactFeedbackGenerator(style: .light).impactOccurred() }
-    static func pick() { UIImpactFeedbackGenerator(style: .medium).impactOccurred() }
-    static func success() { UINotificationFeedbackGenerator().notificationOccurred(.success) }
-    static func warning() { UINotificationFeedbackGenerator().notificationOccurred(.warning) }
-}

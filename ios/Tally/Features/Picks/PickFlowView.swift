@@ -195,7 +195,8 @@ struct PickFlowView: View {
             model.toast("That's five already — tap one in the tray to swap it out.")
             return
         }
-        Haptics.pick()
+        // Taking one back should not feel like choosing it.
+        if already, draft.selections[game.id] == team { Haptics.unpick() } else { Haptics.pick() }
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             draft = draft.toggling(gameId: game.id, team: team)
         }
@@ -212,7 +213,7 @@ struct PickFlowView: View {
             draft = .empty
             wk = .loaded(WeekResponse(now: res.now, week: week, games: games, myPicks: res.picks, pickCounts: wk.value?.pickCounts ?? [:], submitted: wk.value?.submitted ?? 0))
             setStep(.done)
-            Haptics.success()
+            Haptics.lockedIn()
             confetti += 1
             await load(quiet: true)
             await model.refreshBootstrap()
@@ -228,6 +229,7 @@ struct PickFlowView: View {
                 await load(quiet: true)
                 setStep(.select)
             } else {
+                Haptics.failure()
                 saveError = !model.online
                     ? "You're offline. Your picks are saved on this phone — try again when you're back."
                     : err.message
