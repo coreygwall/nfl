@@ -327,7 +327,7 @@ function SelectStep({
             <p className="mt-1.5 text-[14px] leading-snug text-ink-2">
               {full
                 ? "That's your five. Rank them next — surest pick 5 pts, least sure 1."
-                : "Tap who you think wins. You'll rank them next — surest pick 5 pts, least sure 1."}
+                : "Tap a team to pick it. Choose five, then rank them — surest pick 5 pts, least sure 1."}
             </p>
             <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ink-3">
               <span className="chip bg-white py-0 text-[10px] font-bold">
@@ -410,8 +410,15 @@ function GameCard({
         whileTap={locked ? undefined : { scale: 0.96 }}
         aria-pressed={sel}
         aria-label={`Pick ${t.city} ${t.nickname}`}
-        className={`relative flex flex-1 select-none flex-col items-center gap-1 rounded-2xl px-1.5 py-2.5 text-center transition-colors ${
-          locked ? "cursor-default" : "cursor-pointer"
+        // Each side is its own target, so each side has to look like one. Flat logos inside a
+        // single bordered card read as a picture of a matchup, not as two buttons — which is
+        // exactly what the first person to use this said out loud.
+        className={`relative m-1 flex flex-1 select-none flex-col items-center gap-1 rounded-2xl border-2 px-1.5 py-2.5 text-center transition-colors ${
+          locked
+            ? "cursor-default border-transparent"
+            : sel
+              ? "cursor-pointer border-ink"
+              : "cursor-pointer border-line bg-paper-2/60 hover:border-ink"
         }`}
         style={sel ? { background: `${t.primary}14` } : undefined}
       >
