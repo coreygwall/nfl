@@ -299,7 +299,7 @@ struct ReviewStep: View {
                     ForEach(rows) { row in
                         HStack(spacing: 12) {
                             RankBadge(rank: row.pick.rank, size: .small)
-                            TeamSticker(team: model.sport.teamOrPlaceholder(row.pick.team), size: 40, lost: row.outcome == .loss, dimmed: row.outcome == .tie, flat: true)
+                            TeamSticker(team: model.sport.teamOrPlaceholder(row.pick.team), size: 40, dimmed: row.outcome == .tie, lost: row.outcome == .loss, flat: true)
                             MatchupText(pick: row.pick, game: row.game)
                             Spacer()
                             OutcomeTag(outcome: row.outcome, points: row.points)
