@@ -1,6 +1,11 @@
 import type { Game, GameStatus } from "./types.ts";
 
 export const WEEKS = 18;
+/**
+ * The season-long race is the running total from this week on. Week 1 still has its own winner —
+ * it just does not carry forward, so a pool that opens partway through it starts everyone level.
+ */
+export const SEASON_START_WEEK = 2;
 export const HOUR_MS = 60 * 60 * 1000;
 /** How long after kickoff a game is presented as "live" if no result was entered. */
 export const GAME_LIVE_MS = 4 * HOUR_MS;

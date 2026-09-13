@@ -8,6 +8,7 @@ import type { Identity } from "../lib/identity.ts";
 import { nameKey, validateName } from "../../shared/names.ts";
 import { isVulgar, VULGAR_MESSAGE } from "../../shared/profanity.ts";
 import { CODE_LENGTH, formatCode, normalizeCode } from "../../shared/codes.ts";
+import { SEASON_START_WEEK } from "../../shared/week.ts";
 import type { Player } from "../../shared/types.ts";
 import type { RosterPlayer } from "../../shared/api.ts";
 import type { Abbr } from "../../shared/teams.ts";
@@ -342,6 +343,14 @@ export function Welcome() {
                       >
                         {create.isPending ? "One sec…" : "Let's go"}
                       </button>
+                      {/* What they are joining for, at the moment they decide to join. */}
+                      <p className="mt-3 text-xs leading-snug text-ink-3">
+                        There's a winner every week, and a season winner on total points from Week {SEASON_START_WEEK} on
+                        {(boot.data?.currentWeek ?? SEASON_START_WEEK) < SEASON_START_WEEK
+                          ? " — so nobody is ahead of you yet"
+                          : ""}
+                        .
+                      </p>
                     </form>
                     {players.length > 0 && (
                       <p className="mt-4 border-t-2 border-dashed border-line pt-4 text-sm text-ink-2">
@@ -614,7 +623,7 @@ function Hero() {
       </h1>
       <p className="mt-3 max-w-[42ch] text-[15px] leading-snug text-ink-2 lg:text-base">
         Every week, pick the winner of five games and rank them 1 to 5. Nail your #1 for 5 points, your #5 for 1. Most points
-        over the season wins.
+        takes the week — and the season.
       </p>
       <ol className="mt-5 grid grid-cols-3 gap-2 text-center lg:max-w-[420px]">
         {[

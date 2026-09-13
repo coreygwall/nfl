@@ -3,6 +3,8 @@
  * the Worker's share card all read from here, so the explanation a stranger taps on playtally.app
  * is the same text a player sees once they are in. There is no second copy to drift.
  */
+import { SEASON_START_WEEK } from "./week.ts";
+
 export type PoolStep = { title: string; body: string; showRanks?: boolean };
 export type PoolNote = { term: string; body: string; appOnly?: boolean };
 
@@ -50,7 +52,14 @@ export const HIGH_FIVE: PoolTypeContent = {
       body: "Pick from the games that are left. Your first remaining pick is still worth 5 points.",
     },
     { term: "Picks stay private", body: "Other players' picks appear only after those games begin." },
-    { term: "Season standings", body: "Most points wins. Ties break on correct picks, then 5-point hits." },
+    {
+      term: "A winner every week",
+      body: "Most points that week takes it, and everyone starts level again the next week. One bad Sunday is never fatal.",
+    },
+    {
+      term: "And a winner for the season",
+      body: `The season race is your running total from Week ${SEASON_START_WEEK} onward — Week 1 still crowns a weekly winner, it just doesn't carry forward. Most points wins; ties break on correct picks, then 5-point hits.`,
+    },
     {
       term: "Using another device?",
       body: "Tap “I already entered”, choose your name, and type your device code — tap your name at the top of this app to find it. It stops anyone else picking as you.",

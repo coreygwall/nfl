@@ -167,6 +167,9 @@ test.describe.serial("pool flow", () => {
 
     await page.goto(`/board/week/1`);
     await expect(page.getByText("1 of 16 games final")).toBeVisible();
+    // The week board says which of the two prizes it settles, and that this one stops here.
+    await expect(page.getByText("Most points wins Week 1")).toBeVisible();
+    await expect(page.getByText(/don't carry into the season race/)).toBeVisible();
     const corey = page.getByRole("button", { name: /Corey/ });
     await expect(corey).toContainText("4");
     await corey.click();
@@ -182,8 +185,11 @@ test.describe.serial("pool flow", () => {
     await page.getByRole("tab", { name: "Points" }).click();
     await expect(page).not.toHaveURL(/sort=/);
 
+    // Week 1 points are the week's own prize, so the season race has not opened yet.
     await page.getByRole("tab", { name: "Season" }).click();
-    await expect(page.getByText("through Week 1")).toBeVisible();
+    await expect(page.getByText("Season standings start in Week 2")).toBeVisible();
+    await expect(page.getByText(/Most points from Week 2 on wins the season/)).toBeVisible();
+    await expect(page.getByRole("button", { name: /Corey/ })).toContainText("No picks yet");
   });
 });
 

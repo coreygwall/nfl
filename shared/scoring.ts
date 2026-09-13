@@ -1,6 +1,6 @@
 import type { Abbr } from "./teams.ts";
 import type { Game, Pick, Player } from "./types.ts";
-import { isLocked } from "./week.ts";
+import { isLocked, SEASON_START_WEEK } from "./week.ts";
 import { MAX_PICKS } from "./picks.ts";
 
 export const pointsForRank = (rank: number): number => MAX_PICKS + 1 - rank;
@@ -67,6 +67,9 @@ export interface SeasonRow {
 
 export interface SeasonBoard {
   season: number;
+  /** First week that counts towards the season total. Earlier weeks are played for their own sake. */
+  fromWeek: number;
+  /** Latest counting week that has started, or 0 before the season race begins. */
   throughWeek: number;
   rows: SeasonRow[];
 }
@@ -185,7 +188,8 @@ export function buildSeasonBoard(input: {
   for (const p of picks) {
     const row = rowById.get(p.playerId);
     const game = gamesById.get(p.gameId);
-    if (!row || !game) continue;
+    // Weeks before the season race began are the week's own contest and nothing more.
+    if (!row || !game || game.week < SEASON_START_WEEK) continue;
     const set = weeksPlayed.get(p.playerId) ?? new Set<number>();
     set.add(game.week);
     weeksPlayed.set(p.playerId, set);
@@ -205,6 +209,11 @@ export function buildSeasonBoard(input: {
       if (!row.bestWeek || pts > row.bestWeek.points) row.bestWeek = { week, points: pts };
     }
   }
-  const started = games.filter((g) => isLocked(g, now)).map((g) => g.week);
-  return { season, throughWeek: started.length ? Math.max(...started) : 0, rows: assignPlaces(rows) };
+  const started = games.filter((g) => g.week >= SEASON_START_WEEK && isLocked(g, now)).map((g) => g.week);
+  return {
+    season,
+    fromWeek: SEASON_START_WEEK,
+    throughWeek: started.length ? Math.max(...started) : 0,
+    rows: assignPlaces(rows),
+  };
 }

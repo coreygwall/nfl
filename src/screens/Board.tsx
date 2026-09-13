@@ -6,7 +6,7 @@ import { usePlayer } from "../lib/player.tsx";
 import { useHeaderWeek } from "../components/Chrome.tsx";
 import { TEAMS } from "../../shared/teams.ts";
 import type { ScoredPick, SeasonRow, WeekRow } from "../../shared/scoring.ts";
-import { WEEKS } from "../../shared/week.ts";
+import { SEASON_START_WEEK, WEEKS } from "../../shared/week.ts";
 import { EmptyState, ErrorState, RankBadge, Segmented, Spinner } from "../components/Common.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
 import { Lock } from "../components/Icons.tsx";
@@ -83,13 +83,22 @@ function SideRail({ tab, week }: { tab: "week" | "season"; week: number }) {
   const rows: (WeekRow | SeasonRow)[] = tab === "week" ? (weekBoard.data?.rows ?? []) : (seasonBoard.data?.rows ?? []);
   const mine = rows.find((r) => r.playerId === player?.id);
   const leader = rows[0];
+  // Before the season race begins everyone is level on nothing, so there is no standing to report.
+  const seasonPending = tab === "season" && (seasonBoard.data?.throughWeek ?? 0) === 0;
   return (
     <aside className="mt-6 hidden lg:sticky lg:top-24 lg:mt-0 lg:block">
       <div className="card-flat bg-white p-4">
         <h2 className="font-display text-[11px] font-extrabold uppercase tracking-wider text-ink-3">
           {tab === "week" ? `Week ${week}` : "Season"}
         </h2>
-        {mine ? (
+        {seasonPending ? (
+          <>
+            <p className="font-display mt-1 text-xl font-extrabold leading-tight">Starts in Week {SEASON_START_WEEK}</p>
+            <p className="mt-1 text-xs text-ink-2">
+              Week 1 has its own winner. Total points from Week {SEASON_START_WEEK} on take the season.
+            </p>
+          </>
+        ) : mine ? (
           <>
             <div className="mt-1 flex items-baseline gap-2">
               <span className="font-display text-3xl font-extrabold leading-none tabular">{ordinal(mine.place)}</span>
@@ -180,10 +189,16 @@ function WeekBoardView({ week, sort, onWeek }: { week: number; sort: BoardSort; 
         <ErrorState message={board.error.message} onRetry={() => board.refetch()} />
       ) : (
         <div className="mt-4">
-          <p className="mb-3 text-sm text-ink-2">
+          <p className="text-sm text-ink-2">
             {board.data.lockedCount === 0
               ? `Nothing has kicked off yet · ${board.data.rows.filter((r) => r.picksMade > 0).length} of ${board.data.rows.length} have picked`
               : `${board.data.finalCount} of ${board.data.gameCount} games final`}
+          </p>
+          {/* Which of the two prizes this particular week is playing for. */}
+          <p className="mb-3 mt-0.5 text-xs text-ink-3">
+            {week < SEASON_START_WEEK
+              ? `Most points wins Week ${week}. These points don't carry into the season race — that starts in Week ${SEASON_START_WEEK}.`
+              : `Most points wins Week ${week}, and they all count towards the season.`}
           </p>
           {board.data.rows.length === 0 ? (
             <EmptyState
@@ -338,8 +353,18 @@ function SeasonBoardView({ sort }: { sort: BoardSort }) {
   const rows = sortRows(board.data.rows, sort);
   return (
     <div>
-      <p className="mb-3 text-sm text-ink-2">
-        {board.data.throughWeek === 0 ? "Season standings · nothing has kicked off yet" : `Season standings through Week ${board.data.throughWeek}`}
+      <p className="text-sm text-ink-2">
+        {board.data.throughWeek === 0
+          ? `Season standings start in Week ${board.data.fromWeek}`
+          : `Season standings through Week ${board.data.throughWeek}`}
+      </p>
+      {/* The board is the one place someone checks every week, so the prize it settles is named here. */}
+      <p className="mb-3 mt-0.5 text-xs text-ink-3">
+        Most points from Week {board.data.fromWeek} on wins the season. Every week also has its own winner —{" "}
+        <Link to="/rules" className="underline">
+          full rules
+        </Link>
+        .
       </p>
       {rows.length === 0 ? (
         <EmptyState title="Nobody's on the board yet." body="Standings show up once people start picking." />
@@ -355,7 +380,8 @@ function SeasonBoardView({ sort }: { sort: BoardSort }) {
 }
 
 function SeasonRowItem({ row, index, isMe, open, onToggle, throughWeek }: { row: SeasonRow; index: number; isMe: boolean; open: boolean; onToggle: () => void; throughWeek: number }) {
-  const weeks = Array.from({ length: Math.max(throughWeek, 1) }, (_, i) => i + 1);
+  const first = SEASON_START_WEEK;
+  const weeks = Array.from({ length: Math.max(throughWeek - first + 1, 1) }, (_, i) => i + first);
   const max = Math.max(15, ...Object.values(row.byWeek));
   return (
     <motion.li

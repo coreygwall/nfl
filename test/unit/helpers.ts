@@ -22,8 +22,13 @@ export const WEEK1: Game[] = [
   mkGame("g5", 1, "2026-09-15T00:15:00.000Z", "GB", "MIN"),
   mkGame("g6", 1, "2026-09-15T00:15:00.000Z", "LA", "SF"),
 ];
+/** Weeks 2 and 3 are the first two that count towards the season race. */
 export const WEEK2: Game[] = [
   mkGame("h1", 2, "2026-09-18T00:15:00.000Z", "MIA", "NYJ"),
   mkGame("h2", 2, "2026-09-20T17:00:00.000Z", "CHI", "DET"),
   mkGame("h3", 2, "2026-09-22T00:15:00.000Z", "TB", "ATL"),
+];
+export const WEEK3: Game[] = [
+  mkGame("i1", 3, "2026-09-25T00:15:00.000Z", "SEA", "ARI"),
+  mkGame("i2", 3, "2026-09-27T17:00:00.000Z", "NE", "BUF"),
 ];

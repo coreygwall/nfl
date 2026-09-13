@@ -1,7 +1,7 @@
 # High Five — NFL confidence pool
 
 Pick five NFL games a week, rank them 1–5, and score **5 / 4 / 3 / 2 / 1** points for each correct pick by rank.
-Win your #1, #2 and #5 picks: 5 + 4 + 1 = **10**. Most points over the season wins.
+Win your #1, #2 and #5 picks: 5 + 4 + 1 = **10**. Most points wins the week, and most points across the season wins the season.
 
 Built as a single Cloudflare Worker (Hono API + D1 database + static React app). Free to run, no accounts to manage,
 results entered by the commissioner in about a minute a week.
@@ -15,6 +15,7 @@ results entered by the commissioner in about a minute a week.
 | Locking | Each game locks at its kickoff. Until then you can change anything. A locked pick is frozen: team *and* rank. |
 | Reveal | Other people's picks for a game are hidden until that game kicks off. Your own are always visible. |
 | Standings | Points, then correct picks, then 5-point hits, then name. Ties share a place. |
+| Two prizes | Every week has its own winner on that week's points. The season race is the running total from `SEASON_START_WEEK` (`shared/week.ts`, currently **week 2**) onward, so a pool that opens partway through week 1 starts everyone level. Week 1 still crowns a weekly winner; it just does not carry forward, and the season board hides it. |
 | Weeks | Regular season, weeks 1–18. The Picks tab opens to the earliest week that still has an unstarted game. |
 | Identity | Type your name on first visit; the device is handed a token and a short **device code**. The token rides in `localStorage` *and* in a long-lived `HttpOnly` cookie, so a browser that clears one still knows you — you stay signed in indefinitely. The code claims the same name on a second device and stays hidden behind **Pick on another device** until you need it. A claimed name cannot be taken without the code; a name nobody holds is claimed by the first device that asks, which is how everyone who joined before codes existed keeps their place. |
 | Face ID / Touch ID | Optional, and offered rather than required: tap your name → **Turn on Face ID**. After that a new phone signs in from the **Sign in with Face ID** button with nothing typed — the passkey is discoverable, so the credential names the player. A passkey belongs to the domain it was created on (`worker/routes/passkeys.ts` takes the relying party from the request), so one made on `workers.dev` will not be offered on `playtally.app`; the device code covers that, and every browser without biometrics. |

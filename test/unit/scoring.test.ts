@@ -8,7 +8,8 @@ import {
   pointsForRank,
   scorePick,
 } from "../../shared/scoring.ts";
-import { mkGame, NOW, WEEK1, WEEK2 } from "./helpers.ts";
+import { mkGame, NOW, WEEK1, WEEK2, WEEK3 } from "./helpers.ts";
+import { SEASON_START_WEEK } from "../../shared/week.ts";
 
 const players = [
   { id: "p1", name: "Corey" },
@@ -116,33 +117,67 @@ describe("late joiner", () => {
 });
 
 describe("buildSeasonBoard", () => {
-  it("sums weeks and tracks best week and weeks played", () => {
-    const games = [...WEEK1, ...WEEK2].map((g) => ({ ...g }));
+  // Weeks 2 and 3 have all started; week 3's last game has not.
+  const AFTER_WEEK3 = "2026-09-28T12:00:00.000Z";
+
+  it("sums the counting weeks and tracks best week and weeks played", () => {
+    const games = [...WEEK1, ...WEEK2, ...WEEK3].map((g) => ({ ...g }));
     games.find((g) => g.id === "g1")!.winner = "SEA";
     games.find((g) => g.id === "h1")!.winner = "MIA";
     games.find((g) => g.id === "h2")!.winner = "DET";
+    games.find((g) => g.id === "i1")!.winner = "SEA";
     const picks = [
+      // Corey's week 1 pick was right and is worth nothing here.
       { playerId: "p1", gameId: "g1", team: "SEA" as const, rank: 1 },
       { playerId: "p1", gameId: "h1", team: "MIA" as const, rank: 2 },
       { playerId: "p1", gameId: "h2", team: "CHI" as const, rank: 1 },
+      { playerId: "p1", gameId: "i1", team: "SEA" as const, rank: 1 },
       { playerId: "p2", gameId: "h2", team: "DET" as const, rank: 1 },
     ];
-    const board = buildSeasonBoard({ season: 2026, players, picks, games, now: "2026-09-21T12:00:00.000Z", requesterId: "p1" });
+    const board = buildSeasonBoard({ season: 2026, players, picks, games, now: AFTER_WEEK3, requesterId: "p1" });
     const corey = board.rows.find((r) => r.name === "Corey")!;
-    expect(corey).toMatchObject({ points: 9, correct: 2, fives: 1, weeksPlayed: 2, bestWeek: { week: 1, points: 5 }, isMe: true, place: 1 });
-    expect(corey.byWeek).toEqual({ 1: 5, 2: 4 });
+    expect(corey).toMatchObject({ points: 9, correct: 2, fives: 1, weeksPlayed: 2, bestWeek: { week: 3, points: 5 }, isMe: true, place: 1 });
+    expect(corey.byWeek).toEqual({ 2: 4, 3: 5 });
     expect(board.rows.find((r) => r.name === "Alex")).toMatchObject({ points: 5, weeksPlayed: 1, place: 2 });
     expect(board.rows.find((r) => r.name === "sam")).toMatchObject({ points: 0, weeksPlayed: 0, bestWeek: null, place: 3 });
-    expect(board.throughWeek).toBe(2);
+    expect(board.fromWeek).toBe(SEASON_START_WEEK);
+    expect(board.throughWeek).toBe(3);
+  });
+
+  it("leaves the warm-up weeks out of the season race entirely", () => {
+    const games = [...WEEK1, ...WEEK2].map((g) => ({ ...g }));
+    // A perfect week 1: right on the two games that have finished.
+    games.find((g) => g.id === "g1")!.winner = "SEA";
+    games.find((g) => g.id === "g2")!.winner = "BUF";
+    const picks = [
+      { playerId: "p1", gameId: "g1", team: "SEA" as const, rank: 1 },
+      { playerId: "p1", gameId: "g2", team: "BUF" as const, rank: 2 },
+    ];
+    // Week 1 is over; nothing that counts has kicked off.
+    const now = "2026-09-16T12:00:00.000Z";
+
+    // Those points are real on the week board...
+    const week = buildWeekBoard({ week: 1, players, picks, games, now });
+    expect(week.rows.find((r) => r.name === "Corey")).toMatchObject({ points: 9, place: 1 });
+
+    // ...and invisible on the season board, which has not started.
+    const season = buildSeasonBoard({ season: 2026, players, picks, games, now });
+    const corey = season.rows.find((r) => r.name === "Corey")!;
+    expect(corey).toMatchObject({ points: 0, possible: 0, correct: 0, weeksPlayed: 0, bestWeek: null });
+    expect(corey.byWeek).toEqual({});
+    expect(season.throughWeek).toBe(0);
   });
 
   it("counts undecided picks towards what is still possible", () => {
     const games = [...WEEK1, ...WEEK2].map((g) => ({ ...g }));
+    // A week 1 result that must not leak into either number below.
     games.find((g) => g.id === "g1")!.winner = "SEA";
+    games.find((g) => g.id === "h1")!.winner = "MIA";
     const picks = [
-      // Banked 5, plus a rank-3 pick on a game with no result yet.
       { playerId: "p1", gameId: "g1", team: "SEA" as const, rank: 1 },
-      { playerId: "p1", gameId: "h1", team: "MIA" as const, rank: 3 },
+      // Banked 5, plus a rank-3 pick on a game with no result yet.
+      { playerId: "p1", gameId: "h1", team: "MIA" as const, rank: 1 },
+      { playerId: "p1", gameId: "h2", team: "DET" as const, rank: 3 },
       // Nothing decided: everything is still on the table.
       { playerId: "p2", gameId: "h2", team: "DET" as const, rank: 1 },
     ];
