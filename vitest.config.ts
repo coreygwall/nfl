@@ -24,6 +24,10 @@ export default defineConfig({
         test: {
           name: "worker",
           include: ["test/worker/**/*.test.ts"],
+          // These drive the real Worker over dozens of round trips against a real SQLite, so the
+          // 5s default is a stopwatch on the runner rather than a statement about the code: the
+          // slowest here takes ~0.7s locally and tipped over the edge on a shared CI box.
+          testTimeout: 30_000,
         },
       },
     ],
