@@ -46,15 +46,46 @@ final class DecodingTests: XCTestCase {
         XCTAssertEqual(week.myPicks[0].rank, 1)
     }
 
+    func testWeekRowSlotsFillFiveplaces() throws {
+        let json = """
+        {"now":"2026-09-13T20:00:00.000Z","week":1,"gameCount":16,"finalCount":2,"lockedCount":4,
+         "rows":[{"playerId":"p1","name":"Dillon","isMe":false,"place":7,"points":9,"correct":2,"fives":1,"picksMade":5,"possible":15,
+                  "hiddenRanks":[4],
+                  "picks":[{"gameId":"a","team":"PIT","rank":1,"points":5,"outcome":"win"},
+                           {"gameId":"b","team":"JAX","rank":2,"points":4,"outcome":"win"},
+                           {"gameId":"c","team":"LAC","rank":3,"points":0,"outcome":"pending"},
+                           {"gameId":"d","team":"PHI","rank":5,"points":0,"outcome":"pending"}]}]}
+        """
+        let board = try ISO8601Parsing.decoder.decode(WeekBoardResponse.self, from: Data(json.utf8))
+        let slots = board.rows[0].pickSlots
+        // Always five, always in rank order, and the hidden one holds its own place.
+        XCTAssertEqual(slots.count, 5)
+        XCTAssertEqual(slots.map(\.rank), [1, 2, 3, 4, 5])
+        XCTAssertEqual(slots.map(\.points), [5, 4, 3, 2, 1])
+        if case .hidden(let rank) = slots[3] { XCTAssertEqual(rank, 4) } else { XCTFail("rank 4 should be hidden") }
+        if case .taken(let pick) = slots[0] { XCTAssertEqual(pick.team, "PIT") } else { XCTFail("rank 1 should be taken") }
+    }
+
+    func testWeekRowWithoutHiddenRanksStillDecodes() throws {
+        let json = """
+        {"now":"2026-09-13T20:00:00.000Z","week":1,"gameCount":16,"finalCount":0,"lockedCount":0,
+         "rows":[{"playerId":"p1","name":"Sam","isMe":false,"place":1,"points":0,"correct":0,"fives":0,"picksMade":0,"possible":0,"picks":[]}]}
+        """
+        let board = try ISO8601Parsing.decoder.decode(WeekBoardResponse.self, from: Data(json.utf8))
+        XCTAssertEqual(board.rows[0].pickSlots.count, 5)
+        XCTAssertTrue(board.rows[0].pickSlots.allSatisfy { if case .empty = $0 { return true } else { return false } })
+    }
+
     func testSeasonRowByWeekKeys() throws {
         let json = """
-        {"now":"2026-09-13T20:00:00.000Z","season":2026,"throughWeek":1,
+        {"now":"2026-09-13T20:00:00.000Z","season":2026,"fromWeek":2,"throughWeek":1,
          "rows":[{"playerId":"p1","name":"Corey","isMe":true,"place":1,"points":9,"correct":3,"fives":1,"possible":9,"weeksPlayed":1,
                   "bestWeek":{"week":1,"points":9},"byWeek":{"1":9}}]}
         """
         let board = try ISO8601Parsing.decoder.decode(SeasonBoardResponse.self, from: Data(json.utf8))
         XCTAssertEqual(board.rows[0].points(inWeek: 1), 9)
         XCTAssertEqual(board.rows[0].points(inWeek: 2), 0)
+        XCTAssertEqual(board.seasonStartsAt, 2)
     }
 
     func testErrorEnvelopeWithDetails() throws {

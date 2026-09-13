@@ -38,10 +38,15 @@ struct PoolShellView: View {
                     RulesView()
                 }
             }
+            Tab("Account", systemImage: "person.crop.circle.fill", value: AppTab.account) {
+                PoolScreen(week: nil, onWeek: { _ in }) {
+                    AccountView()
+                }
+            }
         }
         .modifier(TabBarBehaviour())
-        .sheet(isPresented: $model.showAccount) {
-            AccountSheet()
+        .sheet(isPresented: $model.showEntrySwitcher) {
+            EntrySwitcherSheet()
         }
     }
 }
@@ -71,17 +76,18 @@ struct PoolScreen<Content: View>: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         if !model.online { OfflineBanner() }
+                        Lockup(poolName: model.poolName)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                            .padding(.horizontal, 16)
+                            .padding(.top, 10)
                         content
                             .padding(.horizontal, 16)
-                            .padding(.top, 12)
+                            .padding(.top, 14)
                             .padding(.bottom, 120)
                     }
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    Lockup(poolName: model.poolName)
-                }
                 if let week {
                     ToolbarItem(placement: .topBarTrailing) {
                         WeekMenu(week: week, max: model.maxWeek, onChange: onWeek)
@@ -89,16 +95,16 @@ struct PoolScreen<Content: View>: View {
                 }
                 ToolbarItem(placement: .topBarTrailing) {
                     Button {
-                        model.showAccount = true
+                        model.showEntrySwitcher = true
                     } label: {
                         HStack(spacing: 4) {
                             Text(model.player?.name ?? "Sign in").lineLimit(1).truncationMode(.tail)
-                            Image(systemName: "arrow.left.arrow.right").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.ink2)
+                            Image(systemName: "chevron.up.chevron.down").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.ink2)
                         }
                         .font(TallyFont.display(14, weight: .bold))
-                        .frame(maxWidth: 130)
+                        .frame(maxWidth: 120)
                     }
-                    .accessibilityLabel("Switch player")
+                    .accessibilityLabel("Switch entry")
                 }
             }
             .toolbarTitleDisplayMode(.inline)

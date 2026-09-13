@@ -2,9 +2,14 @@ import SwiftUI
 import TallyKit
 
 /**
- The front door, ported from `Welcome.tsx`. Almost everyone here is signing up, so the name
- field leads; the ways back in for someone who already has a name — Face ID, the roster and a
- code, a link from the commissioner — sit underneath and take over when they are what arrived.
+ The front door. It is Tally's, not the pool's: whoever opens this app has been handed a link by
+ a friend and has no idea what Tally is, so the mark and one plain sentence come first and the
+ pool they are joining sits underneath as a fact rather than a headline.
+
+ Almost nobody should ever read it. A device with a passkey is signed in before this draws
+ (`attemptAutomaticSignIn`), and a device that has been here before is remembered. What is left
+ is the genuinely new person — a name and a button — with the ways back in for someone who
+ already has an account kept one tap away rather than in front of them.
  */
 struct WelcomeView: View {
     @Environment(AppModel.self) private var model
@@ -35,13 +40,16 @@ struct WelcomeView: View {
         ZStack {
             PaperBackground()
             ScrollView {
-                VStack(alignment: .leading, spacing: 20) {
-                    TeamMarquee().padding(.top, 8)
-                    Hero(onRules: { showRules = true })
+                VStack(alignment: .leading, spacing: 22) {
+                    Hero()
                     panel
+                    Footnote(onRules: { showRules = true })
                 }
-                .padding(.horizontal, 16)
-                .padding(.bottom, 40)
+                .frame(maxWidth: 520)
+                .frame(maxWidth: .infinity)
+                .padding(.horizontal, 20)
+                .padding(.top, 28)
+                .padding(.bottom, 48)
             }
         }
         .sheet(item: $biometricOffer) { identity in
@@ -53,111 +61,104 @@ struct WelcomeView: View {
         }
         .sheet(isPresented: $showRules) {
             NavigationStack {
-                ScrollView { RulesView().padding(16) }
+                ScrollView { RulesView().padding(20) }
                     .background(Color.paper)
+                    .navigationTitle("How to play")
+                    .navigationBarTitleDisplayMode(.inline)
                     .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { showRules = false } } }
             }
         }
-        .task {
-            await attemptAutomaticSignIn()
-        }
+        .task { await attemptAutomaticSignIn() }
         .onAppear {
             if model.welcomeStartsNew { mode = .new; model.welcomeStartsNew = false }
         }
-        .onChange(of: model.boot.value?.now, initial: true) { _, _ in
-            applyPendingClaim()
-        }
+        .onChange(of: model.boot.value?.now, initial: true) { _, _ in applyPendingClaim() }
     }
 
-    // MARK: Panels
+    // MARK: The card
 
     @ViewBuilder
     private var panel: some View {
         switch model.boot {
         case .idle, .loading:
-            Spinner(label: "Getting the roster…").card()
+            Spinner(label: "Finding the pool…")
+                .frame(maxWidth: .infinity)
+                .card()
         case .failed(let err):
             ErrorState(message: err.message) { Task { await model.refreshBootstrap() } }
         case .loaded:
-            VStack(alignment: .leading, spacing: 14) {
+            VStack(alignment: .leading, spacing: 16) {
+                PoolBadge(poolName: model.poolName, sport: model.poolType.sports.first ?? "NFL", season: model.boot.value?.season)
+
                 if let player = model.player, player.token != nil {
-                    HStack {
-                        (Text("This device picks as ") + Text(player.name).bold()).sans(14)
-                        Spacer()
-                        Button("Continue") { finish() }.buttonStyle(.tally(.plain, size: .small))
+                    Button {
+                        finish()
+                    } label: {
+                        HStack(spacing: 8) {
+                            Text("Continue as \(player.name)").lineLimit(1)
+                            Image(systemName: "arrow.right")
+                        }
                     }
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .cardFlat(fill: .flagSoft)
+                    .buttonStyle(.tally(.turf, fullWidth: true))
                 }
+
                 Group {
                     switch mode {
                     case .code:
                         if linkSigningIn, let target {
                             Spinner(label: "Signing you in as \(target.name)…")
                         } else if let target {
-                            CodeForm(player: target, busy: busy, onSubmit: { code in try await claim(target, code: code) }, onBack: {
-                                mode = players.isEmpty ? .new : .roster
-                                self.target = nil
-                            })
+                            CodeForm(
+                                player: target,
+                                busy: busy,
+                                onSubmit: { code in try await claim(target, code: code) },
+                                onBack: {
+                                    mode = players.isEmpty ? .new : .roster
+                                    self.target = nil
+                                }
+                            )
                         } else {
                             newPanel
                         }
-                    case .taken:
-                        takenPanel
-                    case .differentiate:
-                        differentiatePanel
-                    case .roster:
-                        rosterPanel
-                    case .new:
-                        newPanel
+                    case .taken: takenPanel
+                    case .differentiate: differentiatePanel
+                    case .roster: rosterPanel
+                    case .new: newPanel
                     }
                 }
-                .transition(.opacity)
-                .animation(.easeOut(duration: 0.16), value: modeKey)
-                PasskeySignIn()
             }
             .padding(20)
+            .frame(maxWidth: .infinity, alignment: .leading)
             .card()
-        }
-    }
-
-    private var modeKey: String {
-        switch mode {
-        case .new: return "new"
-        case .roster: return "roster"
-        case .taken: return "taken"
-        case .differentiate: return "differentiate"
-        case .code: return "code"
         }
     }
 
     private var newPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("What should we call you?").display(20)
-            Text("This is how you'll show up on the board. One account each — you can add entries for your kids or friends from it later.")
+            Text("What should we call you?").display(21)
+            Text("This is the name everyone sees on the board.")
                 .sans(14).foregroundStyle(Color.ink2)
             NameInput(text: $name, placeholder: "Your name", shake: shake) { error = nil }
             if let error {
                 Text(error).sans(14, weight: .semibold).foregroundStyle(Color.danger)
             } else if let collision {
                 HStack(spacing: 4) {
-                    Text("Someone's already picking as “\(collision.name).”").sans(14, weight: .semibold).foregroundStyle(Color.ink2)
+                    Text("Someone's already “\(collision.name).”").sans(14, weight: .semibold).foregroundStyle(Color.ink2)
                     LinkButton(title: "That's me →") { target = collision.player; mode = .code }
                 }
             }
             Button(busy ? "One sec…" : "Let's go") { Task { await submitName() } }
                 .buttonStyle(.tally(.turf, fullWidth: true))
                 .disabled(busy || Names.normalize(name).count < 2)
-                .padding(.top, 4)
+                .padding(.top, 2)
+
+            PasskeySignIn()
+
             if !players.isEmpty {
-                DashedDivider().padding(.top, 4)
-                VStack(alignment: .leading, spacing: 2) {
-                    Text("\(players.count) \(players.count == 1 ? "player is" : "players are") already in.").sans(14, weight: .bold)
-                    HStack(spacing: 4) {
-                        Text("Joining from another device?").sans(14).foregroundStyle(Color.ink2)
-                        LinkButton(title: "I already entered") { mode = .roster }
-                    }
+                DashedDivider().padding(.top, 6)
+                HStack(spacing: 4) {
+                    Text("Already in this pool?").sans(14).foregroundStyle(Color.ink2)
+                    LinkButton(title: "Find your name") { mode = .roster }
                 }
             }
         }
@@ -165,8 +166,9 @@ struct WelcomeView: View {
 
     private var rosterPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Tap your name").display(20)
-            Text("We'll ask for your code, then remember you on this device.").sans(14).foregroundStyle(Color.ink2)
+            Text("Tap your name").display(21)
+            Text("We'll ask for your code once, then remember you on this phone.")
+                .sans(14).foregroundStyle(Color.ink2)
             FlowLayout(spacing: 8) {
                 ForEach(players) { p in
                     Button(p.name) { Task { await tapRoster(p) } }
@@ -178,29 +180,33 @@ struct WelcomeView: View {
                         .overlay(Capsule().strokeBorder(Color.ink, lineWidth: 2))
                 }
             }
+            PasskeySignIn()
             DashedDivider().padding(.top, 6)
-            LinkButton(title: "Don't see your name? Add it →") { mode = .new; name = "" }
+            LinkButton(title: "Not listed? Add your name →") { mode = .new; name = "" }
         }
     }
 
     private var takenPanel: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("“\(target?.name ?? "")” is already in the pool").display(20)
-            Text("If that's you picking from another device, your code will bring your picks and points with you.")
+            Text("“\(target?.name ?? "")” is already here").display(21)
+            Text("If that's you on another device, your code brings your picks and points with you.")
                 .sans(14).foregroundStyle(Color.ink2)
-            Button("That's me — I have a code") { mode = .code }.buttonStyle(.tally(.turf, fullWidth: true))
+            Button("That's me — I have a code") { mode = .code }
+                .buttonStyle(.tally(.turf, fullWidth: true))
             Button("I'm a different \(target?.name ?? "")") {
                 mode = .differentiate
                 name = "\(target?.name ?? "") "
                 error = nil
-            }.buttonStyle(.tally(.plain, fullWidth: true))
-            LinkButton(title: "Start over", color: .ink2) { target = nil; name = ""; mode = .new }.padding(.top, 4)
+            }
+            .buttonStyle(.tally(.plain, fullWidth: true))
+            LinkButton(title: "Start over", color: .ink2) { target = nil; name = ""; mode = .new }
+                .padding(.top, 2)
         }
     }
 
     private var differentiatePanel: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Make it yours").display(20)
+            Text("Make it yours").display(21)
             Text("Two \(target?.name ?? "")s would be chaos on the board. Add a last initial or a nickname.")
                 .sans(14).foregroundStyle(Color.ink2)
             NameInput(text: $name, placeholder: "\(target?.name ?? "") W.", shake: shake) { error = nil }
@@ -212,7 +218,7 @@ struct WelcomeView: View {
                 } else if Names.normalize(name).count >= 2 {
                     Text("Nice — “\(Names.normalize(name))” is free.").foregroundStyle(Color.turf)
                 } else {
-                    Text("e.g. \(target?.name ?? "") W. · Big \(target?.name ?? "")").foregroundStyle(Color.ink3)
+                    Text("e.g. \(target?.name ?? "") W.").foregroundStyle(Color.ink3)
                 }
             }
             .sans(14, weight: .semibold)
@@ -320,7 +326,7 @@ struct WelcomeView: View {
         }
     }
 
-    /// A sign-in link (`/welcome?claim=<id>&code=<code>`) or "someone else's turn": go straight to that name.
+    /// A sign-in link (`/welcome?claim=<id>&code=<code>`), or "someone else's turn on this phone".
     private func applyPendingClaim() {
         guard let pending = model.pendingClaim, let boot = model.boot.value else { return }
         guard let found = boot.players.first(where: { $0.id == pending.playerId }) else {
@@ -344,6 +350,97 @@ struct WelcomeView: View {
     }
 }
 
+// MARK: - Brand
+
+/// Tally first, because most people arriving here have never heard of it.
+private struct Hero: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 14) {
+            HStack(spacing: 12) {
+                Image("TallyMark")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 56, height: 56)
+                    .background(RoundedRectangle(cornerRadius: 15, style: .continuous).fill(Color.ink).offset(x: 3, y: 3))
+                    .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).strokeBorder(Color.ink, lineWidth: 2))
+                Text("Tally").font(TallyFont.display(40))
+            }
+            Text("Free pools to play with your friends.")
+                .font(TallyFont.display(27))
+                .fixedSize(horizontal: false, vertical: true)
+            Text("Pick, rank, argue about it all season. Tally keeps score so nobody has to run a spreadsheet.")
+                .sans(15).foregroundStyle(Color.ink2)
+                .fixedSize(horizontal: false, vertical: true)
+            TeamStrip()
+        }
+        .accessibilityElement(children: .combine)
+    }
+}
+
+/// A few logos for warmth. Deliberately a fixed, short row: it has to fit the narrowest phone
+/// without pushing the layout wider than the screen.
+private struct TeamStrip: View {
+    @Environment(AppModel.self) private var model
+    private let abbrs = ["KC", "PHI", "DET", "BUF", "SF", "DAL"]
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(abbrs, id: \.self) { abbr in
+                TeamSticker(team: model.sport.teamOrPlaceholder(abbr), size: 38)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .accessibilityHidden(true)
+    }
+}
+
+/// Which pool this link was for. A fact, not a headline — you are here because a friend sent it.
+private struct PoolBadge: View {
+    let poolName: String
+    let sport: String
+    let season: Int?
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(systemName: "football.fill")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(Color.ink)
+                .frame(width: 34, height: 34)
+                .background(Circle().fill(Color.flag))
+                .overlay(Circle().strokeBorder(Color.ink, lineWidth: 2))
+            VStack(alignment: .leading, spacing: 1) {
+                Text("YOU'RE JOINING").font(TallyFont.sans(10, weight: .bold)).tracking(1.2).foregroundStyle(Color.ink3)
+                Text(poolName).font(TallyFont.display(18)).lineLimit(1)
+            }
+            Spacer(minLength: 4)
+            Text(season.map { "\(sport) \($0)" } ?? sport)
+                .sans(12, weight: .bold)
+                .foregroundStyle(Color.ink2)
+                .lineLimit(1)
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardFlat(fill: .flagSoft)
+    }
+}
+
+private struct Footnote: View {
+    let onRules: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 4) {
+                Text("Five picks a week, ranked. No weekly deadline.").sans(13).foregroundStyle(Color.ink3)
+                LinkButton(title: "How it plays", color: .ink2, action: onRules)
+            }
+            Text("Free, and always will be.").sans(13).foregroundStyle(Color.ink3)
+        }
+    }
+}
+
+// MARK: - Ways back in
+
 /// Remembering that the offer was waved away, so it is made once.
 enum PasskeyOffer {
     private static let key = "tally.passkeyOfferDismissed"
@@ -357,7 +454,7 @@ enum PasskeyOffer {
     }
 }
 
-/// Offered under the name form: a passkey knows who you are, so there is nothing to type.
+/// A passkey knows who you are, so there is nothing to type.
 struct PasskeySignIn: View {
     @Environment(AppModel.self) private var model
     @State private var busy = false
@@ -409,7 +506,7 @@ struct CodeForm: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text("Prove you're \(player.name)").display(20)
+            Text("Prove you're \(player.name)").display(21)
             Text("Open the pool on the device you already use and tap your name up top — your code is there.")
                 .sans(14).foregroundStyle(Color.ink2)
             TextField("QRT4-9MKP", text: $code)
@@ -431,7 +528,7 @@ struct CodeForm: View {
                 .disabled(busy || !ready)
             DashedDivider().padding(.top, 4)
             HStack(spacing: 4) {
-                Text("Lost it? The commissioner can issue a new one.").sans(14).foregroundStyle(Color.ink2)
+                Text("Lost it? The commissioner can issue a new one.").sans(13).foregroundStyle(Color.ink2)
                 LinkButton(title: "Go back", action: onBack)
             }
         }
@@ -467,65 +564,5 @@ struct NameInput: View {
             .shake(shake)
             .onChange(of: text) { _, _ in onEdit() }
             .accessibilityLabel("Your name")
-    }
-}
-
-/// All 32 logos drifting past. Decorative.
-struct TeamMarquee: View {
-    @Environment(AppModel.self) private var model
-    @State private var offset: CGFloat = 0
-    private let size: CGFloat = 56
-    private let gap: CGFloat = 14
-
-    var body: some View {
-        let strip = NFL.marquee + NFL.marquee
-        let half = CGFloat(NFL.marquee.count) * (size + gap)
-        HStack(alignment: .bottom, spacing: gap) {
-            ForEach(Array(strip.enumerated()), id: \.offset) { i, abbr in
-                TeamSticker(team: model.sport.teamOrPlaceholder(abbr), size: size)
-                    .padding(.bottom, i % 3 == 1 ? 12 : i % 3 == 2 ? 4 : 0)
-            }
-        }
-        .offset(x: offset)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .frame(height: size + 16)
-        .clipped()
-        .mask(LinearGradient(colors: [.clear, .black, .black, .black, .black, .clear], startPoint: .leading, endPoint: .trailing))
-        .padding(.horizontal, -16)
-        .accessibilityHidden(true)
-        .onAppear {
-            offset = 0
-            withAnimation(.linear(duration: 42).repeatForever(autoreverses: false)) { offset = -half }
-        }
-    }
-}
-
-struct Hero: View {
-    let onRules: () -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            Chip(text: "2026 season", fill: .flag)
-            Text("Pick five.\nRank them.")
-                .font(TallyFont.display(42))
-            Text("Every week, pick the winner of five games and rank them 1 to 5. Nail your #1 for 5 points, your #5 for 1. Most points over the season wins.")
-                .sans(15).foregroundStyle(Color.ink2)
-            HStack(spacing: 8) {
-                ForEach(Array([("Pick 5", "winners"), ("Rank them", "1 to 5"), ("Score", "5·4·3·2·1")].enumerated()), id: \.offset) { i, step in
-                    VStack(spacing: 2) {
-                        Text("STEP \(i + 1)").font(TallyFont.display(10)).tracking(1).foregroundStyle(Color.ink3)
-                        Text(step.0).font(TallyFont.display(15))
-                        Text(step.1).sans(12).foregroundStyle(Color.ink2)
-                    }
-                    .frame(maxWidth: .infinity)
-                    .padding(.vertical, 10)
-                    .cardFlat()
-                }
-            }
-            HStack(spacing: 4) {
-                Text("No weekly deadline — each game locks at kickoff.").sans(12).foregroundStyle(Color.ink3)
-                LinkButton(title: "Full rules", action: onRules)
-            }
-        }
     }
 }

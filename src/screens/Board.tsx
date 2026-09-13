@@ -280,8 +280,9 @@ function WeekRowItem({ row, index, open, onToggle, isMe, week, started }: { row:
             className="overflow-hidden"
           >
             <div className="border-t-2 border-dashed border-line px-3 pb-3 pt-2">
+              <PickSlots picks={row.picks} hiddenRanks={row.hiddenRanks} />
               {row.picksMade === 0 ? (
-                <p className="text-sm text-ink-3">
+                <p className="mt-2 text-sm text-ink-3">
                   {isMe ? (
                     <Link className="font-bold underline" to={`/week/${week}`}>
                       Make your picks →
@@ -291,24 +292,61 @@ function WeekRowItem({ row, index, open, onToggle, isMe, week, started }: { row:
                   )}
                 </p>
               ) : (
-                <>
-                  <ul className="flex flex-wrap gap-1.5">
-                    {row.picks.map((p) => (
-                      <PickChip key={p.gameId} pick={p} />
-                    ))}
-                  </ul>
-                  {hidden > 0 && (
-                    <p className="mt-2 flex items-center gap-1 text-xs text-ink-3">
-                      <Lock size={12} /> {hidden} more pick{hidden === 1 ? "" : "s"} revealed at kickoff
-                    </p>
-                  )}
-                </>
+                hidden > 0 && (
+                  <p className="mt-2 flex items-center gap-1 text-xs text-ink-3">
+                    <Lock size={12} /> {hidden} pick{hidden === 1 ? "" : "s"} still hidden — the team shows at kickoff
+                  </p>
+                )
               )}
             </div>
           </motion.div>
         )}
       </AnimatePresence>
     </motion.li>
+  );
+}
+
+/**
+ * Five slots, always, in rank order. A pick whose game has begun shows its team and what it is
+ * worth; one that has not shows a lock in its own place, because the rank is public even while
+ * the team is not; a rank nobody took stays an empty outline. The row fills in as the week goes
+ * rather than growing sideways, so its shape says how far along someone is at a glance.
+ */
+function PickSlots({ picks, hiddenRanks }: { picks: ScoredPick[]; hiddenRanks: number[] }) {
+  const byRank = new Map(picks.map((p) => [p.rank, p]));
+  const hidden = new Set(hiddenRanks);
+  return (
+    <ul className="flex flex-wrap gap-1.5" aria-label="Picks, most confident first">
+      {[1, 2, 3, 4, 5].map((rank) => {
+        const pick = byRank.get(rank);
+        return pick ? <PickChip key={rank} pick={pick} /> : <EmptySlot key={rank} rank={rank} locked={hidden.has(rank)} />;
+      })}
+    </ul>
+  );
+}
+
+function EmptySlot({ rank, locked }: { rank: number; locked: boolean }) {
+  const stake = 6 - rank;
+  const said = locked ? `A hidden pick worth ${stake} points, revealed at kickoff` : `No pick worth ${stake} points`;
+  return (
+    <li
+      className={`flex items-center gap-0.5 rounded-full border-2 py-0.5 pl-0.5 pr-1 ${
+        locked ? "border-ink/25 bg-white" : "border-dashed border-line bg-paper-2/50"
+      }`}
+      title={said}
+    >
+      <span className="flex h-[26px] w-[26px] items-center justify-center" aria-hidden="true">
+        {locked ? <Lock size={13} className="text-ink-2" /> : <span className="text-[13px] font-bold text-ink-3">–</span>}
+      </span>
+      <span
+        className={`font-display flex h-[18px] min-w-[18px] items-center justify-center rounded-full text-[11px] font-extrabold leading-none tabular ${
+          locked ? "bg-white text-ink" : "text-ink-3"
+        }`}
+        aria-label={said}
+      >
+        {stake}
+      </span>
+    </li>
   );
 }
 

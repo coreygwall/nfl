@@ -23,6 +23,8 @@ export interface BootstrapResponse {
   currentWeek: number;
   /** Latest week with started games — the results view default. */
   boardWeek: number;
+  /** First week that counts towards the season total; earlier weeks stand on their own. */
+  seasonFromWeek: number;
   weeks: WeekSummary[];
   players: RosterPlayer[];
   me: Player | null;

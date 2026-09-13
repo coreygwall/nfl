@@ -8,7 +8,7 @@ import { codesMatch, generateCode } from "../../shared/codes.ts";
 import { clearedSessionCookie, hashToken, isLockedOut, lockUntil, MAX_CLAIM_ATTEMPTS, newToken, sessionCookie } from "../auth.ts";
 import { validatePicks } from "../../shared/picks.ts";
 import { buildSeasonBoard, buildWeekBoard } from "../../shared/scoring.ts";
-import { boardWeek, gameStatus, isLocked, pickWeek, weekSummaries, WEEKS } from "../../shared/week.ts";
+import { boardWeek, gameStatus, isLocked, pickWeek, SEASON_START_WEEK, weekSummaries, WEEKS } from "../../shared/week.ts";
 import type { Game } from "../../shared/types.ts";
 import type {
   BootstrapResponse,
@@ -100,6 +100,7 @@ publicRoutes.get("/bootstrap", async (c) => {
     poolName: c.env.POOL_NAME || "High Five",
     currentWeek: pickWeek(games, now),
     boardWeek: boardWeek(games, now),
+    seasonFromWeek: SEASON_START_WEEK,
     weeks: weekSummaries(games, now),
     players: players.map((p) => ({ ...publicPlayer(p), claimed: (devices.get(p.id) ?? 0) > 0 || managedIds.has(p.id) })),
     me,

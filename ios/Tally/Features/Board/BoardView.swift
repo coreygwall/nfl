@@ -71,10 +71,17 @@ struct WeekBoardView: View {
     private func content(_ data: WeekBoardResponse) -> some View {
         let started = data.lockedCount > 0
         VStack(alignment: .leading, spacing: 10) {
-            Text(data.lockedCount == 0
-                 ? "Nothing has kicked off yet · \(data.rows.filter { $0.picksMade > 0 }.count) of \(data.rows.count) have picked"
-                 : "\(data.finalCount) of \(data.gameCount) games final")
-                .sans(14).foregroundStyle(Color.ink2)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(data.lockedCount == 0
+                     ? "Nothing has kicked off yet · \(data.rows.filter { $0.picksMade > 0 }.count) of \(data.rows.count) have picked"
+                     : "\(data.finalCount) of \(data.gameCount) games final")
+                    .sans(14).foregroundStyle(Color.ink2)
+                if week < model.seasonStartsAt {
+                    Text("Week \(week) has its own winner. The season race starts in Week \(model.seasonStartsAt).")
+                        .sans(12).foregroundStyle(Color.ink3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
             if data.rows.isEmpty {
                 EmptyState(title: "Nobody's on the board yet.", body: "Be the first to lock in five picks.") {
                     Button("Make your picks") { model.pickWeek = week; model.tab = .picks }.buttonStyle(.tally(.primary, size: .small))
@@ -87,20 +94,19 @@ struct WeekBoardView: View {
                                     : "\(row.correct) of \(row.picksMade) right · up to \(row.possible)",
                                  open: open == row.playerId, onToggle: { withAnimation(.easeOut(duration: 0.2)) { open = open == row.playerId ? nil : row.playerId } }) {
                         if row.picksMade == 0 {
+                            PickSlotRow(slots: row.pickSlots)
                             if row.playerId == model.player?.id {
                                 LinkButton(title: "Make your picks →") { model.pickWeek = week; model.tab = .picks }
                             } else {
                                 Text("Hasn't picked yet.").sans(14).foregroundStyle(Color.ink3)
                             }
                         } else {
-                            FlowLayout(spacing: 6) {
-                                ForEach(row.picks) { p in PickChip(pick: p) }
-                            }
+                            PickSlotRow(slots: row.pickSlots)
                             let hidden = row.picksMade - row.picks.count
                             if hidden > 0 {
                                 HStack(spacing: 4) {
                                     Image(systemName: "lock.fill").font(.system(size: 9, weight: .bold))
-                                    Text("\(hidden) more pick\(hidden == 1 ? "" : "s") revealed at kickoff")
+                                    Text("\(hidden) pick\(hidden == 1 ? "" : "s") still hidden — the team shows at kickoff")
                                 }
                                 .sans(12).foregroundStyle(Color.ink3)
                             }
@@ -144,8 +150,20 @@ struct SeasonBoardView: View {
     @ViewBuilder
     private func content(_ data: SeasonBoardResponse) -> some View {
         VStack(alignment: .leading, spacing: 10) {
-            Text(data.throughWeek == 0 ? "Season standings · nothing has kicked off yet" : "Season standings through Week \(data.throughWeek)")
-                .sans(14).foregroundStyle(Color.ink2)
+            if data.notStarted {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("Starts in Week \(data.seasonStartsAt)").display(18)
+                    Text("Week \(data.seasonStartsAt - 1) has a winner of its own — those points just don't carry. The season is the running total from Week \(data.seasonStartsAt) on.")
+                        .sans(13).foregroundStyle(Color.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .cardFlat(fill: .flagSoft)
+            } else {
+                Text("Season standings through Week \(data.throughWeek)")
+                    .sans(14).foregroundStyle(Color.ink2)
+            }
             if data.rows.isEmpty {
                 EmptyState(title: "Nobody's on the board yet.", body: "Standings show up once people start picking.")
             } else {
@@ -217,8 +235,74 @@ struct BoardRowCard<Detail: View>: View {
                 .transition(.opacity.combined(with: .move(edge: .top)))
             }
         }
+        // No .clipped() here: the card's own offset shadow lives outside its bounds, and clipping
+        // sliced it off on the highlighted row.
         .modifier(TallyCard(hard: isMe, fill: isMe ? .flagSoft : .white, border: .ink, radius: TallyRadius.card, dashed: false))
-        .clipped()
+    }
+}
+
+/**
+ Five places, always, in rank order. A pick whose game has begun shows its team and what it is
+ worth; one that has not shows a lock in its own place, because the rank is public even while the
+ team is not; a rank nobody took stays an empty outline. The row fills in as the week goes rather
+ than growing sideways, so its shape says how far along someone is at a glance.
+ */
+struct PickSlotRow: View {
+    let slots: [PickSlot]
+
+    var body: some View {
+        HStack(spacing: 6) {
+            ForEach(slots) { slot in
+                slotView(slot)
+            }
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+    }
+
+    @ViewBuilder
+    private func slotView(_ slot: PickSlot) -> some View {
+        switch slot {
+        case .taken(let pick):
+            PickChip(pick: pick)
+        case .hidden(let rank):
+            EmptySlotChip(points: Scoring.points(forRank: rank), locked: true)
+        case .empty(let rank):
+            EmptySlotChip(points: Scoring.points(forRank: rank), locked: false)
+        }
+    }
+}
+
+struct EmptySlotChip: View {
+    let points: Int
+    let locked: Bool
+
+    var body: some View {
+        let said = locked ? "A hidden pick worth \(points) points, revealed at kickoff" : "No pick worth \(points) points"
+        HStack(spacing: 2) {
+            Group {
+                if locked {
+                    Image(systemName: "lock.fill").font(.system(size: 11, weight: .bold)).foregroundStyle(Color.ink2)
+                } else {
+                    Text("–").sans(13, weight: .bold).foregroundStyle(Color.ink3)
+                }
+            }
+            .frame(width: 26, height: 26)
+            Text("\(points)")
+                .font(TallyFont.display(11))
+                .monospacedDigit()
+                .foregroundStyle(locked ? Color.ink : Color.ink3)
+                .frame(minWidth: 18, minHeight: 18)
+                .background(Circle().fill(locked ? Color.white : Color.clear))
+        }
+        .padding(.leading, 2).padding(.trailing, 4).padding(.vertical, 2)
+        .background(Capsule().fill(locked ? Color.white : Color.paper2.opacity(0.5)))
+        .overlay(
+            Capsule().strokeBorder(
+                locked ? Color.ink.opacity(0.25) : Color.line,
+                style: StrokeStyle(lineWidth: 2, dash: locked ? [] : [4, 3])
+            )
+        )
+        .accessibilityLabel(said)
     }
 }
 

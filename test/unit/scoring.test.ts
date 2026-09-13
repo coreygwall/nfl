@@ -187,3 +187,34 @@ describe("buildSeasonBoard", () => {
     expect(board.rows.find((r) => r.name === "sam")).toMatchObject({ points: 0, possible: 0 });
   });
 });
+
+describe("hidden picks keep their slot", () => {
+  // WEEK1's g1 and g2 have kicked off by NOW; g4 has not.
+  const two = [
+    { id: "me", name: "Me" },
+    { id: "them", name: "Them" },
+  ];
+  const theirs = [
+    { playerId: "them", gameId: "g1", team: "NE" as const, rank: 5 },
+    { playerId: "them", gameId: "g4", team: "PHI" as const, rank: 1 },
+  ];
+
+  it("names the rank of a pick whose team it will not name", () => {
+    const board = buildWeekBoard({ week: 1, players: two, picks: theirs, games: WEEK1, now: NOW, requesterId: "me" });
+    const them = board.rows.find((r) => r.playerId === "them")!;
+    expect(them.picks.map((p) => p.rank)).toEqual([5]);
+    expect(them.hiddenRanks).toEqual([1]);
+    // Every pick is accounted for, so the board can draw one slot each.
+    expect(them.picks.length + them.hiddenRanks.length).toBe(them.picksMade);
+    // The team behind the hidden rank is nowhere in the payload.
+    expect(JSON.stringify(them)).not.toContain("PHI");
+  });
+
+  it("hides nothing from the person who made the picks", () => {
+    const mine = theirs.map((p) => ({ ...p, playerId: "me" }));
+    const board = buildWeekBoard({ week: 1, players: two, picks: mine, games: WEEK1, now: NOW, requesterId: "me" });
+    const me = board.rows.find((r) => r.playerId === "me")!;
+    expect(me.picks).toHaveLength(2);
+    expect(me.hiddenRanks).toEqual([]);
+  });
+});
