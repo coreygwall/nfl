@@ -8,17 +8,22 @@ Two part-time people and a fleet of agents. Agents can write most of the code; t
 what to build, cannot talk to a commissioner, and cannot be accountable for a Sunday when the board
 is wrong. **Sequence ruthlessly. Ship fewer things.**
 
-One hard external date governs everything:
+Two dates on this page are real, not aspirational, and the rest can move around them:
 
-> ### Brackets must be live by mid-February 2027.
-> March Madness is the widest funnel in American sports and the only acquisition moment before
-> August 2027. Missing it costs a full year. Every other date on this page can move.
+> ### The NFL playoffs pool must be live before Wild Card weekend (January 2027).
+> ### The March product must be live with runway before Selection Sunday.
+
+Neither requires the long lead time a generic feature roadmap would assume — the pool-type
+architecture (`pools`, `pool_commissioners`, players global to Tally) already supports standing up
+a new format quickly, and the constraint is sequencing the work now, not waiting for a deadline to
+justify starting. Marketing runs continuously alongside all of it — there is no quiet stretch where
+GTM pauses and only building happens. (See `05-gtm.md` § 1.)
 
 ---
 
 ## 2. The sequence
 
-### Now → December 2026 — *Instrument and delight*
+### Now → October 2026 — *Unblock, instrument, market*
 
 **Unblock the app** *(highest leverage, smallest effort)*
 - [ ] Generate the APNs `.p8`, `wrangler secret put APNS_KEY`, set `APNS_KEY_ID` — push is fully
@@ -30,11 +35,22 @@ One hard external date governs everything:
 - [ ] Metrics 1–4 from `05-gtm.md` § 6, plus pool-size distribution
 - [ ] A Tuesday-morning numbers email. Not a dashboard — a query and a paragraph.
 
-**Build**
+**Market — starts now, does not wait for a bigger moment**
+- [ ] Reddit answers, first SEO pages, network outreach — the "Still Time" motion (`05` § 5)
+- [ ] Recruit 10 commissioners from your own network; watch every setup un-coached
+- [ ] Run the first set-up test with your wife, timed and unassisted
+
+### October–November 2026 — *Delight, then build the playoffs pool*
+
+**Build (weekly pool)**
 - [ ] **The Weekly Recap** (`06` § 2) — batched, prompt-cached, commissioner preview before posting
 - [ ] **CSV importer** — "Steal the spreadsheet" (`05` § 3 ②)
 - [ ] **Streaks** surfaced on the board + the one streak-at-risk push
 - [ ] **Rivalry cards** — pure derivation, near-zero cost, disproportionate delight
+
+**Build (the next pool type)**
+- [ ] **Start the NFL playoffs pool.** Lower-commitment format, single-elimination drama, built on
+      the existing pool-type architecture. Target: live and tested before Wild Card weekend.
 
 **Ops / risk**
 - [ ] Move to `main` with protected branches **at season's end, not during it** — the README is
@@ -42,29 +58,38 @@ One hard external date governs everything:
       operational risk in the product
 - [ ] Choose and budget a commercial data feed fallback for nflverse
 
-### January 2027 — *The off-season artifacts*
+### December 2026 — *Ship the playoffs pool*
+- [ ] **Playoffs pool live before Wild Card weekend.** The first real test of shipping a second
+      pool type on the existing architecture, and the first proof that "days, not months" holds.
+- [ ] Push Campaign 2, "One More Pool" (`05` § 5) — in-app prompt to existing players, Reddit, SEO
+- [ ] Spec the non-traditional March product — this is where the format gets decided, not guessed at
+
+### January 2027 — *The off-season artifacts, and the March build*
 - [ ] **Pick Personality / season wrapped** (`06` § 3 ⑥) — the only shareable moment in January
 - [ ] The record book: all-time bests, longest streaks, biggest collapse
-- [ ] **Brackets build starts** — this is the month it has to start
+- [ ] **Build the March product** — whatever it turns out to be, it is not a traditional bracket
+      (the market is saturated with those); scope it against the calendar in `05-gtm.md` § 1
 - [ ] "The Spreadsheet Amnesty" campaign (`05` § 5)
 - [ ] Pricing page drafted; paywall built but dark
 
 ### February–March 2027 — *March Madness*
-- [ ] **Brackets live by mid-February.** Non-negotiable.
-- [ ] 30–50 SEO pages indexed (published Oct–Dec so they rank by now)
+- [ ] **The March product live with real runway before Selection Sunday** — polished, not rushed,
+      because the build started in January rather than being deferred to a hard deadline
+- [ ] 30–50 SEO pages indexed (published continuously since October so they rank by now)
 - [ ] Paywall **on** — new pools only, and never retroactively on an existing pool mid-season
-- [ ] First cohort of paying commissioners
+- [ ] First cohort of paying commissioners, likely across three pool types by now
 
 ### April–July 2027 — *The group*
-- [ ] **Majors** (golf) — small, delightful, proves multi-sport
+- [ ] **Majors** (golf) — small, delightful, proves multi-sport, only if it earns its place against
+      what the playoffs and March pools actually taught about demand
 - [ ] **Clubhouse tier**: `/g/<slug>`, cross-season standings, Group of the Year
-- [ ] Convert March bracket commissioners into groups
+- [ ] Convert playoffs- and March-pool commissioners into groups
 - [ ] Slack / Discord bot
 - [ ] Build the August campaign
 
 ### August 2027 — *The season*
 - [ ] **Survivor** live alongside High Five on one link (`06` § 3 ①)
-- [ ] Full campaign; a year of SEO maturing at once
+- [ ] Full campaign; a year of SEO and two off-season products' worth of proof maturing at once
 - [ ] App Store featuring pitch, round two
 
 ---
@@ -125,6 +150,7 @@ Open questions that should be settled with a season of data rather than argued a
 
 ## 6. The one-sentence version
 
-> **Run this season to learn, ship the recap and the importer to delight, have Brackets ready for
-> March, turn the paywall on for new pools, and decide in the summer of 2027 — with two seasons of
-> commissioner retention in hand — whether this is a very good side business or something bigger.**
+> **Market continuously starting now, ship the recap and the importer to delight, get a playoffs
+> pool live before Wild Card weekend and a non-traditional pool live for March Madness, turn the
+> paywall on for new pools, and decide in the summer of 2027 — with two seasons of commissioner
+> retention in hand — whether this is a very good side business or something bigger.**
