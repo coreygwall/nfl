@@ -33,6 +33,12 @@ const app = new Hono<AppEnv>();
 
 app.use("/api/*", async (c, next) => {
   await ensureReady(c.env);
+  // Every API response is personal: the board masks picks by who is asking, and bootstrap carries
+  // a claim code. None of it carried a cache directive, which leaves an intermediary free to apply
+  // its own heuristics and serve one player's board to another. Say no once, here, rather than
+  // remembering to on each route.
+  c.header("cache-control", "private, no-store");
+  c.header("vary", "x-player-token, x-entry-id, cookie");
   c.set("now", resolveNow(c));
   // Identity is the device token alone: a player id is public (it is on the board), a token is not.
   // The header is the app; the cookie is the safety net for a browser that cleared its storage.

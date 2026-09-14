@@ -225,6 +225,7 @@ struct AdminPlayersView: View {
     @State private var renaming: AdminPlayer?
     @State private var newName = ""
     @State private var confirmDelete: AdminPlayer?
+    @State private var confirmReset: AdminPlayer?
 
     enum Filter: Hashable { case all, ready, waiting }
 
@@ -242,7 +243,7 @@ struct AdminPlayersView: View {
                     AdminPlayerRow(player: p,
                                    onReady: { Task { await setReady(p, !p.ready) } },
                                    onRename: { renaming = p; newName = p.name },
-                                   onReset: { Task { await reset(p) } },
+                                   onReset: { confirmReset = p },
                                    onCopyLink: { copyLink(p) },
                                    onPutHere: { Task { await putHere(p) } },
                                    onDelete: { confirmDelete = p })
@@ -260,6 +261,16 @@ struct AdminPlayersView: View {
             Button("Keep", role: .cancel) { confirmDelete = nil }
         } message: {
             Text("Their picks leave the board. The pick history keeps a copy, so nothing is truly lost.")
+        }
+        // Signs every one of their devices out and voids the old code. Web asked before doing this
+        // and iOS did it on one tap; the two now agree, because it is the same act either way.
+        .confirmationDialog("Give \(confirmReset?.name ?? "") a new code?", isPresented: Binding(get: { confirmReset != nil }, set: { if !$0 { confirmReset = nil } }), titleVisibility: .visible) {
+            Button("New code, sign out their devices", role: .destructive) {
+                if let p = confirmReset { Task { await reset(p) } }
+            }
+            Button("Cancel", role: .cancel) { confirmReset = nil }
+        } message: {
+            Text("They will be signed out everywhere and will need the new code to get back in. It is copied for you to send them.")
         }
     }
 
@@ -279,6 +290,7 @@ struct AdminPlayersView: View {
     }
 
     private func reset(_ p: AdminPlayer) async {
+        confirmReset = nil
         do {
             let r = try await model.service.resetAccess(playerId: p.id, pin: pin)
             UIPasteboard.general.string = Codes.format(r.code)

@@ -228,6 +228,13 @@ struct PickFlowView: View {
                 model.toast(ids.isEmpty ? err.message : "One of those games just kicked off. Swap it for another.", kind: .error)
                 await load(quiet: true)
                 setStep(.select)
+            } else if err.isSignedOut {
+                // A revoked token is the one failure "Try again" can never fix. Without this the
+                // screen offered it anyway and kept offering it, for up to the five minutes until
+                // the next bootstrap noticed. Go and find out who we are now instead.
+                Haptics.failure()
+                saveError = nil
+                await model.refreshBootstrap()
             } else {
                 Haptics.failure()
                 saveError = !model.online

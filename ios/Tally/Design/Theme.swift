@@ -28,7 +28,7 @@ extension Color {
     static let paper3 = Color(hex: "#E3D9C6")
     static let ink = Color(hex: "#14120F")
     static let ink2 = Color(hex: "#5B554B")
-    static let ink3 = Color(hex: "#8A8377")
+    static let ink3 = Color(hex: "#6B6456")
     static let line = Color(hex: "#D9D0C0")
     static let turf = Color(hex: "#0B7A3B")
     static let turf2 = Color(hex: "#0F9A4C")

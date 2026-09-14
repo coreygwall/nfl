@@ -34,28 +34,52 @@ struct ConfettiView: View {
         }
     }
 
+    /// How long the paper takes to fall and fade.
+    private static let lifetime: Double = 2.6
+
+    /**
+     Whether the burst is still going.
+
+     Without this the `TimelineView` keeps asking for frames forever. The `Canvas` returns
+     immediately once the paper has landed, so nothing is drawn — but the display link does not
+     know that, and stays pinned at the screen's maximum refresh rate for the rest of the view's
+     life. The callers' trigger counters only ever go up, so nothing else was going to stop it.
+     */
+    @State private var falling = true
+
     var body: some View {
-        if reduceMotion {
-            EmptyView()
-        } else {
-            TimelineView(.animation) { timeline in
-                let t = timeline.date.timeIntervalSince(start)
-                Canvas { context, size in
-                    guard t < 2.6 else { return }
-                    for p in particles {
-                        let x = p.x * size.width + p.vx * t
-                        let y = size.height * 0.75 + p.vy * t + 700 * t * t
-                        guard y < size.height + 20 else { continue }
-                        var rect = context
-                        rect.translateBy(x: x, y: y)
-                        rect.rotate(by: .radians(p.spin * t))
-                        rect.opacity = max(0, 1 - (t - 1.6) / 1.0)
-                        rect.fill(Path(CGRect(x: -p.size / 2, y: -p.size / 3, width: p.size, height: p.size * 0.66)), with: .color(p.color))
+        Group {
+            if reduceMotion || !falling {
+                Color.clear.frame(width: 0, height: 0)
+            } else {
+                TimelineView(.animation) { timeline in
+                    let t = timeline.date.timeIntervalSince(start)
+                    Canvas { context, size in
+                        guard t < ConfettiView.lifetime else { return }
+                        for p in particles {
+                            let x = p.x * size.width + p.vx * t
+                            let y = size.height * 0.75 + p.vy * t + 700 * t * t
+                            guard y < size.height + 20 else { continue }
+                            var rect = context
+                            rect.translateBy(x: x, y: y)
+                            rect.rotate(by: .radians(p.spin * t))
+                            rect.opacity = max(0, 1 - (t - 1.6) / 1.0)
+                            rect.fill(
+                                Path(CGRect(x: -p.size / 2, y: -p.size / 3, width: p.size, height: p.size * 0.66)),
+                                with: .color(p.color)
+                            )
+                        }
                     }
                 }
+                .ignoresSafeArea()
+                .id(trigger)
             }
-            .ignoresSafeArea()
-            .id(trigger)
+        }
+        .allowsHitTesting(false)
+        .task(id: trigger) {
+            falling = true
+            try? await Task.sleep(for: .seconds(ConfettiView.lifetime + 0.1))
+            falling = false
         }
     }
 }

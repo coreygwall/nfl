@@ -57,11 +57,17 @@ pushRoutes.post("/", async (c) => {
 });
 
 /**
- * Turning notifications off, or signing out. The token is in the path rather than a body because
- * a DELETE with a body is awkward from most clients, and a device token is not a secret — it
- * identifies an install to Apple, and only a valid push key can do anything with it.
+ * Turning notifications off, or signing out. The token is in the path rather than a body because a
+ * DELETE with a body is awkward from most clients.
+ *
+ * It still needs a signed-in caller. An earlier version of this reasoned that a device token is
+ * not a secret and stopped there — which is true about confidentiality and says nothing about who
+ * is allowed to act on it. Anyone who learned a token could switch off that phone's notifications.
  */
 pushRoutes.delete("/:token", async (c) => {
+  const player = c.get("player");
+  const account = c.get("account");
+  if (!player && !account) throw badRequest("NO_PLAYER", "Sign in first.");
   const token = c.req.param("token").trim();
   if (!TOKEN.test(token)) throw badRequest("BAD_TOKEN", "That is not a device token.");
   await deletePushToken(c.env.DB, token);

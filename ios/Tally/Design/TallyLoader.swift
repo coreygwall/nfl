@@ -38,21 +38,29 @@ struct TallyMark: View {
     var body: some View {
         Group {
             if Motion.reduced {
-                marks(draw: 1)
+                Canvas { context, size in draw(into: context, size: size, progress: 1, fade: 1) }
             } else {
                 TimelineView(.animation) { timeline in
                     // A clock rather than a chain of state changes: the loop is exact, it cannot
                     // drift, and it starts wherever the view happens to appear.
                     let t = timeline.date.timeIntervalSinceReferenceDate.truncatingRemainder(dividingBy: cycle) / cycle
-                    // Draw stroke by stroke, hold, then go as one. An earlier version rubbed each
-                    // stroke out in the order it was drawn, which left the gold slash hanging on
-                    // its own for a beat — a tally with nothing under it.
-                    marks(draw: phase(t, from: 0.10, to: 0.55))
-                        .opacity(phase(t, from: 0.06, to: 0.16) * (1 - phase(t, from: 0.80, to: 0.94)))
+                    // One Canvas, one pass. This used to rebuild a GeometryReader, a ZStack and
+                    // five trimmed Shapes on every frame, which put SwiftUI's diff and layout in
+                    // the hot path of a spinner — the thing on screen precisely when the CPU is
+                    // already busy. Drawing straight into a context costs a fraction of that.
+                    Canvas { context, size in
+                        draw(
+                            into: context,
+                            size: size,
+                            progress: phase(t, from: 0.10, to: 0.55),
+                            fade: phase(t, from: 0.06, to: 0.16) * (1 - phase(t, from: 0.80, to: 0.94))
+                        )
+                    }
                 }
             }
         }
         .frame(width: size, height: size * 40 / 56)
+        .accessibilityHidden(true)
     }
 
     /// Where we are through one leg of the cycle, flat at either end.
@@ -61,46 +69,32 @@ struct TallyMark: View {
     }
 
     /**
-     Four uprights and the slash across them, each starting a little after the one before so the
-     mark is written rather than switched on.
+     Four uprights and the slash across them, each starting a beat after the one before so the mark
+     is written rather than switched on. The offsets are chosen so the fifth stroke finishes exactly
+     as the draw window closes.
 
      The slash is gold: it is the stroke that completes the set, which is the whole idea of a tally.
      */
-    @ViewBuilder
-    private func marks(draw: Double) -> some View {
-        GeometryReader { geo in
-            let w = geo.size.width / 56
-            let h = geo.size.height / 40
-            ZStack {
-                ForEach(Array([7.0, 18.0, 29.0, 40.0].enumerated()), id: \.offset) { index, x in
-                    Stroke(from: CGPoint(x: x * w, y: 7 * h), to: CGPoint(x: x * w, y: 33 * h))
-                        .trim(from: 0, to: staggered(draw, index))
-                        .stroke(Color.ink, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                }
-                Stroke(from: CGPoint(x: 2 * w, y: 33 * h), to: CGPoint(x: 48 * w, y: 7 * h))
-                    .trim(from: 0, to: staggered(draw, 4))
-                    .stroke(Color.flag, style: StrokeStyle(lineWidth: 4.5, lineCap: .round))
-            }
-        }
-    }
+    private func draw(into context: GraphicsContext, size: CGSize, progress: Double, fade: Double) {
+        guard fade > 0 else { return }
+        let w = size.width / 56
+        let h = size.height / 40
+        var context = context
+        context.opacity = fade
 
-    /// Each stroke starts a beat after the one before. The offsets are chosen so the fifth
-    /// stroke finishes exactly as the draw window closes.
-    private func staggered(_ progress: Double, _ index: Int) -> Double {
-        let start = Double(index) * 0.14
-        return min(max((progress - start) / 0.44, 0), 1)
-    }
-
-    private struct Stroke: Shape {
-        let from: CGPoint
-        let to: CGPoint
-
-        func path(in rect: CGRect) -> Path {
+        func stroke(_ index: Int, from: CGPoint, to: CGPoint, colour: Color, width: CGFloat) {
+            let drawn = min(max((progress - Double(index) * 0.14) / 0.44, 0), 1)
+            guard drawn > 0 else { return }
             var path = Path()
             path.move(to: from)
-            path.addLine(to: to)
-            return path
+            path.addLine(to: CGPoint(x: from.x + (to.x - from.x) * drawn, y: from.y + (to.y - from.y) * drawn))
+            context.stroke(path, with: .color(colour), style: StrokeStyle(lineWidth: width, lineCap: .round))
         }
+
+        for (index, x) in [7.0, 18.0, 29.0, 40.0].enumerated() {
+            stroke(index, from: CGPoint(x: x * w, y: 7 * h), to: CGPoint(x: x * w, y: 33 * h), colour: .ink, width: 4)
+        }
+        stroke(4, from: CGPoint(x: 2 * w, y: 33 * h), to: CGPoint(x: 48 * w, y: 7 * h), colour: .flag, width: 4.5)
     }
 }
 

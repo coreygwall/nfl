@@ -62,7 +62,18 @@ public enum DraftStore {
         return try? JSONDecoder().decode(Draft.self, from: data)
     }
 
+    /**
+     An empty draft is not a draft — it is the absence of one, so it clears rather than writes.
+
+     This matters more than it looks. Saving picks clears the store and then resets the draft to
+     empty, and that reset is itself a change, so it wrote an empty draft straight back over the
+     clear. `load` then returned that empty-but-present draft, `seedIfNeeded` took it in preference
+     to the picks on the server, and the screen came back with an empty tray — five picks that were
+     safely saved, looking lost. Making absence and emptiness the same thing here closes it for
+     every caller rather than for the one that happened to trip it.
+     */
     public static func save(_ draft: Draft, playerId: String, week: Int, defaults: UserDefaults = .standard) {
+        guard !draft.isEmpty else { return clear(playerId: playerId, week: week, defaults: defaults) }
         if let data = try? JSONEncoder().encode(draft) { defaults.set(data, forKey: key(playerId, week)) }
     }
 

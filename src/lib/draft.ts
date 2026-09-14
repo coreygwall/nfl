@@ -23,7 +23,16 @@ export function loadDraft(playerId: string, week: number): Draft | null {
   }
 }
 
+/**
+ * An empty draft is not a draft — it is the absence of one, so it clears rather than writes.
+ *
+ * The iOS app had a bug this closes: saving picks clears the store and then resets the draft to
+ * empty, and that reset is itself a change, so an empty draft was written straight back over the
+ * clear and preferred over the saved picks on the next load. The web seeds from the server rather
+ * than from storage so it never showed the symptom, but the same rule belongs on both sides.
+ */
 export function saveDraft(playerId: string, week: number, draft: Draft): void {
+  if (draft.order.length === 0) return clearDraft(playerId, week);
   try {
     localStorage.setItem(key(playerId, week), JSON.stringify(draft));
   } catch {

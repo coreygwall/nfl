@@ -79,8 +79,11 @@ export function Board({ tab }: { tab: "week" | "season" }) {
 function SideRail({ tab, week }: { tab: "week" | "season"; week: number }) {
   const { player } = usePlayer();
   const boot = useBootstrap();
-  const weekBoard = useWeekBoard(week);
-  const seasonBoard = useSeasonBoard();
+  // Only the tab being looked at. This rail is desktop-only — `hidden lg:block` below — but CSS
+  // does not stop React mounting it, so on a phone, where it is invisible, it was quietly polling
+  // both boards every minute for nobody.
+  const weekBoard = useWeekBoard(tab === "week" ? week : null);
+  const seasonBoard = useSeasonBoard(tab === "season");
   const rows: (WeekRow | SeasonRow)[] = tab === "week" ? (weekBoard.data?.rows ?? []) : (seasonBoard.data?.rows ?? []);
   const mine = rows.find((r) => r.playerId === player?.id);
   const leader = rows[0];
@@ -340,17 +343,19 @@ function EmptySlot({ rank, locked }: { rank: number; locked: boolean }) {
   const stake = 6 - rank;
   const said = locked ? `A hidden pick worth ${stake} points, revealed at kickoff` : `No pick worth ${stake} points`;
   return (
+    // The description is a real, visually hidden child rather than an `aria-label`. It was on the
+    // inner span, which is `role="generic"` — ARIA prohibits a label there and browsers drop it, so
+    // an empty rank and a hidden pick both announced only their number. Naming the `li` itself
+    // would work too, but overriding its role costs the list its `listitem`s.
     <li
       className={`${SLOT} ${locked ? "border-ink/25 bg-white" : "border-dashed border-line bg-paper-2/50"}`}
       title={said}
     >
+      <span className="sr-only">{said}</span>
       <span className={SLOT_ICON} aria-hidden="true">
         {locked ? <Lock size={13} className="text-ink-2" /> : <span className="text-[13px] font-bold text-ink-3">–</span>}
       </span>
-      <span
-        className={`${SLOT_BADGE} ${locked ? "bg-white text-ink" : "text-ink-3"}`}
-        aria-label={said}
-      >
+      <span className={`${SLOT_BADGE} ${locked ? "bg-white text-ink" : "text-ink-3"}`} aria-hidden="true">
         {stake}
       </span>
     </li>
@@ -377,15 +382,13 @@ function PickChip({ pick }: { pick: ScoredPick }) {
           ? ["border-line bg-paper-2", "bg-white text-ink-3", "0", "tied, so no points"]
           : ["border-ink/25 bg-white", "bg-white text-ink", `${stake}`, `still playing, worth ${stake} points`];
   return (
-    <li
-      className={`${SLOT} ${tone}`}
-      title={`${t.city} ${t.nickname} — ${said}`}
-    >
-      <TeamSticker abbr={pick.team} size={24} flat lost={pick.outcome === "loss"} />
-      <span
-        className={`${SLOT_BADGE} ${badge}`}
-        aria-label={`${t.nickname}, ${said}`}
-      >
+    <li className={`${SLOT} ${tone}`} title={`${t.city} ${t.nickname} — ${said}`}>
+      {/* The logo's alt text gave the team but never the outcome — colour alone carried that. */}
+      <span className="sr-only">{`${t.nickname}, ${said}`}</span>
+      <span aria-hidden="true" className="contents">
+        <TeamSticker abbr={pick.team} size={24} flat lost={pick.outcome === "loss"} />
+      </span>
+      <span className={`${SLOT_BADGE} ${badge}`} aria-hidden="true">
         {value}
       </span>
     </li>
