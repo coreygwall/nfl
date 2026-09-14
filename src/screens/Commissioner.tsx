@@ -14,12 +14,12 @@ import {
   useRoles,
   useSetReady,
 } from "../api/queries.ts";
-import type { RoleHolder } from "../../shared/api.ts";
+import type { CommissionerPlayerDTO, RoleHolder } from "../../shared/api.ts";
 import { formatShortDay } from "../lib/time.ts";
 import { formatCode } from "../../shared/codes.ts";
 import { poolUrl } from "../lib/basename.ts";
-import { ErrorState, Segmented, Spinner } from "../components/Common.tsx";
-import { Check } from "../components/Icons.tsx";
+import { ErrorState, Menu, Segmented, Spinner } from "../components/Common.tsx";
+import { Cards, Check, LinkIcon, Rows } from "../components/Icons.tsx";
 import { useToast } from "../components/Toast.tsx";
 
 /**
@@ -323,19 +323,49 @@ function Commissioners({ holders, onChanged }: { holders: RoleHolder[]; onChange
       </p>
     </div>
   );
-}
+}type ReadyFilter = "all" | "ready" | "waiting";
+type RosterView = "list" | "cards";
+const VIEW_KEY = "tally.roster.view";
 
-type ReadyFilter = "all" | "ready" | "waiting";
-
+/**
+ * The roster.
+ *
+ * Thirteen people used to mean sixty-five buttons — five per card, every one of them the same
+ * size and the same weight whether you press it every Sunday or once a season. The fix is not
+ * smaller cards; it is deciding which of the five is which.
+ *
+ * Two are weekly: ticking someone off, and sending a person their sign-in link. They stay on the
+ * row. Rename, reset access and remove are once-a-season, so they fold into a menu — which is also
+ * exactly where the iOS roster already keeps them. That takes a row from five controls to three.
+ *
+ * The list is the default because it is the one that still works at forty players: one line each,
+ * columns that line up, nothing to scan past. Cards are there for when you want to *look* at the
+ * pool rather than work through it.
+ */
 function Players() {
   const data = useCommissionerPlayers(true);
   const mut = useCommissionerPlayerMutation();
   const reset = useResetAccess();
   const setReady = useSetReady();
   const [filter, setFilter] = useState<ReadyFilter>("all");
+  const [view, setView] = useState<RosterView>(() => {
+    try {
+      return localStorage.getItem(VIEW_KEY) === "cards" ? "cards" : "list";
+    } catch {
+      return "list";
+    }
+  });
   const toast = useToast();
-  if (data.isPending) return <Spinner />;
-  if (data.error) return <ErrorState message={data.error.message} onRetry={() => data.refetch()} />;
+
+  const chooseView = (v: RosterView) => {
+    setView(v);
+    try {
+      localStorage.setItem(VIEW_KEY, v);
+    } catch {
+      /* Private mode: the choice lasts this visit. */
+    }
+  };
+
   /** Signs someone in on the device they open it with — for a new domain, or a lost code. */
   const copySignIn = async (id: string, code: string, name: string) => {
     const link = `${poolUrl("/welcome")}?claim=${id}&code=${code}`;
@@ -348,6 +378,7 @@ function Players() {
   };
 
   const resetAccess = async (id: string, name: string) => {
+    if (!window.confirm(`Give ${name} a new code and sign out their devices?`)) return;
     try {
       const r = await reset.mutateAsync(id);
       toast(`${name}'s new code is ${formatCode(r.code)} — send it to them.`, "success");
@@ -355,6 +386,7 @@ function Players() {
       toast(err instanceof Error ? err.message : "Couldn't reset", "error");
     }
   };
+
   const toggleReady = async (id: string, name: string, ready: boolean) => {
     try {
       await setReady.mutateAsync({ id, ready });
@@ -363,6 +395,18 @@ function Players() {
       toast(err instanceof Error ? err.message : "Couldn't save", "error");
     }
   };
+
+  const rename = (p: CommissionerPlayerDTO) => {
+    const name = window.prompt("New name", p.name);
+    if (name && name !== p.name) void act({ id: p.id, action: "rename", name });
+  };
+
+  const remove = (p: CommissionerPlayerDTO) => {
+    if (window.confirm(`Remove ${p.name}, their picks, and any entries managed by their account?`)) {
+      void act({ id: p.id, action: "delete" });
+    }
+  };
+
   const act = async (input: Parameters<typeof mut.mutateAsync>[0]) => {
     try {
       await mut.mutateAsync(input);
@@ -371,103 +415,185 @@ function Players() {
       toast(err instanceof Error ? err.message : "Couldn't save", "error");
     }
   };
+
+  if (data.isPending) return <Spinner />;
+  if (data.error) return <ErrorState message={data.error.message} onRetry={() => data.refetch()} />;
+
   const all = data.data.players;
   const readyCount = all.filter((p) => p.ready).length;
   const shown = filter === "all" ? all : all.filter((p) => (filter === "ready" ? p.ready : !p.ready));
 
+  const actions = (p: CommissionerPlayerDTO) => (
+    <Menu
+      label={`More for ${p.name}`}
+      items={[
+        { label: "Rename", onSelect: () => rename(p) },
+        { label: "Reset access", onSelect: () => void resetAccess(p.id, p.name) },
+        { label: "Remove from pool", onSelect: () => remove(p), danger: true },
+      ]}
+    />
+  );
+
+  const readyToggle = (p: CommissionerPlayerDTO, size: "sm" | "md") => (
+    <button
+      role="switch"
+      aria-checked={p.ready}
+      aria-label={`${p.name} ready to go`}
+      disabled={setReady.isPending}
+      onClick={() => void toggleReady(p.id, p.name, !p.ready)}
+      className={`flex shrink-0 items-center justify-center rounded-full border-2 border-ink transition-colors ${
+        size === "sm" ? "h-8 w-8" : "h-9 w-9"
+      } ${p.ready ? "bg-turf text-on-turf" : "bg-surface text-transparent hover:text-ink-3"}`}
+    >
+      <Check size={size === "sm" ? 15 : 18} />
+    </button>
+  );
+
+  const linkButton = (p: CommissionerPlayerDTO, wide: boolean) =>
+    p.code ? (
+      <button
+        className={`btn btn-sm ${wide ? "flex-1" : "h-9 min-h-9 px-2.5"}`}
+        onClick={() => void copySignIn(p.id, p.code!, p.name)}
+        title={`Copy ${p.name}'s sign-in link`}
+        aria-label={wide ? undefined : `Copy ${p.name}'s sign-in link`}
+      >
+        <LinkIcon />
+        {wide && "Copy sign-in link"}
+      </button>
+    ) : null;
+
   return (
     <div>
-      <div className="mb-3 sm:max-w-[460px]">
-        <Segmented
-          value={filter}
-          label="Filter players"
-          pillId="commissioner-ready"
-          options={[
-            { value: "all", label: `All ${all.length}` },
-            { value: "ready", label: `Ready ${readyCount}` },
-            { value: "waiting", label: `Waiting ${all.length - readyCount}` },
-          ]}
-          onChange={setFilter}
-        />
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <div className="min-w-[240px] flex-1 sm:max-w-[420px]">
+          <Segmented
+            value={filter}
+            label="Filter players"
+            pillId="commissioner-ready"
+            options={[
+              { value: "all", label: `All ${all.length}` },
+              { value: "ready", label: `Ready ${readyCount}` },
+              { value: "waiting", label: `Waiting ${all.length - readyCount}` },
+            ]}
+            onChange={setFilter}
+          />
+        </div>
+        <div className="card-flat flex shrink-0 p-1" role="radiogroup" aria-label="Roster layout">
+          {([
+            { value: "list", label: "List", icon: <Rows /> },
+            { value: "cards", label: "Cards", icon: <Cards /> },
+          ] as const).map((o) => (
+            <button
+              key={o.value}
+              role="radio"
+              aria-checked={view === o.value}
+              aria-label={o.label}
+              title={o.label}
+              className={`flex h-9 w-10 items-center justify-center rounded-2xl transition-colors ${
+                view === o.value ? "bg-ink text-paper" : "text-ink-2 hover:text-ink"
+              }`}
+              onClick={() => chooseView(o.value)}
+            >
+              {o.icon}
+            </button>
+          ))}
+        </div>
       </div>
+
       <p className="mb-3 text-sm text-ink-2">
         {readyCount} of {all.length} ready to go · tap the circle to mark someone off.
       </p>
-      <ul className="grid gap-2 lg:grid-cols-2">
-        {all.length === 0 && <p className="text-sm text-ink-2">No players yet.</p>}
-        {shown.length === 0 && all.length > 0 && (
-          <p className="text-sm text-ink-2">{filter === "ready" ? "Nobody marked ready yet." : "Everyone is ready."}</p>
-        )}
-        {shown.map((p) => (
-          <li key={p.id} className={`card-flat p-3 ${p.ready ? "bg-turf-soft" : "bg-surface"}`}>
-            <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-              <button
-                role="switch"
-                aria-checked={p.ready}
-                aria-label={`${p.name} ready to go`}
-                disabled={setReady.isPending}
-                onClick={() => void toggleReady(p.id, p.name, !p.ready)}
-                className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-ink transition-colors ${
-                  p.ready ? "bg-turf text-on-turf" : "bg-surface text-transparent hover:text-ink-3"
-                }`}
-              >
-                <Check />
-              </button>
-              <div className="min-w-0 flex-1 basis-[55%]">
-                <div className="font-display truncate font-extrabold">{p.name}</div>
-                <div className="truncate text-xs text-ink-2">
-                  {p.picksCount} picks · {p.weeksPlayed} wk{p.weeksPlayed === 1 ? "" : "s"} · last seen {formatShortDay(p.lastSeenAt)}
+
+      {all.length === 0 && <p className="text-sm text-ink-2">No players yet.</p>}
+      {shown.length === 0 && all.length > 0 && (
+        <p className="text-sm text-ink-2">{filter === "ready" ? "Nobody marked ready yet." : "Everyone is ready."}</p>
+      )}
+
+      {view === "list" ? (
+        <div className="card-flat overflow-visible p-0">
+          {/* A header makes it a table: the cells can be bare numbers instead of repeating
+              "picks · wks · device" on thirteen consecutive rows. Widths are shared with the
+              rows below, and each column leaves at the width where it stops being worth its
+              space — the code is the last to go, because it is the one people come here for. */}
+          <div className="hidden items-center gap-3 border-b-2 border-dashed border-line px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-ink-3 sm:flex">
+            <span className="w-8 shrink-0" aria-hidden="true" />
+            <span className="min-w-0 flex-1">Player</span>
+            <span className="hidden w-14 shrink-0 text-right lg:block">Picks</span>
+            <span className="hidden w-14 shrink-0 text-right lg:block">Weeks</span>
+            <span className="hidden w-16 shrink-0 text-right md:block">Devices</span>
+            <span className="w-28 shrink-0 text-right">Code</span>
+            <span className="w-28 shrink-0" aria-hidden="true" />
+          </div>
+          <ul className="divide-y-2 divide-dashed divide-line">
+            {shown.map((p) => (
+              <li key={p.id} className={`flex items-center gap-3 px-3 py-2.5 ${p.ready ? "bg-turf-soft" : ""}`}>
+                {readyToggle(p, "sm")}
+                <div className="min-w-0 flex-1">
+                  <div className="font-display truncate font-extrabold leading-tight">{p.name}</div>
+                  <div className="truncate text-xs text-ink-2">last seen {formatShortDay(p.lastSeenAt)}</div>
+                </div>
+                <div className="font-display hidden w-14 shrink-0 text-right text-sm font-extrabold tabular lg:block">
+                  {p.picksCount}
+                </div>
+                <div className="font-display hidden w-14 shrink-0 text-right text-sm font-extrabold tabular lg:block">
+                  {p.weeksPlayed}
+                </div>
+                <div
+                  className={`font-display hidden w-16 shrink-0 text-right text-sm font-extrabold tabular md:block ${
+                    p.devices === 0 ? "text-ink-3" : ""
+                  }`}
+                >
+                  {p.devices}
+                </div>
+                <div className="font-display hidden w-28 shrink-0 text-right text-xs tracking-[0.08em] text-ink-2 sm:block">
+                  {p.code ? formatCode(p.code) : <span className="text-ink-3">none</span>}
+                </div>
+                <div className="flex w-28 shrink-0 justify-end gap-2">
+                  {linkButton(p, false)}
+                  {actions(p)}
+                </div>
+              </li>
+            ))}
+          </ul>
+        </div>
+      ) : (
+        <ul className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+          {shown.map((p) => (
+            <li key={p.id} className={`card-flat flex flex-col gap-3 p-4 ${p.ready ? "bg-turf-soft" : "bg-surface"}`}>
+              <div className="flex items-start gap-3">
+                {readyToggle(p, "md")}
+                <div className="min-w-0 flex-1">
+                  <div className="font-display truncate font-extrabold leading-tight">{p.name}</div>
+                  <div className="truncate text-xs text-ink-2">last seen {formatShortDay(p.lastSeenAt)}</div>
                 </div>
               </div>
-              {/* Wraps to its own line on a phone rather than crushing the name. */}
-              <div className="ml-auto flex gap-2">
-                <button
-                  className="btn btn-sm"
-                  onClick={() => {
-                    const name = window.prompt("New name", p.name);
-                    if (name && name !== p.name) void act({ id: p.id, action: "rename", name });
-                  }}
-                >
-                  Rename
-                </button>
-                <button
-                  className="btn btn-sm text-danger"
-                  onClick={() => {
-                    if (window.confirm(`Remove ${p.name}, their picks, and any entries managed by their account?`)) void act({ id: p.id, action: "delete" });
-                  }}
-                >
-                  Remove
-                </button>
+
+              {/* Three numbers on one line, labelled — the same facts the list shows in columns. */}
+              <dl className="flex gap-4 border-y-2 border-dashed border-line py-2.5 text-center">
+                {[
+                  { term: p.picksCount === 1 ? "pick" : "picks", value: p.picksCount },
+                  { term: p.weeksPlayed === 1 ? "week" : "weeks", value: p.weeksPlayed },
+                  { term: p.devices === 1 ? "device" : "devices", value: p.devices },
+                ].map((stat) => (
+                  <div key={stat.term} className="flex-1">
+                    <dd className="font-display text-lg font-extrabold leading-none tabular">{stat.value}</dd>
+                    <dt className="text-[11px] uppercase tracking-wider text-ink-3">{stat.term}</dt>
+                  </div>
+                ))}
+              </dl>
+
+              <div className="font-display text-center text-sm tracking-[0.12em] text-ink-2">
+                {p.code ? formatCode(p.code) : <span className="text-ink-3">no code</span>}
               </div>
-            </div>
-            <div className="mt-2 flex flex-wrap items-center gap-2 border-t-2 border-dashed border-line pt-2 text-xs text-ink-2">
-              <span className="chip bg-paper-2 py-0 text-[11px]">
-                {p.devices === 0 ? "No device yet" : `${p.devices} device${p.devices === 1 ? "" : "s"}`}
-              </span>
-              <span className="font-display tracking-[0.1em]">{p.code ? formatCode(p.code) : "no code"}</span>
-              {p.code && (
-                <button
-                  className="btn btn-sm"
-                  onClick={() => void copySignIn(p.id, p.code!, p.name)}
-                  title="A link that signs this person in on whatever device they open it with"
-                >
-                  Copy sign-in link
-                </button>
-              )}
-              <button
-                className="btn btn-sm ml-auto"
-                disabled={reset.isPending}
-                onClick={() => {
-                  if (!window.confirm(`Give ${p.name} a new code and sign out their devices?`)) return;
-                  void resetAccess(p.id, p.name);
-                }}
-              >
-                Reset access
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
+
+              <div className="mt-auto flex gap-2">
+                {linkButton(p, true)}
+                {actions(p)}
+              </div>
+            </li>
+          ))}
+        </ul>
+      )}
     </div>
   );
 }

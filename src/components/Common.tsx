@@ -1,7 +1,8 @@
-import { animate, motion, useMotionValue, useReducedMotion, useTransform } from "motion/react";
+import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion, useTransform } from "motion/react";
 import { TallyLoader } from "./TallyLoader.tsx";
-import { useEffect } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { ReactNode } from "react";
+import { MoreHorizontal } from "./Icons.tsx";
 
 /**
  * Kept as the name every screen already imports, so the app has one wait rather than two. What it
@@ -133,5 +134,89 @@ export function CountUp({ value, className }: { value: number; className?: strin
     <motion.span className={className} aria-label={`${value}`}>
       {rounded}
     </motion.span>
+  );
+}
+
+/**
+ * The rare actions, folded away.
+ *
+ * A roster row used to carry five equally-weighted buttons, and thirteen rows carried sixty-five —
+ * every one of them shouting at the same volume whether you use it every Sunday or once a season.
+ * Rename, reset access and remove are once-a-season; they live in here, and what is left on the row
+ * is the thing you actually came to do.
+ */
+export function Menu({
+  label,
+  items,
+}: {
+  label: string;
+  items: { label: string; onSelect: () => void; danger?: boolean }[];
+}) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      // Escape should leave you where you were, not adrift at the top of the page.
+      trigger.current?.focus();
+    };
+    const onDown = (e: MouseEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("mousedown", onDown);
+    return () => {
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("mousedown", onDown);
+    };
+  }, [open]);
+
+  return (
+    <div ref={wrap} className="relative shrink-0">
+      <button
+        ref={trigger}
+        type="button"
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="btn btn-sm h-9 min-h-9 px-2"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <MoreHorizontal />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            role="menu"
+            aria-label={label}
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.12 }}
+            className="card absolute right-0 top-[calc(100%+6px)] z-30 w-52 overflow-hidden p-1"
+          >
+            {items.map((item) => (
+              <button
+                key={item.label}
+                role="menuitem"
+                className={`block w-full rounded-2xl px-3 py-2.5 text-left font-display text-sm font-bold hover:bg-paper-2 ${
+                  item.danger ? "text-danger" : ""
+                }`}
+                onClick={() => {
+                  setOpen(false);
+                  item.onSelect();
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }
