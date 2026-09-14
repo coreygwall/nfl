@@ -106,11 +106,14 @@ fact that the same twelve people have four seasons of standings living in one pl
 Tally is a **group** product wearing a **pool** product's clothes. The pool is the wedge; the group
 is the business. The order matters:
 
-1. **Season 1 (now):** one pool type, one sport, prove that a commissioner comes back.
-2. **Season 2:** more pool types (Brackets, Majors, Survivor) so the *same group* has a reason to
-   exist in March and April, not just September.
-3. **Season 3:** the group itself becomes the object — `/g/<slug>`, cross-season standings,
-   a Group of the Year. Now churn means abandoning four years of history, and it stops happening.
+1. **Year 1 (now through next August):** prove the flagship weekly pool retains its commissioner,
+   and prove the pool-type architecture can ship fast — a playoffs pool for January, a
+   non-traditional tournament pool for March — so the *same group* has a reason to exist beyond
+   just the NFL regular season. This isn't sequential with step 2; it starts immediately.
+2. **Year 2:** round out the pool-type catalogue (Survivor, Majors, a traditional bracket if it
+   still earns its place) once real usage data says which formats people actually want.
+3. **Year 3:** the group itself becomes the object — `/g/<slug>`, cross-season standings,
+   a Group of the Year. Now churn means abandoning years of history, and it stops happening.
 
 The schema is already shaped for this (`pools`, `pool_commissioners`, players global to Tally with a
 `pool_players` join, `/g/<slug>` reserved). That is unusually good positioning for a product this
@@ -122,7 +125,7 @@ young and it should be protected — **do not take a shortcut that re-couples a 
 
 | Risk | Severity | Read |
 |---|---|---|
-| **Seasonality** | High | A pure NFL product is dead for 7 months a year. This is the single strongest argument for shipping Brackets before March 2027. Nothing else on the roadmap matters as much. |
+| **Seasonality** | High | A pure NFL regular-season product is dead for most of the year. The counter isn't waiting for one big spring launch — it's the playoffs pool (January) and a non-traditional March product, both shipped on the existing pool-type architecture in weeks, not months. Nothing else on the roadmap matters as much as proving that cadence. |
 | **Commissioner churn** | High | The whole business rests on one person per pool returning next season. Unmeasured today. Instrument it *this season* — it is the only metric that decides whether to raise money. |
 | **Splash/Sleeper ship a free family tier** | Medium | Unlikely (cannibalization), but if Sleeper ever decouples identity, the moat narrows fast. Response: own the group-history layer, which they cannot retrofit. |
 | **Apple rejection** | Low | Only becomes a risk if Tally touches prize money. Don't. |

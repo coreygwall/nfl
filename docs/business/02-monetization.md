@@ -146,8 +146,9 @@ i.e. on go-to-market (`05`), not on engineering or ops.
 
 - **C ($39k)** is a good side business and pays for itself many times over. Reachable in one strong
   season with disciplined GTM. **This is the target for the 2026–27 cycle.**
-- **D ($196k)** is where this could replace meaningful income for two people. Requires Brackets
-  shipped and two consecutive NFL seasons of compounding. **This is the 3-year target.**
+- **D ($196k)** is where this could replace meaningful income for two people. Requires the
+  playoffs and March pool types shipped and compounding across two consecutive NFL seasons.
+  **This is the 3-year target.**
 - **E ($784k)** is the only scenario where raising money makes sense — and by the time it's
   visible, you probably won't need to. See `07`.
 

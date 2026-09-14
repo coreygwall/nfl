@@ -139,7 +139,7 @@ you finished 4th."* Archetypes — Chalk Merchant, Homer, Contrarian, Coin Flip.
 - **Timing:** ship for the end of the 2026 season. It's the only marketing you get in January.
 
 **⑦ Group of the Year.**
-Cross-pool, cross-season standing for Clubhouse groups. NFL + brackets + golf majors, one table.
+Cross-pool, cross-season standing for Clubhouse groups. NFL + playoffs + a March pool + golf majors, one table.
 
 - **Why:** it is the mechanic that makes the Clubhouse tier worth $99, and it is the switching cost.
 
@@ -191,8 +191,8 @@ Prop of the Week and the Rivalry exist almost entirely to serve the player in 9t
 
 **Moment 3 — Next August, when the commissioner decides.**
 The single most important moment in the business (`01-strategy.md` § 5). It is not won in August —
-it is won in December, with an end-of-season recap and a record book worth coming back to, and in
-March with a bracket pool that kept the group alive through the winter.
+it is won in December, with an end-of-season recap and a record book worth coming back to, and
+across the winter with a playoffs pool and a March product that kept the group alive between seasons.
 
 > **The metric that matters more than any other: what percentage of commissioners run a second
 > season.** Everything in this document is ultimately in service of that one number.

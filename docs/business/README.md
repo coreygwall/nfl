@@ -26,7 +26,7 @@ score across every season of the year, and to charge the one person with the pai
 | 2 | [Monetization](02-monetization.md) | The money rule, freemium ladder, pricing, revenue scenarios |
 | 3 | [Unit Economics](03-unit-economics.md) | Cost to run, modelled to 3M players, AI cost line, margin analysis |
 | 4 | [Brand Narrative](04-brand.md) | The story, positioning statement, voice rules, visual identity, the enemy |
-| 5 | [Go-To-Market](05-gtm.md) | The timing call, channels ranked, the work split, four campaigns, five metrics, first 90 days |
+| 5 | [Go-To-Market](05-gtm.md) | The timing call, channels ranked, the work split, six campaigns, five metrics, first 90 days |
 | 6 | [Engagement](06-engagement.md) | Games on top, the incentive model, the Weekly Recap, retention moments |
 | 7 | [Partnerships & Investment](07-partnerships-investors.md) | Partner tiers, the case against raising, the acquisition path |
 | 8 | [Roadmap](08-roadmap.md) | Sequencing, AI agent autonomy, what's explicitly not being built |
@@ -41,8 +41,12 @@ score across every season of the year, and to charge the one person with the pai
 2. **Charge the commissioner, never the players, and never per-player.** Per-player pricing makes
    the commissioner hesitate over the eleventh invite, which is the one behaviour that must never
    happen. → `02` § 2
-3. **The 2026 NFL window has closed. March Madness 2027 is the first real swing.** Which makes
-   *Brackets shipped by mid-February* the only hard deadline on the roadmap. → `05` § 1
+3. **Don't wait for one big spring launch — ship continuously.** The bulk NFL pool-formation window
+   closes in September, but that's an argument against a big generic re-launch push, not against
+   marketing or building. An NFL playoffs pool ships before Wild Card weekend, and a non-traditional
+   March Madness product (not another bracket clone) ships with real runway before Selection Sunday
+   — both fast builds on the existing pool-type architecture, both with marketing running the whole
+   time. → `05` § 1
 4. **Cost is not a variable in this business.** Gross margin is ~98% at every scale from 20 players
    to 3 million. Stop optimising it; spend every hour on distribution. → `03`
 5. **The Weekly Recap is the highest-value unbuilt feature.** It costs ~$0.002/pool/week, it's the
