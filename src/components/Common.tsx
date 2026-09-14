@@ -1,17 +1,14 @@
-import { motion } from "motion/react";
+import { animate, motion, useMotionValue, useReducedMotion, useTransform } from "motion/react";
+import { TallyLoader } from "./TallyLoader.tsx";
+import { useEffect } from "react";
 import type { ReactNode } from "react";
 
+/**
+ * Kept as the name every screen already imports, so the app has one wait rather than two. What it
+ * draws is the tally mark, not a ring — see `TallyLoader`.
+ */
 export function Spinner({ label = "Loading…" }: { label?: string }) {
-  return (
-    <div className="flex flex-col items-center justify-center gap-3 py-16 text-ink-3">
-      <motion.div
-        className="h-9 w-9 rounded-full border-4 border-ink border-t-flag"
-        animate={{ rotate: 360 }}
-        transition={{ repeat: Infinity, duration: 0.9, ease: "linear" }}
-      />
-      <span className="text-sm font-semibold">{label}</span>
-    </div>
-  );
+  return <TallyLoader label={label} />;
 }
 
 export function ErrorState({ message, onRetry }: { message: string; onRetry?: () => void }) {
@@ -107,5 +104,34 @@ export function Segmented<T extends string>({
         );
       })}
     </div>
+  );
+}
+
+/**
+ * A number that counts to its new value instead of snapping to it.
+ *
+ * Points on the board change while you are looking at them — a game finishes, the poll comes back,
+ * and a 7 becomes a 12. Snapping tells you the number is different; counting tells you it went
+ * *up*, which is the part worth knowing. Rounded on the way so it never shows a fraction of a
+ * point, and pinned to the value outright when the reader has asked for less motion.
+ */
+export function CountUp({ value, className }: { value: number; className?: string }) {
+  const motionValue = useMotionValue(value);
+  const rounded = useTransform(motionValue, (v) => Math.round(v));
+  const reduced = useReducedMotion();
+
+  useEffect(() => {
+    if (reduced) {
+      motionValue.set(value);
+      return;
+    }
+    const controls = animate(motionValue, value, { duration: 0.55, ease: [0.16, 1, 0.3, 1] });
+    return () => controls.stop();
+  }, [value, motionValue, reduced]);
+
+  return (
+    <motion.span className={className} aria-label={`${value}`}>
+      {rounded}
+    </motion.span>
   );
 }

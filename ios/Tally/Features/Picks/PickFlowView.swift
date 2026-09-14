@@ -66,7 +66,7 @@ struct PickFlowView: View {
         Group {
             switch wk {
             case .idle, .loading:
-                Spinner(label: "Loading the slate…")
+                GamesSkeleton()
             case .failed(let err):
                 ErrorState(message: err.message) { Task { await load() } }
             case .loaded(let data):

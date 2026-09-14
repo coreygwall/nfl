@@ -274,29 +274,16 @@ struct DashedDivider: View {
 
 // MARK: States
 
+/**
+ Kept as the name every screen already calls, so the app has one wait rather than two. What it
+ draws is `TallyLoader` — the mark, not a ring.
+ */
 struct Spinner: View {
-    var label = "Loading…"
-    @State private var spinning = false
+    var label: String? = "Loading…"
 
-    var body: some View {
-        VStack(spacing: 12) {
-            Circle()
-                .strokeBorder(Color.ink, lineWidth: 4)
-                .overlay(
-                    Circle().trim(from: 0, to: 0.25)
-                        .stroke(Color.flag, style: StrokeStyle(lineWidth: 4, lineCap: .round))
-                        .padding(2)
-                )
-                .frame(width: 36, height: 36)
-                .rotationEffect(.degrees(spinning ? 360 : 0))
-                .animation(.linear(duration: 0.9).repeatForever(autoreverses: false), value: spinning)
-            Text(label).sans(14, weight: .semibold).foregroundStyle(Color.ink3)
-        }
-        .frame(maxWidth: .infinity)
-        .padding(.vertical, 56)
-        .onAppear { spinning = true }
-    }
+    var body: some View { TallyLoader(label: label) }
 }
+
 
 struct ErrorState: View {
     let message: String

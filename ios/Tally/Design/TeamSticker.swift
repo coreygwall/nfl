@@ -45,6 +45,9 @@ struct TeamSticker: View {
             .opacity(dimmed ? 0.4 : lost ? 0.65 : 1)
             .scaleEffect(selected ? 1.1 : dimmed ? 0.9 : 1)
             .rotationEffect(.degrees(selected || flat ? 0 : TeamSticker.tilt(for: team.abbr)))
+            // A sticker goes on with a slap, not a fade. The spring is deliberately under-damped
+            // so it overshoots and settles — which is what a thumb pressing a sticker down does.
+            .animation(Motion.slap, value: selected)
 
             if selected {
                 Image(systemName: "checkmark")
@@ -59,8 +62,7 @@ struct TeamSticker: View {
             }
         }
         .frame(width: size, height: size)
-        .animation(.spring(response: 0.28, dampingFraction: 0.7), value: selected)
-        .animation(.spring(response: 0.28, dampingFraction: 0.7), value: dimmed)
+        .animation(Motion.snap, value: dimmed)
         .accessibilityLabel(team.fullName)
     }
 }

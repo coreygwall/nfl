@@ -14,6 +14,7 @@ import type { Pick } from "../../shared/types.ts";
 import { MAX_PICKS } from "../../shared/picks.ts";
 import { isLocked, WEEKS } from "../../shared/week.ts";
 import { ErrorState, RankBadge, Spinner } from "../components/Common.tsx";
+import { GamesSkeleton } from "../components/TallyLoader.tsx";
 import { useHeaderWeek, useHideNav } from "../components/Chrome.tsx";
 import { poolUrl } from "../lib/basename.ts";
 import { ChevronDown, ChevronLeft, ChevronUp, Grip, Lock, Share } from "../components/Icons.tsx";
@@ -186,7 +187,7 @@ function PickFlowInner({ week }: { week: number }) {
     }
   };
 
-  if (wk.isPending || boot.isPending) return <Spinner label="Loading the slate…" />;
+  if (wk.isPending || boot.isPending) return <GamesSkeleton />;
   if (wk.error) return <ErrorState message={wk.error.message} onRetry={() => wk.refetch()} />;
 
   const openGames = games.filter((g) => !lockedNow(g));

@@ -38,7 +38,7 @@ struct PoolsView: View {
                                     .frame(maxWidth: .infinity, alignment: .leading)
                                     .contentShape(Rectangle())
                                 }
-                                .buttonStyle(.plain)
+                                .buttonStyle(.cardPress)
                                 .modifier(TallyCard(hard: current, fill: .white, border: .ink, radius: TallyRadius.card, dashed: false))
                                 .contextMenu {
                                     if model.catalog.pools.count > 1 {

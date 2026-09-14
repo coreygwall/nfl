@@ -53,7 +53,7 @@ struct AccountView: View {
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .contentShape(Rectangle())
                 }
-                .buttonStyle(.plain)
+                .buttonStyle(.cardPress)
                 .modifier(TallyCard(hard: active, fill: .white, border: .ink, radius: TallyRadius.card, dashed: false))
             }
             if adding {
@@ -161,7 +161,7 @@ struct EntrySwitcherSheet: View {
                                 .frame(maxWidth: .infinity, alignment: .leading)
                                 .contentShape(Rectangle())
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.cardPress)
                             .cardFlat()
                         }
 
@@ -344,7 +344,7 @@ struct SomeoneElse: View {
             FlowLayout(spacing: 6) {
                 ForEach(roster.prefix(6)) { p in
                     Button(p.name) { onPick(p.id) }
-                        .buttonStyle(.plain)
+                        .buttonStyle(.cardPress)
                         .sans(12, weight: .bold)
                         .foregroundStyle(Color.ink2)
                         .underline()
