@@ -75,6 +75,8 @@ private struct PoolSettingsView: View {
     @State private var saving = false
     @State private var csv: URL?
     @State private var exporting = false
+    /// The commissioner being granted or revoked, so the whole card disables while it lands.
+    @State private var granting: String?
 
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
@@ -122,19 +124,66 @@ private struct PoolSettingsView: View {
         .padding(12).frame(maxWidth: .infinity, alignment: .leading).cardFlat()
     }
 
+    /// Sharing the office, or handing it over. A co-commissioner gets the roster and the settings —
+    /// never the results, which are not this pool's to set in the first place.
     private func commissioners(_ o: CommissionerOverview) -> some View {
-        VStack(alignment: .leading, spacing: 6) {
+        let held = Set(o.commissioners.map(\.id))
+        let candidates = (model.boot.value?.players ?? []).filter { !held.contains($0.id) }
+        return VStack(alignment: .leading, spacing: 8) {
             SectionLabel(text: "Commissioners")
             ForEach(o.commissioners) { c in
-                Text(c.name).font(TallyFont.display(15))
+                HStack {
+                    Text(c.name).font(TallyFont.display(15))
+                    Spacer()
+                    if o.commissioners.count > 1 {
+                        Button("Remove") { Task { await removeCommissioner(c) } }
+                            .buttonStyle(.tally(.ghost, size: .small))
+                            .disabled(granting != nil)
+                    }
+                }
             }
             if o.commissioners.isEmpty {
                 Text("Nobody yet.").sans(13).foregroundStyle(Color.ink2)
             }
-            Text("A co-commissioner shares the roster and the settings, never the results.")
-                .sans(12).foregroundStyle(Color.ink3)
+            if candidates.isEmpty {
+                Text("A co-commissioner shares the roster and the settings, never the results.")
+                    .sans(12).foregroundStyle(Color.ink3)
+            } else {
+                Menu {
+                    ForEach(candidates) { p in
+                        Button(p.name) { Task { await addCommissioner(p) } }
+                    }
+                } label: {
+                    Label(granting == nil ? "Add a co-commissioner" : "Adding…", systemImage: "person.badge.key.fill")
+                }
+                .buttonStyle(.tally(.plain, size: .small))
+                .disabled(granting != nil)
+                Text("They share the roster and the settings, never the results. It has to be an account rather than an entry someone manages.")
+                    .sans(12).foregroundStyle(Color.ink3)
+            }
         }
         .padding(12).frame(maxWidth: .infinity, alignment: .leading).cardFlat()
+    }
+
+    private func addCommissioner(_ p: RosterPlayer) async {
+        granting = p.id
+        defer { granting = nil }
+        do {
+            _ = try await model.service.addCommissioner(playerId: p.id)
+            model.toast("\(p.name) can run this pool now.", kind: .success)
+            await load()
+        } catch { model.toast(error.asAPIError.message, kind: .error) }
+    }
+
+    private func removeCommissioner(_ c: RoleHolder) async {
+        granting = c.id
+        defer { granting = nil }
+        do {
+            _ = try await model.service.removeCommissioner(playerId: c.id)
+            model.toast("\(c.name) no longer runs this pool.", kind: .success)
+            await load()
+            await model.refreshBootstrap()
+        } catch { model.toast(error.asAPIError.message, kind: .error) }
     }
 
     private func backup() -> some View {
@@ -353,13 +402,25 @@ private struct ClaimKeysCard: View {
     @State private var shake = 0
     @FocusState private var focused: Bool
 
+    /// This phone kept a PIN from when the PIN was the login. Offer it rather than make them find it.
+    private var saved: String? { model.legacyPin }
+
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             Text("This isn't your pool to run").display(22)
             Text("\(model.boot.value?.poolName ?? "This pool") has a commissioner, and it isn't this account. They set the roster, the name and the invites — if something needs changing, ask them.")
                 .sans(14).foregroundStyle(Color.ink2)
             DashedDivider().padding(.top, 6)
-            if !asking {
+            if let saved, !asking {
+                Text("This phone still has the pool's PIN saved from before. One tap moves the office onto your account, and the saved copy goes away once it has.")
+                    .sans(12).foregroundStyle(Color.ink2)
+                Button(busy ? "Checking…" : "Take the keys with the saved PIN") { Task { await submit(saved) } }
+                    .buttonStyle(.tally(.primary, fullWidth: true))
+                    .disabled(busy)
+                if let error { Text(error).sans(14, weight: .semibold).foregroundStyle(Color.danger) }
+                Button("Type a different PIN") { asking = true }
+                    .buttonStyle(.tally(.ghost, size: .small))
+            } else if !asking {
                 Button("I own this pool and lost access") { asking = true }
                     .buttonStyle(.tally(.ghost, size: .small))
             } else {
@@ -373,7 +434,7 @@ private struct ClaimKeysCard: View {
                     .shake(shake)
                     .accessibilityLabel("Owner PIN")
                 if let error { Text(error).sans(14, weight: .semibold).foregroundStyle(Color.danger) }
-                Button(busy ? "Checking…" : "Take the keys") { Task { await submit() } }
+                Button(busy ? "Checking…" : "Take the keys") { Task { await submit(pin) } }
                     .buttonStyle(.tally(.primary, fullWidth: true))
                     .disabled(busy || pin.isEmpty)
                     .onAppear { focused = true }
@@ -384,18 +445,27 @@ private struct ClaimKeysCard: View {
         .card()
     }
 
-    private func submit() async {
+    private func submit(_ candidate: String) async {
         busy = true
         error = nil
         defer { busy = false }
         do {
-            _ = try await model.service.claimRoles(pin: pin)
+            _ = try await model.service.claimRoles(pin: candidate)
+            // Spent: it bought the offices, and the grant on the account is what matters now.
+            model.spendLegacyPin()
             pin = ""
             await model.refreshBootstrap()
             model.toast("You're the commissioner of this pool. The office is attached to your account now.", kind: .success)
         } catch {
-            self.error = error.asAPIError.message
+            let api = error.asAPIError
+            self.error = api.message
             shake += 1
+            // A PIN the server has rejected outright is worth nothing; stop offering it. A network
+            // failure says nothing about the PIN, so that one is kept.
+            if api.code == "BAD_PIN", candidate == model.legacyPin {
+                model.spendLegacyPin()
+                asking = true
+            }
         }
     }
 }

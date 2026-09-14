@@ -236,6 +236,38 @@ describe("the two offices", () => {
     expect((await api("/league/status", { player: bystander.token })).status).toBe(403);
   });
 
+  it("shares the office and takes it back, but never leaves the pool without one", async () => {
+    const owner = await newPlayer("Sharer");
+    const mate = await newPlayer("Deputy");
+    await api("/roles/claim", { body: {}, player: owner.token, pin });
+
+    const shared = await api("/commissioner/commissioners", { body: { playerId: mate.id }, player: owner.token });
+    expect(shared.status).toBe(200);
+    // Earlier tests in this file claim the office too, so assert membership rather than the whole list.
+    const ids = shared.body.commissioners.map((c: any) => c.id);
+    expect(ids).toContain(owner.id);
+    expect(ids).toContain(mate.id);
+
+    // Shared means shared: the roster, not the results.
+    expect((await api("/commissioner/players", { player: mate.token })).status).toBe(200);
+    expect((await api("/league/status", { player: mate.token })).status).toBe(403);
+
+    const back = await api(`/commissioner/commissioners/${mate.id}`, { method: "DELETE", player: owner.token });
+    expect(back.status).toBe(200);
+    expect((await api("/commissioner/players", { player: mate.token })).status).toBe(403);
+
+    // Down to the last one — earlier tests in this file have claimed the office too, so empty it
+    // rather than assuming a count — and the pool refuses to be left with nobody running it.
+    let holders = (await api("/commissioner", { player: owner.token })).body.commissioners as { id: string }[];
+    while (holders.length > 1) {
+      const victim = holders.find((h) => h.id !== owner.id)!;
+      const gone = await api(`/commissioner/commissioners/${victim.id}`, { method: "DELETE", player: owner.token });
+      expect(gone.status).toBe(200);
+      holders = gone.body.commissioners;
+    }
+    expect((await api(`/commissioner/commissioners/${owner.id}`, { method: "DELETE", player: owner.token })).status).toBe(409);
+  });
+
   it("lets the commissioner rename the pool, and shows the new name to everyone", async () => {
     const owner = await newPlayer("Renamer");
     await api("/roles/claim", { body: {}, player: owner.token, pin });

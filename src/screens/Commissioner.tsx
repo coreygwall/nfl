@@ -7,12 +7,14 @@ import {
   useClaimRoles,
   useCommissionerOverview,
   useCommissionerPlayerMutation,
+  useCommissionerGrant,
   useCommissionerPlayers,
   useRenamePool,
   useResetAccess,
   useRoles,
   useSetReady,
 } from "../api/queries.ts";
+import type { RoleHolder } from "../../shared/api.ts";
 import { formatShortDay } from "../lib/time.ts";
 import { formatCode } from "../../shared/codes.ts";
 import { poolUrl } from "../lib/basename.ts";
@@ -231,20 +233,10 @@ function PoolSettings() {
         </button>
       </div>
 
-      <div className="card-flat bg-white p-4">
-        <h3 className="font-display font-extrabold">Commissioners</h3>
-        <ul className="mb-2 text-sm text-ink-2">
-          {overview.data.commissioners.map((c) => (
-            <li key={c.id} className="font-display font-extrabold text-ink">
-              {c.name}
-            </li>
-          ))}
-          {overview.data.commissioners.length === 0 && <li>Nobody yet — the owner PIN hands out the first set of keys.</li>}
-        </ul>
-        <p className="text-xs text-ink-3">
-          A co-commissioner shares the roster and the settings, never the results. Add one from the app.
-        </p>
-      </div>
+      <Commissioners
+        holders={overview.data.commissioners}
+        onChanged={() => void overview.refetch()}
+      />
 
       <div className="card-flat bg-white p-4">
         <h3 className="font-display font-extrabold">Backup</h3>
@@ -255,6 +247,80 @@ function PoolSettings() {
           {exporting ? "Preparing…" : "Download picks CSV"}
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Sharing the office, or handing it over. A co-commissioner gets the roster and the settings —
+ * never the results, which are not this pool's to set in the first place.
+ */
+function Commissioners({ holders, onChanged }: { holders: RoleHolder[]; onChanged: () => void }) {
+  const boot = useBootstrap();
+  const grant = useCommissionerGrant();
+  const toast = useToast();
+  const [pick, setPick] = useState("");
+  const held = new Set(holders.map((c) => c.id));
+  const candidates = (boot.data?.players ?? []).filter((p) => !held.has(p.id));
+
+  const act = async (playerId: string, action: "add" | "remove", name: string) => {
+    try {
+      await grant.mutateAsync({ playerId, action } as Parameters<typeof grant.mutateAsync>[0]);
+      toast(action === "add" ? `${name} can run this pool now.` : `${name} no longer runs this pool.`, "success");
+      setPick("");
+      onChanged();
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Couldn't save", "error");
+    }
+  };
+
+  return (
+    <div className="card-flat bg-white p-4">
+      <h3 className="font-display font-extrabold">Commissioners</h3>
+      <ul className="mb-3 text-sm text-ink-2">
+        {holders.map((c) => (
+          <li key={c.id} className="flex items-center gap-2">
+            <span className="font-display font-extrabold text-ink">{c.name}</span>
+            {holders.length > 1 && (
+              <button className="btn btn-sm ml-auto" disabled={grant.isPending} onClick={() => void act(c.id, "remove", c.name)}>
+                Remove
+              </button>
+            )}
+          </li>
+        ))}
+        {holders.length === 0 && <li>Nobody yet — the owner PIN hands out the first set of keys.</li>}
+      </ul>
+      {candidates.length > 0 && (
+        <div className="flex flex-wrap gap-2">
+          <label className="sr-only" htmlFor="co-commissioner">
+            Add a co-commissioner
+          </label>
+          <select
+            id="co-commissioner"
+            className="card-flat min-w-0 flex-1 px-3 py-2 outline-none focus:shadow-hard"
+            value={pick}
+            onChange={(e) => setPick(e.target.value)}
+          >
+            <option value="">Add a co-commissioner…</option>
+            {candidates.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name}
+              </option>
+            ))}
+          </select>
+          <button
+            className="btn btn-sm btn-primary"
+            disabled={!pick || grant.isPending}
+            onClick={() => void act(pick, "add", candidates.find((p) => p.id === pick)?.name ?? "They")}
+          >
+            {grant.isPending ? "Adding…" : "Add"}
+          </button>
+        </div>
+      )}
+      <p className="mt-2 text-xs text-ink-3">
+        They share the roster and the settings, never the results. It has to be an account rather than an entry
+        someone manages.
+      </p>
     </div>
   );
 }

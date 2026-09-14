@@ -157,6 +157,21 @@ export function useCommissionerPlayerMutation() {
   });
 }
 
+/** Sharing the office, or handing it over. Only someone who already holds it can give it away. */
+export function useCommissionerGrant() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { playerId: string; action: "add" } | { playerId: string; action: "remove" }) =>
+      input.action === "add"
+        ? api("/commissioner/commissioners", { method: "POST", body: { playerId: input.playerId } })
+        : api(`/commissioner/commissioners/${input.playerId}`, { method: "DELETE" }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["commissioner"] });
+      void qc.invalidateQueries({ queryKey: ["bootstrap"] });
+    },
+  });
+}
+
 export function useResetAccess() {
   const qc = useQueryClient();
   return useMutation({

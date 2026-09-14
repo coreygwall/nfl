@@ -93,9 +93,24 @@ final class AppModel {
     var isCommissioner: Bool { roles.commissioner }
     var isLeagueAdmin: Bool { roles.platformAdmin }
 
-    /// Drops any PIN this phone remembered from when the PIN *was* the commissioner.
-    private func forgetLegacyPin() {
-        Keychain.shared.remove(forKey: "admin.pin.\(pool.host)/\(pool.slug)")
+    /**
+     A PIN this phone saved back when the PIN *was* the commissioner.
+
+     It is not a login any more, but it may be the only copy anyone still has — a Cloudflare secret
+     cannot be read back out — so it is kept until it has been *spent* on a role claim rather than
+     wiped on sight. The claim screen offers it; a successful claim is what deletes it.
+     */
+    private(set) var legacyPin: String?
+    private var legacyPinKey: String { "admin.pin.\(pool.host)/\(pool.slug)" }
+
+    private func loadLegacyPin() {
+        legacyPin = Keychain.shared.string(forKey: legacyPinKey)
+    }
+
+    /// Called once the PIN has bought this account its offices, or once the server says it is wrong.
+    func spendLegacyPin() {
+        legacyPin = nil
+        Keychain.shared.remove(forKey: legacyPinKey)
     }
 
     private let monitor = NWPathMonitor()
@@ -121,7 +136,7 @@ final class AppModel {
             Task { @MainActor in self?.online = path.status == .satisfied }
         }
         monitor.start(queue: DispatchQueue(label: "tally.network"))
-        forgetLegacyPin()
+        loadLegacyPin()
         connectPush()
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -296,7 +311,7 @@ final class AppModel {
         session = store
         SessionBox.shared.store = store
         service = AppModel.makeService(pool: ref, session: { SessionBox.shared.store.authHeaders })
-        forgetLegacyPin()
+        loadLegacyPin()
         boot = .idle
         pickWeek = nil
         boardWeek = nil
