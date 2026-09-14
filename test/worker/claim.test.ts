@@ -1,4 +1,4 @@
-import { SELF } from "cloudflare:test";
+import { env, SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { MAX_CLAIM_ATTEMPTS } from "../../worker/auth.ts";
 
@@ -86,7 +86,7 @@ describe("claiming a name on another device", () => {
     expect(locked.status).toBe(429);
     expect(locked.body.error.code).toBe("CLAIM_LOCKED");
 
-    const reset = await api(`/admin/players/${p.id}/reset-access`, { body: {}, pin: "1234" });
+    const reset = await api(`/commissioner/players/${p.id}/reset-access`, { body: {}, pin: "1234" });
     expect(reset.status).toBe(200);
     expect(reset.body.code).not.toBe(p.code);
 
@@ -97,16 +97,35 @@ describe("claiming a name on another device", () => {
     expect(back.status).toBe(200);
   });
 
-  it("claims a name that no device holds, so people who joined earlier are not locked out", async () => {
-    const p = await join();
-    await api(`/admin/players/${p.id}/reset-access`, { body: {}, pin: "1234" });
-    // No devices left: the next one in gets the name without a code, and a code for the one after.
-    const first = await api(`/players/${p.id}/claim`, { body: {} });
+  it("claims a name no device has ever held, so people who joined earlier are not locked out", async () => {
+    // A roster name from before devices existed: no code, nobody signed in. The first device in
+    // takes it, and gets a code for the one after.
+    const id = crypto.randomUUID();
+    const name = `Legacy ${id.slice(0, 8)}`;
+    await env.DB.prepare("INSERT INTO players (id, name, name_key, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?)")
+      .bind(id, name, name.toLowerCase(), BEFORE, BEFORE)
+      .run();
+    const first = await api(`/players/${id}/claim`, { body: {} });
     expect(first.status).toBe(200);
     expect(first.body.code).toMatch(/^[A-Z2-9]{8}$/);
     // Now it is spoken for.
-    const second = await api(`/players/${p.id}/claim`, { body: {} });
-    expect(second.status).toBe(401);
+    expect((await api(`/players/${id}/claim`, { body: {} })).status).toBe(401);
+  });
+
+  it("keeps a name spoken for after a reset, rather than putting it back on the shelf", async () => {
+    // A reset signs every device out, which used to leave the name at zero devices — and zero
+    // devices is how an untouched roster name lets its owner in *without* a code. Anyone holding
+    // the pool's link and a player id could walk in. The code is the door now.
+    const p = await join("Reset");
+    const reset = await api(`/commissioner/players/${p.id}/reset-access`, { body: {}, pin: "1234" });
+    expect(reset.status).toBe(200);
+
+    const uninvited = await api(`/players/${p.id}/claim`, { body: {} });
+    expect(uninvited.status).toBe(401);
+    expect(uninvited.body.error.code).toBe("BAD_CODE");
+
+    const back = await api(`/players/${p.id}/claim`, { body: { code: reset.body.code } });
+    expect(back.status).toBe(200);
   });
 
   it("will not take picks from a device with no token", async () => {
@@ -159,34 +178,25 @@ describe("staying signed in and picking for the family", () => {
     expect(res.headers.get("set-cookie")).toContain("Max-Age=0");
   });
 
-  it("lets the commissioner put someone else's name on their own phone", async () => {
+  it("no longer mints a device token for somebody else's name", async () => {
+    // This was how a commissioner picked for the family, and it handed out an identity that
+    // looked exactly like the player's own. An account owns its entries now, so the capability
+    // has nowhere left to point — and the route is gone rather than merely hidden.
     const son = await join("Son");
-    const issued = await api(`/admin/players/${son.id}/device`, { body: {}, pin: "1234" });
-    expect(issued.status).toBe(200);
-    expect(issued.body.token).not.toBe(son.token);
-
-    // No code was needed, and the son's own device keeps working.
-    for (const token of [son.token, issued.body.token]) {
-      const boot = await api("/bootstrap", { token });
-      expect(boot.body.me).toMatchObject({ id: son.id });
-    }
-    const admin = await api("/admin/players", { pin: "1234" });
-    const row = admin.body.players.find((x: any) => x.id === son.id);
-    expect(row).toMatchObject({ devices: 2, adminDevices: 1 });
+    expect((await api(`/commissioner/players/${son.id}/device`, { body: {}, pin: "1234" })).status).toBe(404);
   });
 
-  it("marks picks made from a commissioner's device in the export", async () => {
-    const son = await join("Audit");
-    const issued = await api(`/admin/players/${son.id}/device`, { body: {}, pin: "1234" });
+  it("marks picks the commissioner entered on someone's behalf in the export", async () => {
+    const player = await join("Audit");
     const games = await api("/weeks/3", { now: BEFORE });
     const picks = games.body.games.slice(0, 2).map((g: any, i: number) => ({ gameId: g.id, team: g.home, rank: i + 1 }));
-    const saved = await api("/weeks/3/picks", { method: "PUT", body: { picks }, token: issued.body.token, now: BEFORE });
+    const saved = await api(`/commissioner/players/${player.id}/weeks/3/picks`, { method: "PUT", body: { picks }, pin: "1234", now: BEFORE });
     expect(saved.status).toBe(200);
 
-    const csv = await SELF.fetch("http://pool.test/api/admin/export.csv", { headers: { "x-admin-pin": "1234" } });
+    const csv = await SELF.fetch("http://pool.test/api/commissioner/export.csv", { headers: { "x-admin-pin": "1234" } });
     const text = await csv.text();
     expect(text.split("\n")[0]).toContain("entered_by");
-    const mine = text.split("\n").filter((l) => l.includes(son.name));
+    const mine = text.split("\n").filter((l) => l.includes(player.name));
     expect(mine.length).toBe(2);
     for (const line of mine) expect(line.endsWith("commissioner")).toBe(true);
   });
@@ -196,7 +206,7 @@ describe("staying signed in and picking for the family", () => {
     const games = await api("/weeks/4", { now: BEFORE });
     const picks = [{ gameId: games.body.games[0].id, team: games.body.games[0].home, rank: 1 }];
     await api("/weeks/4/picks", { method: "PUT", body: { picks }, token: p.token, now: BEFORE });
-    const csv = await SELF.fetch("http://pool.test/api/admin/export.csv", { headers: { "x-admin-pin": "1234" } });
+    const csv = await SELF.fetch("http://pool.test/api/commissioner/export.csv", { headers: { "x-admin-pin": "1234" } });
     const text = await csv.text();
     const line = text.split("\n").find((l) => l.includes(p.name))!;
     expect(line.endsWith("player")).toBe(true);
@@ -206,24 +216,24 @@ describe("staying signed in and picking for the family", () => {
 describe("the commissioner's ready list", () => {
   it("starts everyone off as not ready and toggles both ways", async () => {
     const p = await join("Ready");
-    const before = await api("/admin/players", { pin: "1234" });
+    const before = await api("/commissioner/players", { pin: "1234" });
     expect(before.body.players.find((x: any) => x.id === p.id)).toMatchObject({ ready: false });
 
-    const on = await api(`/admin/players/${p.id}/ready`, { method: "PUT", body: { ready: true }, pin: "1234" });
+    const on = await api(`/commissioner/players/${p.id}/ready`, { method: "PUT", body: { ready: true }, pin: "1234" });
     expect(on.status).toBe(200);
-    const marked = await api("/admin/players", { pin: "1234" });
+    const marked = await api("/commissioner/players", { pin: "1234" });
     expect(marked.body.players.find((x: any) => x.id === p.id)).toMatchObject({ ready: true });
 
-    await api(`/admin/players/${p.id}/ready`, { method: "PUT", body: { ready: false }, pin: "1234" });
-    const off = await api("/admin/players", { pin: "1234" });
+    await api(`/commissioner/players/${p.id}/ready`, { method: "PUT", body: { ready: false }, pin: "1234" });
+    const off = await api("/commissioner/players", { pin: "1234" });
     expect(off.body.players.find((x: any) => x.id === p.id)).toMatchObject({ ready: false });
   });
 
   it("is commissioner-only and never leaks to the pool", async () => {
     const p = await join("Private");
-    await api(`/admin/players/${p.id}/ready`, { method: "PUT", body: { ready: true }, pin: "1234" });
+    await api(`/commissioner/players/${p.id}/ready`, { method: "PUT", body: { ready: true }, pin: "1234" });
 
-    const noPin = await api(`/admin/players/${p.id}/ready`, { method: "PUT", body: { ready: true } });
+    const noPin = await api(`/commissioner/players/${p.id}/ready`, { method: "PUT", body: { ready: true } });
     expect(noPin.status).toBe(401);
 
     const boot = await api("/bootstrap", { token: p.token });
@@ -234,9 +244,9 @@ describe("the commissioner's ready list", () => {
 
   it("rejects anything that is not a boolean", async () => {
     const p = await join("Bool");
-    const bad = await api(`/admin/players/${p.id}/ready`, { method: "PUT", body: { ready: "yes" }, pin: "1234" });
+    const bad = await api(`/commissioner/players/${p.id}/ready`, { method: "PUT", body: { ready: "yes" }, pin: "1234" });
     expect(bad.status).toBe(400);
-    const missing = await api("/admin/players/nope/ready", { method: "PUT", body: { ready: true }, pin: "1234" });
+    const missing = await api("/commissioner/players/nope/ready", { method: "PUT", body: { ready: true }, pin: "1234" });
     expect(missing.status).toBe(404);
   });
 });

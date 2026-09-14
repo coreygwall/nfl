@@ -1,4 +1,5 @@
 import type { Player } from "../shared/types.ts";
+import type { PoolRecord, Roles } from "./db.ts";
 
 export interface Env {
   DB: D1Database;
@@ -33,6 +34,10 @@ export type AppEnv = {
     account: Player | null;
     /** Which device the request authenticated as, for the pick audit trail. */
     deviceId: string | null;
+    /** The pool this request is about, resolved once per request by `currentPool`. */
+    pool: PoolRecord | null;
+    /** What the asking account may do here, filled in by the guards that needed to know. */
+    roles: Roles | null;
   };
 };
 

@@ -12,7 +12,7 @@
     "not_found_handling": "single-page-application",
     // The Worker decides what every page route is: Tally's own tags at /, the pool's at /p/*,
     // and a redirect for the root-level paths the pool used to live at.
-    "run_worker_first": ["/api/*", "/", "/p/*", "/welcome", "/rules", "/week/*", "/board", "/board/*", "/admin", "/.well-known/*", "/apple-app-site-association"]
+    "run_worker_first": ["/api/*", "/", "/p/*", "/welcome", "/rules", "/week/*", "/board", "/board/*", "/admin", "/commissioner", "/league", "/.well-known/*", "/apple-app-site-association"]
   },
   "d1_databases": [
     {

@@ -81,44 +81,61 @@ public struct PoolService: Sendable {
     }
 
     // MARK: Commissioner
+    //
+    // No PIN rides on any of these. The grant is against the account, so the ordinary session
+    // headers are the authorisation — `claimRoles` is the one call that still takes the owner PIN,
+    // and it is how an account gets the keys in the first place.
 
-    public func verifyPin(_ pin: String) async throws -> OkResponse {
-        try await client.post("/admin/verify", options: .init(pin: pin))
+    public func claimRoles(pin: String) async throws -> ClaimRolesResponse {
+        try await client.post("/roles/claim", options: .init(pin: pin))
     }
 
-    public func adminWeek(_ week: Int, pin: String) async throws -> AdminWeekResponse {
-        try await client.get("/admin/weeks/\(week)", options: .init(pin: pin))
+    public func commissionerOverview() async throws -> CommissionerOverview {
+        try await client.get("/commissioner")
     }
 
-    public func setResult(gameId: String, winner: String?, pin: String) async throws -> Game {
-        try await client.put("/admin/games/\(gameId)/result", body: AdminSetResultRequest(winner: winner), options: .init(pin: pin))
+    public func renamePool(name: String) async throws -> PoolResponse {
+        try await client.patch("/commissioner/pool", body: NameBody(name: name))
     }
 
-    public func adminPlayers(pin: String) async throws -> AdminPlayersResponse {
-        try await client.get("/admin/players", options: .init(pin: pin))
+    public func commissionerWeek(_ week: Int) async throws -> CommissionerWeekResponse {
+        try await client.get("/commissioner/weeks/\(week)")
+    }
+
+    public func commissionerPlayers() async throws -> CommissionerPlayersResponse {
+        try await client.get("/commissioner/players")
     }
 
     private struct ReadyBody: Encodable { let ready: Bool }
 
-    public func setReady(playerId: String, ready: Bool, pin: String) async throws -> AdminReadyResponse {
-        try await client.put("/admin/players/\(playerId)/ready", body: ReadyBody(ready: ready), options: .init(pin: pin))
+    public func setReady(playerId: String, ready: Bool) async throws -> ReadyResponse {
+        try await client.put("/commissioner/players/\(playerId)/ready", body: ReadyBody(ready: ready))
     }
 
-    public func renamePlayer(playerId: String, name: String, pin: String) async throws -> Player {
-        try await client.patch("/admin/players/\(playerId)", body: NameBody(name: name), options: .init(pin: pin))
+    public func renamePlayer(playerId: String, name: String) async throws -> Player {
+        try await client.patch("/commissioner/players/\(playerId)", body: NameBody(name: name))
     }
 
-    public func deletePlayer(playerId: String, pin: String) async throws -> OkResponse {
-        try await client.delete("/admin/players/\(playerId)", options: .init(pin: pin))
+    public func deletePlayer(playerId: String) async throws -> OkResponse {
+        try await client.delete("/commissioner/players/\(playerId)")
     }
 
-    public func resetAccess(playerId: String, pin: String) async throws -> AdminResetAccessResponse {
-        try await client.post("/admin/players/\(playerId)/reset-access", options: .init(pin: pin))
+    public func resetAccess(playerId: String) async throws -> ResetAccessResponse {
+        try await client.post("/commissioner/players/\(playerId)/reset-access")
     }
 
-    /// Puts an existing player on this phone with the commissioner's say-so.
-    public func adminDevice(playerId: String, pin: String) async throws -> AdminDeviceResponse {
-        try await client.post("/admin/players/\(playerId)/device", options: .init(pin: pin))
+    private struct CommissionerBody: Encodable { let playerId: String }
+
+    public func addCommissioner(playerId: String) async throws -> CommissionersResponse {
+        try await client.post("/commissioner/commissioners", body: CommissionerBody(playerId: playerId))
+    }
+
+    public func removeCommissioner(playerId: String) async throws -> CommissionersResponse {
+        try await client.delete("/commissioner/commissioners/\(playerId)")
+    }
+
+    public func exportCSV() async throws -> Data {
+        try await client.download("/commissioner/export.csv")
     }
 
     // MARK: Notifications
@@ -146,22 +163,30 @@ public struct PoolService: Sendable {
         let appVersion: String?
     }
 
+    // MARK: League office
+    //
+    // Results, the schedule and the feed. One authority for every pool on Tally.
+
     private struct SyncBody: Encodable { let source: String }
     private struct PullBody: Encodable { let week: Int? }
 
-    public func syncSchedule(source: String, pin: String) async throws -> AdminSyncResult {
-        try await client.post("/admin/sync-schedule", body: SyncBody(source: source), options: .init(pin: pin))
+    public func leagueWeek(_ week: Int) async throws -> LeagueWeekResponse {
+        try await client.get("/league/weeks/\(week)")
     }
 
-    public func pullResults(week: Int?, pin: String) async throws -> AdminPullResultsResponse {
-        try await client.post("/admin/pull-results", body: PullBody(week: week), options: .init(pin: pin))
+    public func setResult(gameId: String, winner: String?) async throws -> Game {
+        try await client.put("/league/games/\(gameId)/result", body: SetResultRequest(winner: winner))
     }
 
-    public func adminStatus(pin: String) async throws -> AdminStatus {
-        try await client.get("/admin/status", options: .init(pin: pin))
+    public func syncSchedule(source: String) async throws -> SyncResult {
+        try await client.post("/league/sync-schedule", body: SyncBody(source: source))
     }
 
-    public func exportCSV(pin: String) async throws -> Data {
-        try await client.download("/admin/export.csv", options: .init(pin: pin))
+    public func pullResults(week: Int?) async throws -> PullResultsResponse {
+        try await client.post("/league/pull-results", body: PullBody(week: week))
+    }
+
+    public func leagueStatus() async throws -> LeagueStatus {
+        try await client.get("/league/status")
     }
 }

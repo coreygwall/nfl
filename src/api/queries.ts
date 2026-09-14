@@ -1,11 +1,14 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
-  AdminPlayersResponse,
-  AdminPullResultsResponse,
-  AdminResetAccessResponse,
   ClaimResponse,
-  AdminSetResultRequest,
-  AdminWeekResponse,
+  ClaimRolesResponse,
+  CommissionerOverview,
+  CommissionerPlayersResponse,
+  CommissionerResetAccessResponse,
+  CommissionerWeekResponse,
+  LeagueWeekResponse,
+  PullResultsResponse,
+  SetResultRequest,
   BootstrapResponse,
   CreatePlayerResponse,
   GameDTO,
@@ -94,23 +97,119 @@ export function useClaimPlayer() {
   });
 }
 
-// ---- admin ----
+// ---- commissioner ----
+//
+// None of these take a PIN any more. The office is attached to the signed-in account, so the
+// session that carries your picks is the session that carries your keys.
 
-export function useAdminWeek(week: number, pin: string | null) {
+export function useRoles() {
+  const boot = useBootstrap();
+  return boot.data?.roles ?? { commissioner: false, platformAdmin: false };
+}
+
+export function useCommissionerOverview(enabled: boolean) {
   return useQuery({
-    queryKey: ["admin", "week", week, pin],
-    queryFn: () => api<AdminWeekResponse>(`/admin/weeks/${week}`, { pin: pin! }),
-    enabled: !!pin,
+    queryKey: ["commissioner", "overview"],
+    queryFn: () => api<CommissionerOverview>("/commissioner"),
+    enabled,
   });
 }
 
-export function useAdminSetResult(pin: string | null) {
+export function useRenamePool() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ gameId, ...body }: AdminSetResultRequest & { gameId: string }) =>
-      api<GameDTO>(`/admin/games/${gameId}/result`, { method: "PUT", body, pin: pin! }),
+    mutationFn: (name: string) => api("/commissioner/pool", { method: "PATCH", body: { name } }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["admin", "week"] });
+      void qc.invalidateQueries({ queryKey: ["commissioner"] });
+      void qc.invalidateQueries({ queryKey: ["bootstrap"] });
+    },
+  });
+}
+
+export function useCommissionerWeek(week: number, enabled: boolean) {
+  return useQuery({
+    queryKey: ["commissioner", "week", week],
+    queryFn: () => api<CommissionerWeekResponse>(`/commissioner/weeks/${week}`),
+    enabled,
+  });
+}
+
+export function useCommissionerPlayers(enabled: boolean) {
+  return useQuery({
+    queryKey: ["commissioner", "players"],
+    queryFn: () => api<CommissionerPlayersResponse>("/commissioner/players"),
+    enabled,
+  });
+}
+
+export function useCommissionerPlayerMutation() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { id: string; action: "rename"; name: string } | { id: string; action: "delete" }) =>
+      input.action === "rename"
+        ? api(`/commissioner/players/${input.id}`, { method: "PATCH", body: { name: input.name } })
+        : api(`/commissioner/players/${input.id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["commissioner"] });
+      void qc.invalidateQueries({ queryKey: ["bootstrap"] });
+      void qc.invalidateQueries({ queryKey: ["board"] });
+    },
+  });
+}
+
+/** Sharing the office, or handing it over. Only someone who already holds it can give it away. */
+export function useCommissionerGrant() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { playerId: string; action: "add" } | { playerId: string; action: "remove" }) =>
+      input.action === "add"
+        ? api("/commissioner/commissioners", { method: "POST", body: { playerId: input.playerId } })
+        : api(`/commissioner/commissioners/${input.playerId}`, { method: "DELETE" }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["commissioner"] });
+      void qc.invalidateQueries({ queryKey: ["bootstrap"] });
+    },
+  });
+}
+
+export function useResetAccess() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<CommissionerResetAccessResponse>(`/commissioner/players/${id}/reset-access`, { method: "POST", body: {} }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["commissioner"] }),
+  });
+}
+
+export function useSetReady() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ready }: { id: string; ready: boolean }) =>
+      api<{ ready: boolean }>(`/commissioner/players/${id}/ready`, { method: "PUT", body: { ready } }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["commissioner"] }),
+  });
+}
+
+// ---- league office ----
+//
+// Results, the schedule and the feed. One authority for every pool, which is why none of it is
+// reachable from a commissioner's console.
+
+export function useLeagueWeek(week: number, enabled: boolean) {
+  return useQuery({
+    queryKey: ["league", "week", week],
+    queryFn: () => api<LeagueWeekResponse>(`/league/weeks/${week}`),
+    enabled,
+  });
+}
+
+export function useSetResult() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ gameId, ...body }: SetResultRequest & { gameId: string }) =>
+      api<GameDTO>(`/league/games/${gameId}/result`, { method: "PUT", body }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["league"] });
+      void qc.invalidateQueries({ queryKey: ["commissioner"] });
       void qc.invalidateQueries({ queryKey: ["board"] });
       void qc.invalidateQueries({ queryKey: ["week"] });
       void qc.invalidateQueries({ queryKey: ["bootstrap"] });
@@ -118,45 +217,24 @@ export function useAdminSetResult(pin: string | null) {
   });
 }
 
-export function useAdminPlayers(pin: string | null) {
-  return useQuery({
-    queryKey: ["admin", "players", pin],
-    queryFn: () => api<AdminPlayersResponse>("/admin/players", { pin: pin! }),
-    enabled: !!pin,
-  });
-}
-
-export function useAdminPlayerMutation(pin: string | null) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (input: { id: string; action: "rename"; name: string } | { id: string; action: "delete" }) =>
-      input.action === "rename"
-        ? api(`/admin/players/${input.id}`, { method: "PATCH", body: { name: input.name }, pin: pin! })
-        : api(`/admin/players/${input.id}`, { method: "DELETE", pin: pin! }),
-    onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: ["admin"] });
-      void qc.invalidateQueries({ queryKey: ["bootstrap"] });
-      void qc.invalidateQueries({ queryKey: ["board"] });
-    },
-  });
-}
-
-export interface AdminStatus {
+export interface LeagueStatus {
   now: string;
   build: string;
+  season: number;
   scheduleVersion: string;
   scheduleSyncedAt: string | null;
   scheduleLastChanges: number | null;
   scheduleSyncError: string | null;
   resultsSyncedAt: string | null;
   resultsSyncError: string | null;
+  admins: { id: string; name: string; grantedAt: string }[];
 }
 
-export function useAdminStatus(pin: string | null) {
+export function useLeagueStatus(enabled: boolean) {
   return useQuery({
-    queryKey: ["admin", "status", pin],
-    queryFn: () => api<AdminStatus>("/admin/status", { pin: pin! }),
-    enabled: !!pin,
+    queryKey: ["league", "status"],
+    queryFn: () => api<LeagueStatus>("/league/status"),
+    enabled,
   });
 }
 
@@ -168,37 +246,28 @@ export interface RemoteSyncResult {
   syncedAt: string;
 }
 
-export function useAdminSync(pin: string | null) {
+export function useSyncSchedule() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (source: "remote" | "bundled") =>
-      api<RemoteSyncResult | { upserted: number; version: string }>("/admin/sync-schedule", { method: "POST", body: { source }, pin: pin! }),
+      api<RemoteSyncResult | { upserted: number; version: string }>("/league/sync-schedule", { method: "POST", body: { source } }),
     onSuccess: () => void qc.invalidateQueries(),
   });
 }
 
-export function useAdminPullResults(pin: string | null) {
+export function usePullResults() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (week?: number) =>
-      api<AdminPullResultsResponse>("/admin/pull-results", { method: "POST", body: week ? { week } : {}, pin: pin! }),
+    mutationFn: (week?: number) => api<PullResultsResponse>("/league/pull-results", { method: "POST", body: week ? { week } : {} }),
     onSuccess: () => void qc.invalidateQueries(),
   });
 }
 
-export function useAdminResetAccess(pin: string | null) {
+/** The one call the PIN still makes: attach both offices to this account, once. */
+export function useClaimRoles() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: string) => api<AdminResetAccessResponse>(`/admin/players/${id}/reset-access`, { method: "POST", body: {}, pin: pin! }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ["admin"] }),
-  });
-}
-
-export function useAdminSetReady(pin: string | null) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, ready }: { id: string; ready: boolean }) =>
-      api<{ ready: boolean }>(`/admin/players/${id}/ready`, { method: "PUT", body: { ready }, pin: pin! }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ["admin"] }),
+    mutationFn: (pin: string) => api<ClaimRolesResponse>("/roles/claim", { method: "POST", body: {}, pin }),
+    onSuccess: () => void qc.invalidateQueries(),
   });
 }

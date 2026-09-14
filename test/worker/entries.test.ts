@@ -63,12 +63,12 @@ describe("account-owned entries", () => {
 
   it("doesn't offer a fake recovery code, and removes an account's entries together", async () => {
     const { owner, child } = await family();
-    const reset = await api(`/admin/players/${child.id}/reset-access`, { body: {}, pin: "1234" });
+    const reset = await api(`/commissioner/players/${child.id}/reset-access`, { body: {}, pin: "1234" });
     expect(reset.status).toBe(409);
     expect(reset.body.error.code).toBe("MANAGED_ENTRY");
     expect((await api("/bootstrap", { token: owner.token, entry: child.id })).body.me.id).toBe(child.id);
 
-    expect((await api(`/admin/players/${owner.player.id}`, { method: "DELETE", pin: "1234" })).status).toBe(200);
+    expect((await api(`/commissioner/players/${owner.player.id}`, { method: "DELETE", pin: "1234" })).status).toBe(200);
     const roster = (await api("/bootstrap")).body.players;
     expect(roster.some((p: any) => p.id === owner.player.id || p.id === child.id)).toBe(false);
   });

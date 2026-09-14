@@ -109,8 +109,8 @@ final class DecodingTests: XCTestCase {
         XCTAssertEqual(Base64URL.decode(res.options.user.id).map { String(decoding: $0, as: UTF8.self) }, "p1")
     }
 
-    func testAdminSetResultEncodesNullWinner() throws {
-        let data = try ISO8601Parsing.encoder.encode(AdminSetResultRequest(winner: nil))
+    func testSetResultEncodesNullWinner() throws {
+        let data = try ISO8601Parsing.encoder.encode(SetResultRequest(winner: nil))
         XCTAssertEqual(String(decoding: data, as: UTF8.self), "{\"winner\":null}")
     }
 }

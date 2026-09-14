@@ -103,12 +103,6 @@ struct AccountView: View {
                 Text("A one-tap link you can text yourself, and the code to type if you'd rather.")
                     .sans(12).foregroundStyle(Color.ink2)
             }
-            if let roster = boot?.players, roster.count > entries.count {
-                SomeoneElse(roster: roster.filter { r in !entries.contains { $0.id == r.id } }) { id in
-                    model.pendingClaim = PendingClaim(playerId: id, code: nil)
-                    model.showWelcome = true
-                }
-            }
         }
     }
 
@@ -118,8 +112,14 @@ struct AccountView: View {
         VStack(alignment: .leading, spacing: 10) {
             DashedDivider()
             HStack(spacing: 8) {
-                Button { model.showAdmin = true } label: { Label("Commissioner", systemImage: "key.fill") }
-                    .buttonStyle(.tally(.plain, size: .small))
+                if model.isCommissioner {
+                    Button { model.showCommissioner = true } label: { Label("Commissioner", systemImage: "key.fill") }
+                        .buttonStyle(.tally(.plain, size: .small))
+                }
+                if model.isLeagueAdmin {
+                    Button { model.showLeagueOffice = true } label: { Label("League office", systemImage: "building.columns.fill") }
+                        .buttonStyle(.tally(.plain, size: .small))
+                }
                 Button { model.showPools = true } label: { Label("Pools", systemImage: "square.grid.2x2.fill") }
                     .buttonStyle(.tally(.plain, size: .small))
             }
@@ -331,26 +331,6 @@ struct DeviceCodeCard: View {
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
         .cardFlat(fill: .flagSoft)
-    }
-}
-
-struct SomeoneElse: View {
-    let roster: [RosterPlayer]
-    let onPick: (String) -> Void
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            Text("Someone else's turn on this phone?").sans(12).foregroundStyle(Color.ink3)
-            FlowLayout(spacing: 6) {
-                ForEach(roster.prefix(6)) { p in
-                    Button(p.name) { onPick(p.id) }
-                        .buttonStyle(.cardPress)
-                        .sans(12, weight: .bold)
-                        .foregroundStyle(Color.ink2)
-                        .underline()
-                }
-            }
-        }
     }
 }
 

@@ -33,7 +33,7 @@ describe("picks are never really gone", () => {
     expect(put.status).toBe(200);
 
     // The commissioner removes them — picks and all.
-    const del = await SELF.fetch(`http://pool.test/api/admin/players/${me.player.id}`, {
+    const del = await SELF.fetch(`http://pool.test/api/commissioner/players/${me.player.id}`, {
       method: "DELETE",
       headers: { "x-admin-pin": "1234" },
     });
@@ -44,7 +44,7 @@ describe("picks are never really gone", () => {
     expect(left?.n).toBe(0);
 
     // But the history still has every one of them, under a name still readable.
-    const res = await SELF.fetch("http://pool.test/api/admin/pick-history?name=Vanisher&week=1", {
+    const res = await SELF.fetch("http://pool.test/api/commissioner/pick-history?name=Vanisher&week=1", {
       headers: { "x-admin-pin": "1234" },
     });
     expect(res.status).toBe(200);
@@ -71,7 +71,7 @@ describe("picks are never really gone", () => {
     expect((await save("away")).status).toBe(200);
     expect((await save("home")).status).toBe(200);
 
-    const res = await SELF.fetch("http://pool.test/api/admin/pick-history?name=Changer&week=1", {
+    const res = await SELF.fetch("http://pool.test/api/commissioner/pick-history?name=Changer&week=1", {
       headers: { "x-admin-pin": "1234" },
     });
     const { saves } = (await res.json()) as { saves: { team: string }[] };

@@ -22,11 +22,7 @@ struct BoardView: View {
                 SeasonBoardView(sort: model.boardSort)
                     .id(model.player?.id ?? "-")
             }
-            HStack(spacing: 4) {
-                LinkButton(title: "How scoring works", color: .ink3) { model.tab = .rules }
-                Text("· Commissioner?").sans(12).foregroundStyle(Color.ink3)
-                LinkButton(title: "Enter results", color: .ink3) { model.showAdmin = true }
-            }
+            LinkButton(title: "How scoring works", color: .ink3) { model.tab = .rules }
             .frame(maxWidth: .infinity)
             .padding(.top, 24)
         }

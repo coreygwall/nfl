@@ -13,12 +13,30 @@ export interface RosterPlayer extends Player {
   claimed: boolean;
 }
 
+/** What the asking account may open. Both are false for a player, which is nearly everyone. */
+export interface Roles {
+  /** Runs this pool: the roster, its name, its invite. */
+  commissioner: boolean;
+  /** Runs the league: results, the schedule, the feed. Above any one pool. */
+  platformAdmin: boolean;
+}
+
+export interface PoolDTO {
+  id: string;
+  slug: string;
+  name: string;
+  type: string;
+}
+
 export interface BootstrapResponse {
   now: string;
   /** Build id of the deployed Worker; the client reloads when its own differs. */
   build: string;
   season: number;
+  /** The pool's display name. Kept alongside `pool` because every older client reads this one. */
   poolName: string;
+  pool?: PoolDTO;
+  roles?: Roles;
   /** Week where picking should happen right now. */
   currentWeek: number;
   /** Latest week with started games — the results view default. */
@@ -89,53 +107,87 @@ export interface ApiErrorBody {
   error: { code: string; message: string; details?: unknown };
 }
 
-export interface AdminGameDTO extends GameDTO {
+export interface CommissionerGameDTO extends GameDTO {
   picks: { playerId: string; name: string; team: string; rank: number }[];
 }
-export interface AdminWeekResponse {
+export interface CommissionerWeekResponse {
   now: string;
   week: number;
-  games: AdminGameDTO[];
+  games: CommissionerGameDTO[];
   players: Player[];
 }
-export interface AdminSetResultRequest {
+
+/** The league office's view of a week: the games and their results, and nobody's picks. */
+export interface LeagueWeekResponse {
+  now: string;
+  week: number;
+  games: GameDTO[];
+}
+
+export interface PoolSummary extends PoolDTO {
+  season: number;
+  createdAt: string;
+}
+
+export interface RoleHolder {
+  id: string;
+  name: string;
+  grantedAt: string;
+}
+
+export interface CommissionerOverview {
+  now: string;
+  pool: PoolSummary;
+  playerCount: number;
+  readyCount: number;
+  /** Names on the roster that no device has signed in as yet. */
+  unclaimedCount: number;
+  commissioners: RoleHolder[];
+  roles: Roles;
+}
+
+export interface RolesResponse {
+  pool: { id: string; slug: string; name: string };
+  roles: Roles;
+}
+
+export interface ClaimRolesResponse {
+  roles: Roles;
+  pool: { id: string; slug: string; name: string };
+  commissioners: RoleHolder[];
+}
+
+export interface SetResultRequest {
   winner: string | null;
   awayScore?: number | null;
   homeScore?: number | null;
 }
-export interface AdminPlayerDTO extends Player {
+export interface CommissionerPlayerDTO extends Player {
   createdAt: string;
   lastSeenAt: string;
   picksCount: number;
   weeksPlayed: number;
   /** How many devices are signed in as this player. */
   devices: number;
-  /** Of those, how many the commissioner put on their own phone. */
-  adminDevices: number;
   /** The code that claims this name on a new device; null for names created before codes. */
   code: string | null;
-  /** The commissioner's checkmark — squared away for the season. Admin API only. */
+  /** The commissioner's checkmark — squared away for the season. Commissioner API only. */
   ready: boolean;
 }
 
-export interface AdminDeviceResponse {
-  player: Player;
-  token: string;
-}
-
-export interface AdminResetAccessResponse {
+export interface CommissionerResetAccessResponse {
   player: Player;
   code: string;
 }
-export interface AdminPlayersResponse {
-  players: AdminPlayerDTO[];
+export interface CommissionerPlayersResponse {
+  players: CommissionerPlayerDTO[];
 }
 
-export interface AdminPullResultsRequest {
+export interface PullResultsRequest {
   /** Limit the pull to one week. Omit to sweep the season. */
   week?: number;
 }
-export interface AdminPullResultsResponse {
+export interface PullResultsResponse {
   ok: boolean;
   reason?: string;
   applied: number;

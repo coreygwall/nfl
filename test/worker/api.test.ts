@@ -199,15 +199,82 @@ describe("weeks & picks", () => {
   });
 });
 
-describe("admin", () => {
+describe("the two offices", () => {
   const pin = "1234";
 
-  it("guards with the PIN", async () => {
-    expect((await api("/admin/verify", { method: "POST", body: {} })).status).toBe(401);
-    expect((await api("/admin/verify", { method: "POST", body: {}, pin: "0000" })).status).toBe(401);
-    expect((await api("/admin/verify", { method: "POST", body: {}, pin })).status).toBe(200);
-    expect((await api("/admin/pull-results", { method: "POST", body: {} })).status).toBe(401);
-    expect((await api("/admin/pull-results", { method: "POST", body: { week: 99 }, pin })).status).toBe(400);
+  it("keeps the league office and the commissioner's office apart", async () => {
+    // Neither office opens for a stranger, and the owner PIN is still the break-glass for both.
+    expect((await api("/league/pull-results", { method: "POST", body: {} })).status).toBe(401);
+    expect((await api("/league/pull-results", { method: "POST", body: {}, pin: "0000" })).status).toBe(401);
+    expect((await api("/league/pull-results", { method: "POST", body: { week: 99 }, pin })).status).toBe(400);
+    expect((await api("/commissioner/players")).status).toBe(401);
+    expect((await api("/commissioner/players", { pin })).status).toBe(200);
+    // Results are not a commissioner's to set: the route simply is not there.
+    expect((await api("/commissioner/pull-results", { method: "POST", body: {}, pin })).status).toBe(404);
+  });
+
+  it("hands both offices to the account that types the owner PIN, and only that account", async () => {
+    const owner = await newPlayer("Owner");
+    const bystander = await newPlayer("Bystander");
+
+    const before = await api("/roles", { player: owner.token });
+    expect(before.body.roles).toEqual({ commissioner: false, platformAdmin: false });
+
+    expect((await api("/roles/claim", { body: {}, player: owner.token, pin: "0000" })).status).toBe(401);
+    expect((await api("/roles/claim", { body: {}, pin })).status).toBe(401); // signed out
+    const claimed = await api("/roles/claim", { body: {}, player: owner.token, pin });
+    expect(claimed.status).toBe(200);
+    expect(claimed.body.roles).toEqual({ commissioner: true, platformAdmin: true });
+
+    // The keys travel with the account, not the phone: no PIN needed from here on.
+    expect((await api("/commissioner/players", { player: owner.token })).status).toBe(200);
+    expect((await api("/league/status", { player: owner.token })).status).toBe(200);
+    expect((await api("/bootstrap", { player: owner.token })).body.roles).toEqual({ commissioner: true, platformAdmin: true });
+
+    // And nobody else's.
+    expect((await api("/commissioner/players", { player: bystander.token })).status).toBe(403);
+    expect((await api("/league/status", { player: bystander.token })).status).toBe(403);
+  });
+
+  it("shares the office and takes it back, but never leaves the pool without one", async () => {
+    const owner = await newPlayer("Sharer");
+    const mate = await newPlayer("Deputy");
+    await api("/roles/claim", { body: {}, player: owner.token, pin });
+
+    const shared = await api("/commissioner/commissioners", { body: { playerId: mate.id }, player: owner.token });
+    expect(shared.status).toBe(200);
+    // Earlier tests in this file claim the office too, so assert membership rather than the whole list.
+    const ids = shared.body.commissioners.map((c: any) => c.id);
+    expect(ids).toContain(owner.id);
+    expect(ids).toContain(mate.id);
+
+    // Shared means shared: the roster, not the results.
+    expect((await api("/commissioner/players", { player: mate.token })).status).toBe(200);
+    expect((await api("/league/status", { player: mate.token })).status).toBe(403);
+
+    const back = await api(`/commissioner/commissioners/${mate.id}`, { method: "DELETE", player: owner.token });
+    expect(back.status).toBe(200);
+    expect((await api("/commissioner/players", { player: mate.token })).status).toBe(403);
+
+    // Down to the last one — earlier tests in this file have claimed the office too, so empty it
+    // rather than assuming a count — and the pool refuses to be left with nobody running it.
+    let holders = (await api("/commissioner", { player: owner.token })).body.commissioners as { id: string }[];
+    while (holders.length > 1) {
+      const victim = holders.find((h) => h.id !== owner.id)!;
+      const gone = await api(`/commissioner/commissioners/${victim.id}`, { method: "DELETE", player: owner.token });
+      expect(gone.status).toBe(200);
+      holders = gone.body.commissioners;
+    }
+    expect((await api(`/commissioner/commissioners/${owner.id}`, { method: "DELETE", player: owner.token })).status).toBe(409);
+  });
+
+  it("lets the commissioner rename the pool, and shows the new name to everyone", async () => {
+    const owner = await newPlayer("Renamer");
+    await api("/roles/claim", { body: {}, player: owner.token, pin });
+    const renamed = await api("/commissioner/pool", { method: "PATCH", body: { name: "Sunday Crew" }, player: owner.token });
+    expect(renamed.status).toBe(200);
+    expect((await api("/bootstrap")).body.poolName).toBe("Sunday Crew");
+    expect((await api("/commissioner/pool", { method: "PATCH", body: { name: "x" }, player: owner.token })).status).toBe(400);
   });
 
   it("records results that score the board, and keeps them through a schedule sync", async () => {
@@ -227,16 +294,16 @@ describe("admin", () => {
       now: BEFORE,
     });
     const outsider = ["KC", "SEA", "DAL"].find((t) => t !== g1.away && t !== g1.home)!;
-    const bad = await api(`/admin/games/${g1.id}/result`, { method: "PUT", body: { winner: outsider }, pin });
+    const bad = await api(`/league/games/${g1.id}/result`, { method: "PUT", body: { winner: outsider }, pin });
     expect(bad.status).toBe(400);
     expect(bad.body.error.code).toBe("INVALID_WINNER");
-    expect((await api("/admin/games/nope/result", { method: "PUT", body: { winner: null }, pin })).status).toBe(404);
+    expect((await api("/league/games/nope/result", { method: "PUT", body: { winner: null }, pin })).status).toBe(404);
 
-    const set = await api(`/admin/games/${g1.id}/result`, { method: "PUT", body: { winner: g1.away, awayScore: 24, homeScore: 17 }, pin });
+    const set = await api(`/league/games/${g1.id}/result`, { method: "PUT", body: { winner: g1.away, awayScore: 24, homeScore: 17 }, pin });
     expect(set.status).toBe(200);
     expect(set.body).toMatchObject({ winner: g1.away, awayScore: 24, homeScore: 17, status: "final" });
-    await api(`/admin/games/${g2.id}/result`, { method: "PUT", body: { winner: g2.home }, pin });
-    await api(`/admin/games/${g3.id}/result`, { method: "PUT", body: { winner: "TIE" }, pin });
+    await api(`/league/games/${g2.id}/result`, { method: "PUT", body: { winner: g2.home }, pin });
+    await api(`/league/games/${g3.id}/result`, { method: "PUT", body: { winner: "TIE" }, pin });
 
     const done = "2026-09-23T12:00:00.000Z";
     const board = await api("/board/week/2", { player: p.token, now: done });
@@ -250,22 +317,22 @@ describe("admin", () => {
     expect(srow).toMatchObject({ points: 5, weeksPlayed: 1, bestWeek: { week: 2, points: 5 }, isMe: true });
     expect(srow.byWeek).toEqual({ 2: 5 });
 
-    const sync = await api("/admin/sync-schedule", { method: "POST", body: {}, pin });
+    const sync = await api("/league/sync-schedule", { method: "POST", body: {}, pin });
     expect(sync.body.upserted).toBe(272);
     const still = await api("/weeks/2", { now: done });
     expect(still.body.games.find((g: any) => g.id === g1.id).winner).toBe(g1.away);
 
-    const cleared = await api(`/admin/games/${g3.id}/result`, { method: "PUT", body: { winner: null }, pin });
+    const cleared = await api(`/league/games/${g3.id}/result`, { method: "PUT", body: { winner: null }, pin });
     expect(cleared.body.winner).toBeNull();
 
-    const adminWeek = await api("/admin/weeks/2", { pin, now: BEFORE });
+    const adminWeek = await api("/commissioner/weeks/2", { pin, now: BEFORE });
     const g = adminWeek.body.games.find((x: any) => x.id === g1.id);
     expect(g.picks).toContainEqual({ playerId: p.id, name: p.name, team: g1.away, rank: 1 });
   });
 
   it("backfills picks past locks, renames and deletes players", async () => {
     const p = await newPlayer("Late");
-    const backfill = await api(`/admin/players/${p.id}/weeks/1/picks`, {
+    const backfill = await api(`/commissioner/players/${p.id}/weeks/1/picks`, {
       method: "PUT",
       body: { picks: [{ gameId: "2026_01_NE_SEA", team: "NE", rank: 1 }] },
       pin,
@@ -274,17 +341,17 @@ describe("admin", () => {
     expect(backfill.status).toBe(200);
     expect(backfill.body.picks).toEqual([{ gameId: "2026_01_NE_SEA", team: "NE", rank: 1 }]);
 
-    const players = await api("/admin/players", { pin });
+    const players = await api("/commissioner/players", { pin });
     expect(players.body.players.find((x: any) => x.id === p.id)).toMatchObject({ picksCount: 1, weeksPlayed: 1 });
 
     const other = await newPlayer("Other");
-    const clash = await api(`/admin/players/${p.id}`, { method: "PATCH", body: { name: other.name.toLowerCase() }, pin });
+    const clash = await api(`/commissioner/players/${p.id}`, { method: "PATCH", body: { name: other.name.toLowerCase() }, pin });
     expect(clash.status).toBe(409);
-    const renamed = await api(`/admin/players/${p.id}`, { method: "PATCH", body: { name: `${p.name} Jr` }, pin });
+    const renamed = await api(`/commissioner/players/${p.id}`, { method: "PATCH", body: { name: `${p.name} Jr` }, pin });
     expect(renamed.body.player.name).toBe(`${p.name} Jr`);
 
-    expect((await api(`/admin/players/${p.id}`, { method: "DELETE", pin })).status).toBe(200);
-    expect((await api(`/admin/players/${p.id}`, { method: "DELETE", pin })).status).toBe(404);
+    expect((await api(`/commissioner/players/${p.id}`, { method: "DELETE", pin })).status).toBe(200);
+    expect((await api(`/commissioner/players/${p.id}`, { method: "DELETE", pin })).status).toBe(404);
     const boot = await api("/bootstrap", { player: p.token });
     expect(boot.body.me).toBeNull();
     const week = await api("/weeks/1", { now: AFTER_WEEK1 });
@@ -308,7 +375,7 @@ describe("late joiner", () => {
     expect(saved.body.picks).toEqual(picks);
 
     for (const g of open) {
-      await api(`/admin/games/${g.id}/result`, { method: "PUT", body: { winner: g.home }, pin: "1234" });
+      await api(`/league/games/${g.id}/result`, { method: "PUT", body: { winner: g.home }, pin: "1234" });
     }
     const board = await api("/board/week/1", { player: p.token, now: "2026-09-16T12:00:00.000Z" });
     const row = board.body.rows.find((r: any) => r.playerId === p.id);
@@ -317,7 +384,7 @@ describe("late joiner", () => {
 
     // Clean up so the shared week-1 fixtures stay result-free for other assertions.
     for (const g of open) {
-      await api(`/admin/games/${g.id}/result`, { method: "PUT", body: { winner: null }, pin: "1234" });
+      await api(`/league/games/${g.id}/result`, { method: "PUT", body: { winner: null }, pin: "1234" });
     }
   });
 });
