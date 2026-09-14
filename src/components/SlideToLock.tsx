@@ -30,7 +30,7 @@ export function SlideToLock({ disabled, pending, onSubmit }: { disabled: boolean
   return (
     <div className="mobile-lock w-full">
       <p className="mb-2 text-center text-sm font-semibold text-ink-2" id="slide-lock-help">Hold the arrow and slide right to lock in</p>
-      <div ref={track} className="relative h-16 overflow-hidden rounded-full border-2 border-ink bg-turf text-white shadow-hard-sm" style={{ opacity: disabled && !pending ? 0.5 : 1 }}>
+      <div ref={track} className="relative h-16 overflow-hidden rounded-full border-2 border-ink bg-turf text-on-turf shadow-hard-sm" style={{ opacity: disabled && !pending ? 0.5 : 1 }}>
         <span
           aria-hidden="true"
           className="pointer-events-none absolute inset-y-0 left-0 w-full origin-left bg-flag/30"

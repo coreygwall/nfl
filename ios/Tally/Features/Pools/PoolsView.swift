@@ -44,7 +44,7 @@ struct PoolsView: View {
                                     .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.cardPress)
-                                .modifier(TallyCard(hard: current, fill: .white, border: .ink, radius: TallyRadius.card, dashed: false))
+                                .modifier(TallyCard(hard: current, fill: .surface, border: .ink, radius: TallyRadius.card, dashed: false))
                                 .contextMenu {
                                     if model.catalog.pools.count > 1 {
                                         Button("Remove from this phone", role: .destructive) { model.removePool(pool.id) }
@@ -96,7 +96,7 @@ struct PoolsView: View {
                                         Text(type.name).display(18)
                                         Text(type.status == .live ? "LIVE NOW" : "COMING SOON")
                                             .font(TallyFont.display(10)).tracking(0.8)
-                                            .foregroundStyle(type.status == .live ? .white : Color.ink2)
+                                            .foregroundStyle(type.status == .live ? Color.onFill : Color.ink2)
                                             .padding(.horizontal, 8).padding(.vertical, 3)
                                             .background(Capsule().fill(type.status == .live ? Color.turf : Color.paper2))
                                             .overlay(Capsule().strokeBorder(type.status == .live ? Color.turf : Color.ink, lineWidth: 2))
@@ -120,6 +120,7 @@ struct PoolsView: View {
                     .padding(16)
                 }
             }
+            .noZoom()
             .navigationTitle("Pools")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }

@@ -25,6 +25,9 @@ struct TallyApp: App {
             RootView()
                 .environment(model)
                 .tint(.ink)
+                // The whole app, in one place. Every colour in Theme.swift resolves against the
+                // trait collection, so this one modifier re-lights every screen.
+                .preferredColorScheme(model.theme.scheme)
                 .onOpenURL { url in model.open(url) }
                 // A notification tapped while the app was shut arrives before any view exists, so
                 // the path waits on the service and is picked up here instead of being lost.

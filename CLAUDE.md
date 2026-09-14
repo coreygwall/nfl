@@ -39,6 +39,23 @@ Nothing else needs doing in the developer portal. The Push Notifications capabil
 `ios/Tally/Tally.entitlements`, and Xcode enables it on the App ID itself when it provisions with
 automatic signing — the same way it already handles associated domains.
 
+## Dark mode is a re-light, not an inversion
+
+`src/index.css` holds the reasoning and the hex values; `ios/Tally/Design/Theme.swift` mirrors them
+as `Color(light:dark:)` pairs that resolve at draw time, so `.preferredColorScheme` on the root
+re-lights every screen without a call site knowing. Three things make it work:
+
+- **`ink` draws text *and* the 2pt border**, so flipping it would turn every hard offset shadow
+  white. `Color.shadow` / `--color-shadow` is separate and stays black.
+- **`surface` is where the light theme said white** — cards sit a step above a warm dark ground.
+  There is no `bg-white` or `Color.white` left outside team-coloured fills.
+- **`onFill` / `--color-on-turf`** is the label on a filled accent: white on the deep light-theme
+  green, black on the lighter dark-theme one. The yellow flag always takes black (`onAccent`).
+
+Every pair clears 4.5:1; the tightest is ink-3 on paper-2 at 4.76. The preference is `tally.theme`
+in localStorage / UserDefaults, absent meaning "system", and `index.html` applies it inline before
+the first paint so there is no white flash.
+
 ## Four tabs, and what is deliberately not one
 
 Home · Picks · Board · Account, on both surfaces. Home is the landing and the only screen that can
@@ -48,6 +65,10 @@ say *which pool* and *what needs doing* before a tab is chosen.
   swaps the whole app, so it is a context change and lives on the header lockup. `PoolsView` (iOS)
   and `PoolSheet` (web) are that sheet.
 - **Rules is not a tab.** `RulesSheet` on iOS, `/rules` on web, linked from Home and the board.
+- **The brand is not a block of content.** Home wears the full lockup; every other iOS tab carries
+  `PoolChip` (mark + pool name + chevron) in the navigation bar, which is also the switcher.
+- **Pinch does nothing.** `.noZoom()` on the root and on each sheet — there is no zoomable content
+  in Tally, so a pinch that scales the page is always an accident.
 - Web keeps the pick flow's step in the query string, so switching entries clears it
   (`AppShell.onSwitch`) and `PickFlowRoute` keys the flow by identity. Without both, the previous
   entry's "locked in" screen follows you.

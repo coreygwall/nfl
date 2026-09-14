@@ -142,23 +142,23 @@ function MorePools() {
       </button>
       {open && (
         <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          <div className="card-flat bg-white p-4">
+          <div className="card-flat bg-surface p-4">
             <h3 className="font-display font-extrabold">Join a pool</h3>
             <p className="text-sm text-ink-2">
               Open the link your commissioner sent. Every pool lives at its own address, so the link is the way in.
             </p>
           </div>
-          <div className="card-flat bg-white p-4">
+          <div className="card-flat bg-surface p-4">
             <h3 className="font-display font-extrabold">
               Start a pool <span className="chip ml-1 bg-paper-2 py-0 text-[10px]">coming soon</span>
             </h3>
             <p className="text-sm text-ink-2">Pick a game, name it, share one link.</p>
           </div>
           {POOL_TYPES.map((t) => (
-            <div key={t.slug} className="card-flat bg-white p-4">
+            <div key={t.slug} className="card-flat bg-surface p-4">
               <h3 className="font-display font-extrabold">
                 {t.name}{" "}
-                <span className={`chip ml-1 py-0 text-[10px] ${t.status === "live" ? "bg-turf text-white" : "bg-paper-2"}`}>
+                <span className={`chip ml-1 py-0 text-[10px] ${t.status === "live" ? "bg-turf text-on-turf" : "bg-paper-2"}`}>
                   {t.status === "live" ? "live now" : "coming soon"}
                 </span>
               </h3>

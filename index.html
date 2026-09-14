@@ -3,9 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
-    <meta name="theme-color" content="#F6F1E8" />
+    <meta name="theme-color" content="#F6F1E8" media="(prefers-color-scheme: light)" />
+    <meta name="theme-color" content="#1A1713" media="(prefers-color-scheme: dark)" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <!--
+      The theme, before the first paint. A saved "light" or "dark" has to be on <html> by the time
+      the stylesheet applies, or the page renders in the system theme for a frame and then flips —
+      a white flash on the way into a dark app is the one thing people notice about dark mode.
+      Inline and tiny on purpose: a module script is too late.
+    -->
+    <script>
+      try {
+        var t = localStorage.getItem("tally.theme");
+        if (t === "dark" || t === "light") document.documentElement.dataset.theme = t;
+      } catch (e) {}
+    </script>
     <!--
       One document serves the whole site. These tags describe Tally itself, which is what the bare
       domain is; the Worker rewrites them for a pool under /p/<slug>, so a pool link unfurls with

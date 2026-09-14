@@ -3,43 +3,80 @@ import SwiftUI
 import UIKit
 
 // The design system, ported from src/index.css: paper and ink, hard offset shadows, 2pt borders,
-// a display face for anything that shouts and Inter for everything else. Single-look (light),
-// as the site is; the paper is the background everywhere.
+// a display face for anything that shouts and Inter for everything else.
+//
+// Every colour is a pair. The hex values are the same ones in `src/index.css`, and the reasoning
+// behind the dark half lives there too — the short version is that paper-and-ink cannot be
+// inverted. `ink` draws both the text and the 2pt border, so flipping it to a light colour turns
+// every hard shadow white, which reads as a glow rather than as a card lying on a page. The shadow
+// therefore has its own colour and stays black in both themes, cards sit a step above a warm dark
+// ground rather than being white, and anything *filled* with an accent keeps dark text on it.
 
-extension Color {
-    init(hex: String) {
+extension UIColor {
+    fileprivate convenience init(hex: String) {
         var s = hex.trimmingCharacters(in: .whitespacesAndNewlines)
         if s.hasPrefix("#") { s.removeFirst() }
         var value: UInt64 = 0
         Scanner(string: s).scanHexInt64(&value)
-        let r, g, b: Double
-        if s.count == 6 {
-            r = Double((value >> 16) & 0xFF) / 255
-            g = Double((value >> 8) & 0xFF) / 255
-            b = Double(value & 0xFF) / 255
-        } else {
-            r = 0.5; g = 0.5; b = 0.5
+        guard s.count == 6 else {
+            self.init(white: 0.5, alpha: 1)
+            return
         }
-        self.init(red: r, green: g, blue: b)
+        self.init(
+            red: CGFloat((value >> 16) & 0xFF) / 255,
+            green: CGFloat((value >> 8) & 0xFF) / 255,
+            blue: CGFloat(value & 0xFF) / 255,
+            alpha: 1
+        )
+    }
+}
+
+extension Color {
+    init(hex: String) {
+        self.init(uiColor: UIColor(hex: hex))
     }
 
-    static let paper = Color(hex: "#F6F1E8")
-    static let paper2 = Color(hex: "#EDE5D6")
-    static let paper3 = Color(hex: "#E3D9C6")
-    static let ink = Color(hex: "#14120F")
-    static let ink2 = Color(hex: "#5B554B")
-    static let ink3 = Color(hex: "#6B6456")
-    static let line = Color(hex: "#D9D0C0")
-    static let turf = Color(hex: "#0B7A3B")
-    static let turf2 = Color(hex: "#0F9A4C")
-    static let turfSoft = Color(hex: "#DFF2E6")
-    static let flag = Color(hex: "#FFD23F")
-    static let flagSoft = Color(hex: "#FFF3C4")
-    static let danger = Color(hex: "#D7263D")
-    static let dangerSoft = Color(hex: "#FDE2E6")
-    static let sky = Color(hex: "#2F80ED")
-    static let skySoft = Color(hex: "#E1ECFC")
-    static let bronze = Color(hex: "#E9C9A6")
+    /// A colour that resolves against whatever theme the view is rendered in. Resolution happens at
+    /// draw time, so `.preferredColorScheme` on the root — the app's own Light/Dark/System setting
+    /// — reaches every one of these without a single call site knowing about it.
+    init(light: String, dark: String) {
+        self.init(uiColor: UIColor { traits in
+            traits.userInterfaceStyle == .dark ? UIColor(hex: dark) : UIColor(hex: light)
+        })
+    }
+
+    static let paper = Color(light: "#F6F1E8", dark: "#1A1713")
+    static let paper2 = Color(light: "#EDE5D6", dark: "#2E2921")
+    static let paper3 = Color(light: "#E3D9C6", dark: "#3A342A")
+    static let ink = Color(light: "#14120F", dark: "#F4EFE6")
+    static let ink2 = Color(light: "#5B554B", dark: "#B8AF9E")
+    static let ink3 = Color(light: "#6B6456", dark: "#9C9384")
+    static let line = Color(light: "#D9D0C0", dark: "#443C30")
+    static let turf = Color(light: "#0B7A3B", dark: "#3FBF74")
+    static let turf2 = Color(light: "#0F9A4C", dark: "#5AD48C")
+    static let turfSoft = Color(light: "#DFF2E6", dark: "#16301F")
+    static let flag = Color(light: "#FFD23F", dark: "#FFD23F")
+    static let flagSoft = Color(light: "#FFF3C4", dark: "#3A2F10")
+    static let danger = Color(light: "#D7263D", dark: "#FF6B7E")
+    static let dangerSoft = Color(light: "#FDE2E6", dark: "#3A1720")
+    static let sky = Color(light: "#2F80ED", dark: "#6FA8FF")
+    static let skySoft = Color(light: "#E1ECFC", dark: "#16233A")
+    static let bronze = Color(light: "#E9C9A6", dark: "#8A6A4A")
+
+    /// Where the light theme said `.white`: the fill of a card, a button, a chip. It is a step
+    /// lighter than the ground in the dark theme rather than white, or the cards shout.
+    static let surface = Color(light: "#FFFFFF", dark: "#24201A")
+
+    /// The hard offset shadow. Black in both themes — it is what makes a card look lifted, and a
+    /// light shadow is a glow.
+    static let shadow = Color(light: "#14120F", dark: "#000000")
+
+    /// Text that sits *on* a filled accent — a green button, a red one. White reads on the deep
+    /// light-theme green; the lighter dark-theme green needs black, and so does the pink-red.
+    static let onFill = Color(light: "#FFFFFF", dark: "#14120F")
+
+    /// Text on the yellow flag, which is the same yellow in both themes and always wants black.
+    static let onAccent = Color(hex: "#14120F")
 }
 
 enum TallyRadius {

@@ -2,10 +2,15 @@ import SwiftUI
 import TallyKit
 
 /**
- The pool's frame: three tabs on Liquid Glass, and on every tab the same header the web has —
- the Tally lockup on the left, the week picker and the name chip on the right. The tab bar
- tucks away as you scroll a long slate, which is the system's behaviour and exactly what the
- site's bottom nav did by hand.
+ The pool's frame: four tabs on Liquid Glass, and a header that no longer repeats itself.
+
+ The full lockup — the mark over "Tally" over the pool's name — used to sit at the top of every
+ tab's scroll content, which meant scrolling the board pushed the brand off screen and coming back
+ to Picks put it up again, in the middle of the page, for no reason. It is a cover, and a cover
+ belongs on the front: Home wears it, and every other tab carries the mark and the pool's name as a
+ compact control in the navigation bar, where it is always visible, always says which pool you are
+ in, and opens the switcher. The brand is more present than it was, not less — it just stopped
+ being a block of content.
  */
 struct PoolShellView: View {
     @Environment(AppModel.self) private var model
@@ -14,7 +19,7 @@ struct PoolShellView: View {
         @Bindable var model = model
         TabView(selection: $model.tab) {
             Tab("Home", systemImage: "house.fill", value: AppTab.home) {
-                PoolScreen(week: nil, onWeek: { _ in }) {
+                PoolScreen(week: nil, onWeek: { _ in }, wearsLockup: true) {
                     HomeView()
                 }
             }
@@ -58,6 +63,8 @@ struct PoolScreen<Content: View>: View {
     @Environment(AppModel.self) private var model
     let week: Int?
     let onWeek: (Int) -> Void
+    /// Home only. Everywhere else the brand is the mark in the navigation bar.
+    var wearsLockup = false
     @ViewBuilder let content: Content
 
     var body: some View {
@@ -67,23 +74,28 @@ struct PoolScreen<Content: View>: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         if !model.online { OfflineBanner() }
-                        Button { model.showPools = true } label: {
-                            Lockup(poolName: model.poolName, switchable: true)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .contentShape(Rectangle())
+                        if wearsLockup {
+                            Button { model.showPools = true } label: {
+                                Lockup(poolName: model.poolName, switchable: true)
+                                    .frame(maxWidth: .infinity, alignment: .leading)
+                                    .contentShape(Rectangle())
+                            }
+                            .buttonStyle(.cardPress)
+                            .accessibilityLabel("\(model.poolName). Switch pool")
+                            .padding(.horizontal, 16)
+                            .padding(.top, 10)
                         }
-                        .buttonStyle(.cardPress)
-                        .accessibilityLabel("\(model.poolName). Switch pool")
-                        .padding(.horizontal, 16)
-                        .padding(.top, 10)
                         content
                             .padding(.horizontal, 16)
-                            .padding(.top, 14)
+                            .padding(.top, wearsLockup ? 14 : 6)
                             .padding(.bottom, 120)
                     }
                 }
             }
             .toolbar {
+                if !wearsLockup {
+                    ToolbarItem(placement: .topBarLeading) { PoolChip() }
+                }
                 if let week {
                     ToolbarItem(placement: .topBarTrailing) {
                         WeekMenu(week: week, max: model.maxWeek, onChange: onWeek)
@@ -105,6 +117,37 @@ struct PoolScreen<Content: View>: View {
             }
             .toolbarTitleDisplayMode(.inline)
         }
+    }
+}
+
+/**
+ The pool you are in, small enough to live in a navigation bar on every screen.
+
+ It is the switcher as well as the label, which is the point: the one control that says *where am
+ I* is the same one that changes it, and it is the left-hand counterpart to the entry chip on the
+ right — where am I, and who am I.
+ */
+struct PoolChip: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Button { model.showPools = true } label: {
+            HStack(spacing: 6) {
+                Image("TallyMark")
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 22, height: 22)
+                Text(model.poolName)
+                    .font(TallyFont.display(15, weight: .bold))
+                    .lineLimit(1)
+                    .truncationMode(.tail)
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 9, weight: .black))
+                    .foregroundStyle(Color.ink3)
+            }
+            .frame(maxWidth: 150)
+        }
+        .accessibilityLabel("\(model.poolName). Switch pool")
     }
 }
 

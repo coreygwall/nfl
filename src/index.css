@@ -30,12 +30,88 @@
   --color-sky: #2f80ed;
   --color-sky-soft: #e1ecfc;
 
-  --shadow-hard: 4px 4px 0 0 #14120f;
-  --shadow-hard-sm: 2px 2px 0 0 #14120f;
-  --shadow-hard-lg: 6px 6px 0 0 #14120f;
-  --shadow-lift: 0 10px 24px -8px rgb(20 18 15 / 0.35);
+  /* The four that let the light theme be re-lit rather than inverted. See the dark block below. */
+  --color-surface: #ffffff;
+  --color-shadow: #14120f;
+  --color-on-accent: #14120f;
+  --color-on-turf: #ffffff;
+  --color-dot: rgb(20 18 15 / 0.06);
+
+  --shadow-hard: 4px 4px 0 0 var(--color-shadow);
+  --shadow-hard-sm: 2px 2px 0 0 var(--color-shadow);
+  --shadow-hard-lg: 6px 6px 0 0 var(--color-shadow);
+  --shadow-lift: 0 10px 24px -8px rgb(0 0 0 / 0.35);
 
   --radius-card: 20px;
+}
+
+/**
+ * Dark mode, which is not an inversion.
+ *
+ * Paper-and-ink has two things a naive invert destroys. The hard offset shadow is the whole look,
+ * and `ink` draws both the text and the 2px border — flip `ink` to a light colour and every shadow
+ * turns white, which reads as a glow rather than as a card lying on a page. So the shadow gets its
+ * own token and stays black: cards sit *above* a warm dark ground, lit from the same corner.
+ *
+ * The ground is warm (#1A1713, brown-black) rather than neutral, because the paper it replaces is
+ * warm. Cards are a step lighter than the ground instead of white. The accents keep their hue and
+ * gain lightness so they still clear 4.5:1, and anything *filled* with an accent keeps dark text
+ * in both themes — a yellow chip wants black on it whatever the rest of the screen is doing.
+ *
+ * Every pair here was checked: the worst is ink-3 on paper-2 at 4.76:1.
+ */
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    color-scheme: dark;
+    --color-paper: #1a1713;
+    --color-paper-2: #2e2921;
+    --color-paper-3: #3a342a;
+    --color-ink: #f4efe6;
+    --color-ink-2: #b8af9e;
+    --color-ink-3: #9c9384;
+    --color-line: #443c30;
+    --color-turf: #3fbf74;
+    --color-turf-2: #5ad48c;
+    --color-turf-soft: #16301f;
+    --color-flag: #ffd23f;
+    --color-flag-soft: #3a2f10;
+    --color-danger: #ff6b7e;
+    --color-danger-soft: #3a1720;
+    --color-sky: #6fa8ff;
+    --color-sky-soft: #16233a;
+    --color-surface: #24201a;
+    --color-shadow: #000000;
+    --color-on-turf: #14120f;
+    --color-dot: rgb(244 239 230 / 0.05);
+  }
+}
+
+:root[data-theme="dark"] {
+  color-scheme: dark;
+  --color-paper: #1a1713;
+  --color-paper-2: #2e2921;
+  --color-paper-3: #3a342a;
+  --color-ink: #f4efe6;
+  --color-ink-2: #b8af9e;
+  --color-ink-3: #9c9384;
+  --color-line: #443c30;
+  --color-turf: #3fbf74;
+  --color-turf-2: #5ad48c;
+  --color-turf-soft: #16301f;
+  --color-flag: #ffd23f;
+  --color-flag-soft: #3a2f10;
+  --color-danger: #ff6b7e;
+  --color-danger-soft: #3a1720;
+  --color-sky: #6fa8ff;
+  --color-sky-soft: #16233a;
+  --color-surface: #24201a;
+  --color-shadow: #000000;
+  --color-on-turf: #14120f;
+  --color-dot: rgb(244 239 230 / 0.05);
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
 }
 
 html {
@@ -49,7 +125,7 @@ body {
   font-family: var(--font-sans);
   font-feature-settings: "cv11", "ss01";
   min-height: 100dvh;
-  background-image: radial-gradient(rgb(20 18 15 / 0.06) 1px, transparent 1px);
+  background-image: radial-gradient(var(--color-dot) 1px, transparent 1px);
   background-size: 18px 18px;
 }
 
@@ -59,13 +135,13 @@ body {
     font-variation-settings: "wdth" 96, "opsz" 32;
   }
   .card {
-    background: #fff;
+    background: var(--color-surface);
     border: 2px solid var(--color-ink);
     border-radius: var(--radius-card);
     box-shadow: var(--shadow-hard);
   }
   .card-flat {
-    background: #fff;
+    background: var(--color-surface);
     border: 2px solid var(--color-ink);
     border-radius: var(--radius-card);
   }
@@ -82,7 +158,7 @@ body {
     font-weight: 700;
     font-size: 1.05rem;
     letter-spacing: 0.01em;
-    background: #fff;
+    background: var(--color-surface);
     color: var(--color-ink);
     box-shadow: var(--shadow-hard-sm);
     transition: transform 120ms ease, box-shadow 120ms ease, opacity 120ms ease;
@@ -92,7 +168,7 @@ body {
   }
   .btn:active {
     transform: translate(2px, 2px);
-    box-shadow: 0 0 0 0 var(--color-ink);
+    box-shadow: 0 0 0 0 var(--color-shadow);
   }
   .btn:disabled {
     opacity: 0.45;
@@ -104,11 +180,13 @@ body {
   }
   .btn-turf {
     background: var(--color-turf);
-    color: #fff;
+    /* A filled accent keeps legible text on it in both themes; the lighter dark-mode green
+       wants black on it, not white. */
+    color: var(--color-on-turf);
   }
   .btn-flag {
     background: var(--color-flag);
-    color: var(--color-ink);
+    color: var(--color-on-accent);
   }
   .btn-ghost {
     border-color: transparent;
@@ -127,7 +205,7 @@ body {
     padding: 0.2rem 0.65rem;
     border-radius: 999px;
     border: 2px solid var(--color-ink);
-    background: #fff;
+    background: var(--color-surface);
     font-size: 0.8rem;
     font-weight: 700;
     line-height: 1.4;
@@ -141,11 +219,14 @@ body {
     user-select: none;
     -webkit-user-drag: none;
   }
+  /* The halo separates a logo from whatever it sits on, so it is the surface colour rather
+     than white — a white ring on a dark card is a sticker someone cut out badly. */
   .sticker-raster {
-    filter: drop-shadow(1.5px 0 0 #fff) drop-shadow(-1.5px 0 0 #fff) drop-shadow(0 1.5px 0 #fff) drop-shadow(0 -1.5px 0 #fff);
+    filter: drop-shadow(1.5px 0 0 var(--color-surface)) drop-shadow(-1.5px 0 0 var(--color-surface))
+      drop-shadow(0 1.5px 0 var(--color-surface)) drop-shadow(0 -1.5px 0 var(--color-surface));
   }
   .sticker-shadow {
-    filter: drop-shadow(0 6px 6px rgb(20 18 15 / 0.22));
+    filter: drop-shadow(0 6px 6px rgb(0 0 0 / 0.22));
   }
   .no-scrollbar::-webkit-scrollbar {
     display: none;
@@ -314,7 +395,7 @@ button {
       transition: background-color 140ms ease;
     }
     .row-hover:hover {
-      background: color-mix(in oklab, var(--color-flag) 12%, #fff);
+      background: color-mix(in oklab, var(--color-flag) 12%, var(--color-surface));
     }
   }
 
@@ -327,7 +408,7 @@ button {
   }
   .app-header[data-scrolled="true"] {
     border-bottom-color: var(--color-ink);
-    box-shadow: 0 4px 0 -2px rgb(20 18 15 / 0.08);
+    box-shadow: 0 4px 0 -2px rgb(0 0 0 / 0.08);
   }
 
   .marquee-track {

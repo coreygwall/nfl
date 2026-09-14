@@ -27,6 +27,7 @@ struct AccountView: View {
 
             entriesSection
             passkeySection
+            appearanceSection
             notificationsSection
             anotherDeviceSection
             moreSection
@@ -54,7 +55,7 @@ struct AccountView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.cardPress)
-                .modifier(TallyCard(hard: active, fill: .white, border: .ink, radius: TallyRadius.card, dashed: false))
+                .modifier(TallyCard(hard: active, fill: .surface, border: .ink, radius: TallyRadius.card, dashed: false))
             }
             if adding {
                 AddEntryForm(onDone: { identity in
@@ -77,6 +78,20 @@ struct AccountView: View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Signing in")
             PasskeyRow(hasPasskey: (boot?.myPasskeys ?? 0) > 0)
+        }
+    }
+
+    // MARK: Appearance
+
+    private var appearanceSection: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "Appearance")
+            TallySegmented(
+                value: Binding(get: { model.theme }, set: { model.theme = $0 }),
+                options: ThemeChoice.allCases.map { ($0, $0.label) }
+            )
+            Text("System follows your phone, so the app turns dark when everything else does.")
+                .sans(12).foregroundStyle(Color.ink2)
         }
     }
 
@@ -140,7 +155,7 @@ struct EntrySwitcherSheet: View {
     var body: some View {
         NavigationStack {
             ZStack {
-                Color.white.ignoresSafeArea()
+                Color.surface.ignoresSafeArea()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 12) {
                         ForEach(model.people) { p in
@@ -192,6 +207,7 @@ struct EntrySwitcherSheet: View {
                     .padding(20)
                 }
             }
+            .noZoom()
             .navigationTitle("Picking as")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }

@@ -176,7 +176,7 @@ struct WelcomeView: View {
                         .sans(15, weight: .bold)
                         .padding(.horizontal, 14)
                         .padding(.vertical, 9)
-                        .background(Capsule().fill(Color.white))
+                        .background(Capsule().fill(Color.surface))
                         .overlay(Capsule().strokeBorder(Color.ink, lineWidth: 2))
                 }
             }

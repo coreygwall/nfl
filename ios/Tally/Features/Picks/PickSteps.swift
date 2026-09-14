@@ -59,7 +59,7 @@ struct SelectStep: View {
                             Text("No weekly deadline").sans(10, weight: .bold)
                         }
                         .padding(.horizontal, 8).padding(.vertical, 2)
-                        .background(Capsule().fill(Color.white))
+                        .background(Capsule().fill(Color.surface))
                         .overlay(Capsule().strokeBorder(Color.ink, lineWidth: 2))
                         Text("Games lock one by one at kickoff · \(openCount) open").sans(12).foregroundStyle(Color.ink3)
                     }

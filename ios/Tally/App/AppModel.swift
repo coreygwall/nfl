@@ -12,6 +12,32 @@ enum AppTab: Hashable {
     case home, picks, board, account
 }
 
+/**
+ Light, dark, or whatever the phone is doing.
+
+ "System" is the default and is stored as the absence of a choice, so a phone that turns dark at
+ sunset takes the app with it without anyone having picked anything.
+ */
+enum ThemeChoice: String, CaseIterable, Hashable {
+    case system, light, dark
+
+    var label: String {
+        switch self {
+        case .system: return "System"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
+    }
+
+    var scheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+}
+
 enum BoardScope: String, Hashable {
     case week, season
 }
@@ -117,6 +143,18 @@ final class AppModel {
         Keychain.shared.remove(forKey: legacyPinKey)
     }
 
+    // MARK: Appearance
+
+    private static let themeKey = "tally.theme"
+
+    var theme: ThemeChoice = .system {
+        didSet {
+            guard theme != oldValue else { return }
+            if theme == .system { UserDefaults.standard.removeObject(forKey: AppModel.themeKey) }
+            else { UserDefaults.standard.set(theme.rawValue, forKey: AppModel.themeKey) }
+        }
+    }
+
     private let monitor = NWPathMonitor()
     private var refreshTask: Task<Void, Never>?
 
@@ -140,6 +178,7 @@ final class AppModel {
             Task { @MainActor in self?.online = path.status == .satisfied }
         }
         monitor.start(queue: DispatchQueue(label: "tally.network"))
+        theme = UserDefaults.standard.string(forKey: AppModel.themeKey).flatMap(ThemeChoice.init(rawValue:)) ?? .system
         loadLegacyPin()
         connectPush()
         refreshTask = Task { [weak self] in

@@ -90,6 +90,7 @@ struct RulesSheet: View {
                         .padding(.bottom, 40)
                 }
             }
+            .noZoom()
             .navigationTitle("How it works")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }

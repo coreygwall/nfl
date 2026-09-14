@@ -7,6 +7,7 @@ import { useChrome } from "./Chrome.tsx";
 import { ChevronDown, ChevronLeft, ChevronRight, Football, House, Swap, Trophy, X } from "./Icons.tsx";
 import { useToast } from "./Toast.tsx";
 import { useOnline } from "../lib/online.ts";
+import { useTheme, type Theme } from "../lib/theme.ts";
 import { api, ApiClientError } from "../api/client.ts";
 import type { Identity } from "../lib/identity.ts";
 import { formatCode } from "../../shared/codes.ts";
@@ -320,6 +321,7 @@ function AccountSheet({
 
       <p className="mt-2 text-sm text-ink-2">Add entries for your kids, family, or friends. Each gets their own picks and score, all managed by your account.</p>
       <PasskeyRow key={player?.accountId ?? player?.id} hasPasskey={hasPasskey} />
+      <ThemeRow />
 
       {adding ? (
         <AddPerson
@@ -349,6 +351,37 @@ function AccountSheet({
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Light, dark, or the device's own mind. "System" is the default and is the absence of a choice,
+ * so a phone that turns dark at sunset takes the app with it.
+ */
+function ThemeRow() {
+  const [theme, setTheme] = useTheme();
+  const options: { value: Theme; label: string }[] = [
+    { value: "system", label: "System" },
+    { value: "light", label: "Light" },
+    { value: "dark", label: "Dark" },
+  ];
+  return (
+    <div className="mt-4 border-t-2 border-dashed border-line pt-4">
+      <h3 className="font-display mb-2 text-sm font-extrabold uppercase tracking-wider text-ink-3">Appearance</h3>
+      <div className="flex gap-2" role="radiogroup" aria-label="Appearance">
+        {options.map((o) => (
+          <button
+            key={o.value}
+            role="radio"
+            aria-checked={theme === o.value}
+            className={`btn btn-sm flex-1 ${theme === o.value ? "btn-primary" : ""}`}
+            onClick={() => setTheme(o.value)}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -585,7 +618,7 @@ export function Sheet({
         transition={{ type: "spring", stiffness: 400, damping: 32 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 -mx-5 mb-3 flex items-center justify-between bg-white px-5 pb-3">
+        <div className="sticky top-0 -mx-5 mb-3 flex items-center justify-between bg-surface px-5 pb-3">
           <h2 className="font-display text-xl font-extrabold">{title}</h2>
           <button className="btn btn-ghost btn-sm px-2" onClick={onClose} aria-label="Close">
             <X />
@@ -607,7 +640,7 @@ function PoolSheet({ poolName, poolType, onClose }: { poolName: string; poolType
   return (
     <Sheet title="Pools" onClose={onClose}>
       <h3 className="font-display mb-2 text-sm font-extrabold uppercase tracking-wider text-ink-3">Your pool</h3>
-      <div className="card-flat flex items-center gap-3 bg-white p-3">
+      <div className="card-flat flex items-center gap-3 bg-surface p-3">
         <div className="min-w-0">
           <div className="font-display truncate font-extrabold">{poolName}</div>
           <div className="truncate text-xs text-ink-2">{poolType ?? "High Five"}</div>

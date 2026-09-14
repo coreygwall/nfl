@@ -19,6 +19,7 @@ struct RootView: View {
             }
             ToastStack()
         }
+        .noZoom()
         .animation(.easeInOut(duration: 0.2), value: model.player == nil || model.showWelcome)
         .onChange(of: scenePhase) { _, phase in
             // Back from the background: the week may have moved on, a game may have kicked off.

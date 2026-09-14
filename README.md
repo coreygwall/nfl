@@ -156,6 +156,14 @@ Four places, on both surfaces:
 | **Board** | Who is winning. |
 | **Account** | Your entries, signing in, notifications — and the office doors, for whoever holds one. |
 
+The brand is on Home as the full lockup and in the navigation bar everywhere else, rather than
+repeating as a block at the top of every tab's content.
+
+**Dark mode** follows the device by default; Account → Appearance sets Light or Dark instead. It is
+a re-light rather than an inversion — cards sit above a warm dark ground, the hard offset shadow
+stays black so it still reads as a shadow, and filled accents keep dark text. iOS ships a dark app
+icon to match. Every colour pair clears 4.5:1.
+
 Two things deliberately *not* in that list:
 
 - **Switching pools** is a context change, not a destination — it swaps the whole app. It lives on

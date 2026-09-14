@@ -342,7 +342,7 @@ function SelectStep({
                 : "Tap a team to pick it. Choose five, then rank them — surest pick 5 pts, least sure 1."}
             </p>
             <p className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ink-3">
-              <span className="chip bg-white py-0 text-[10px] font-bold">
+              <span className="chip bg-surface py-0 text-[10px] font-bold">
                 <Lock size={10} /> No weekly deadline
               </span>
               <span>Games lock one by one at kickoff · {openCount} open</span>
@@ -456,7 +456,7 @@ function GameCard({
     <motion.li
       layout
       className={`card-flat relative select-none overflow-hidden transition-opacity duration-200 ${
-        locked ? "bg-paper-2/70" : "bg-white"
+        locked ? "bg-paper-2/70" : "bg-surface"
       } ${muted ? "opacity-45 hover:opacity-100 focus-within:opacity-100" : ""}`}
       animate={chosen && !locked ? { boxShadow: "4px 4px 0 0 #14120f", y: -1 } : { boxShadow: "0px 0px 0 0 #14120f", y: 0 }}
       transition={{ type: "spring", stiffness: 500, damping: 30 }}
@@ -671,7 +671,7 @@ function RankRow({
       dragControls={controls}
       layout
       whileDrag={{ scale: 1.03, boxShadow: "6px 6px 0 0 #14120f", zIndex: 10 }}
-      className="card-flat relative flex touch-pan-y select-none items-center gap-3 bg-white p-2.5"
+      className="card-flat relative flex touch-pan-y select-none items-center gap-3 bg-surface p-2.5"
     >
       <motion.div key={rank} initial={{ scale: 0.7 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 600, damping: 20 }}>
         <RankBadge rank={rank} />
@@ -761,7 +761,7 @@ function DoneStep({
             initial={{ opacity: 0, x: -12 }}
             animate={{ opacity: 1, x: 0 }}
             transition={{ delay: 0.25 + i * 0.07 }}
-            className="card-flat flex items-center gap-3 bg-white p-2"
+            className="card-flat flex items-center gap-3 bg-surface p-2"
           >
             <RankBadge rank={p.rank} size="sm" />
             <TeamSticker abbr={p.team} size={36} flat />
@@ -872,7 +872,7 @@ function ReviewStep({
               const mine = myPicks.find((p) => p.gameId === g.id)?.team;
               const pct = (n: number) => (total ? Math.round((n / total) * 100) : 0);
               return (
-                <li key={g.id} className="card-flat bg-white p-3">
+                <li key={g.id} className="card-flat bg-surface p-3">
                   <div className="flex items-center gap-2 text-sm">
                     <TeamSticker abbr={g.away} size={28} flat />
                     <span className={`font-bold ${mine === g.away ? "text-turf" : ""}`}>{TEAMS[g.away].display}</span>
@@ -914,7 +914,7 @@ export function outcomeStyle(outcome: string): string {
     case "live":
       return "border-flag bg-flag-soft";
     default:
-      return "border-line bg-white";
+      return "border-line bg-surface";
   }
 }
 

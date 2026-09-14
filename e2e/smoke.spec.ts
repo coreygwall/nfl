@@ -342,6 +342,24 @@ test("an entry removed by the commissioner doesn't strand the device that held i
   await expect(page.getByRole("heading", { name: /Pick 5 winners/ })).toBeVisible();
 });
 
+test("dark mode follows the device, and a choice overrides it", async ({ page }) => {
+  // The tokens are the theme: nothing re-renders, the custom properties are redefined on <html>.
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto(`/p/high-five/welcome?now=${BEFORE}`);
+  const ground = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  expect(await ground()).toBe("rgb(26, 23, 19)");
+
+  await page.emulateMedia({ colorScheme: "light" });
+  expect(await ground()).toBe("rgb(246, 241, 232)");
+
+  // A saved choice wins over the device, and survives a reload without a flash — the inline
+  // script in index.html puts it on <html> before the stylesheet applies.
+  await page.evaluate(() => localStorage.setItem("tally.theme", "dark"));
+  await page.reload();
+  expect(await page.getAttribute("html", "data-theme")).toBe("dark");
+  expect(await ground()).toBe("rgb(26, 23, 19)");
+});
+
 test("the landing page explains a pool without linking into one", async ({ page }) => {
   await page.goto("/");
   await expect(page.getByRole("heading", { name: /Simple, fun games/ })).toBeVisible();

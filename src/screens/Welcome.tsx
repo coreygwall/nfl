@@ -662,7 +662,7 @@ function Hero() {
           ["Rank them", "1 to 5"],
           ["Score", "5·4·3·2·1"],
         ].map(([a, b], i) => (
-          <li key={a} className="card-flat bg-white px-2 py-2.5">
+          <li key={a} className="card-flat bg-surface px-2 py-2.5">
             <span className="font-display block text-[10px] font-extrabold uppercase tracking-wider text-ink-3">Step {i + 1}</span>
             <span className="font-display block text-[15px] font-extrabold leading-tight">{a}</span>
             <span className="block text-xs text-ink-2">{b}</span>
