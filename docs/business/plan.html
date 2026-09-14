@@ -1,0 +1,1028 @@
+<title>Tally Business Plan</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&family=Inter:wght@400;500;600;700&display=swap">
+<style>
+  :root {
+    --paper:      #f6f1e8;
+    --paper-2:    #ede5d6;
+    --surface:    #fffdf8;
+    --ink:        #14120f;
+    --ink-2:      #5b554b;
+    --ink-3:      #7d7566;
+    --line:       #d9d0c0;
+    --rule:       #14120f;
+    --turf:       #0b7a3b;
+    --turf-soft:  #dff2e6;
+    --flag:       #ffd23f;
+    --flag-soft:  #fff3c4;
+    --danger:     #b81e33;
+    --danger-soft:#fde2e6;
+    --sky:        #2f80ed;
+    --sky-soft:   #e1ecfc;
+    --shadow:     #14120f;
+    --dot:        rgb(20 18 15 / 0.06);
+
+    --f-display: "Bricolage Grotesque", ui-sans-serif, system-ui, sans-serif;
+    --f-sans: "Inter", ui-sans-serif, system-ui, -apple-system, sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --paper:      #16130f;
+      --paper-2:    #1d1a14;
+      --surface:    #221e18;
+      --ink:        #f4eee2;
+      --ink-2:      #b3aa98;
+      --ink-3:      #928a79;
+      --line:       #3a342b;
+      --rule:       #4a4235;
+      --turf:       #4fcb7e;
+      --turf-soft:  #17311f;
+      --flag:       #ffd23f;
+      --flag-soft:  #33290a;
+      --danger:     #ff7a8c;
+      --danger-soft:#3a1119;
+      --sky:        #7ab0ff;
+      --sky-soft:   #16233a;
+      --shadow:     #000000;
+      --dot:        rgb(244 238 226 / 0.05);
+    }
+  }
+  :root[data-theme="dark"] {
+    --paper:      #16130f;
+    --paper-2:    #1d1a14;
+    --surface:    #221e18;
+    --ink:        #f4eee2;
+    --ink-2:      #b3aa98;
+    --ink-3:      #928a79;
+    --line:       #3a342b;
+    --rule:       #4a4235;
+    --turf:       #4fcb7e;
+    --turf-soft:  #17311f;
+    --flag:       #ffd23f;
+    --flag-soft:  #33290a;
+    --danger:     #ff7a8c;
+    --danger-soft:#3a1119;
+    --sky:        #7ab0ff;
+    --sky-soft:   #16233a;
+    --shadow:     #000000;
+    --dot:        rgb(244 238 226 / 0.05);
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    background-color: var(--paper);
+    background-image: radial-gradient(var(--dot) 1px, transparent 1px);
+    background-size: 18px 18px;
+    color: var(--ink);
+    font-family: var(--f-sans);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+  }
+
+  .wrap { max-width: 940px; margin: 0 auto; padding-inline: 20px; padding-block: 0; }
+
+  h1, h2, h3, h4, .display { font-family: var(--f-display); font-weight: 800; letter-spacing: -0.015em; text-wrap: balance; }
+
+  a { color: var(--ink); text-underline-offset: 3px; text-decoration-thickness: 1.5px; text-decoration-color: var(--flag); }
+  a:hover { text-decoration-color: var(--ink); }
+  :focus-visible { outline: 3px solid var(--sky); outline-offset: 3px; border-radius: 4px; }
+
+  /* ---------- masthead ---------- */
+  .masthead { border-bottom: 2px solid var(--rule); background: var(--paper); }
+  .masthead .wrap { display: flex; align-items: center; gap: 14px; padding-block: 16px; flex-wrap: wrap; }
+  .mark { flex: none; }
+  .wordmark { font-family: var(--f-display); font-weight: 800; font-size: 1.6rem; line-height: 1; letter-spacing: -0.03em; }
+  .masthead .kicker { margin-left: auto; font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-3); }
+
+  /* ---------- nav ---------- */
+  nav.toc { position: sticky; top: 0; z-index: 20; background: var(--paper); border-bottom: 2px solid var(--rule); }
+  nav.toc .wrap { display: flex; gap: 6px; overflow-x: auto; padding-block: 9px; scrollbar-width: thin; }
+  nav.toc a {
+    flex: none; font-family: var(--f-display); font-weight: 700; font-size: 13px;
+    padding: 5px 11px; border-radius: 999px; border: 1.5px solid transparent;
+    text-decoration: none; color: var(--ink-2); white-space: nowrap;
+  }
+  nav.toc a:hover { border-color: var(--rule); color: var(--ink); }
+
+  /* ---------- hero ---------- */
+  .hero { padding-block: 44px 8px; scroll-margin-top: 62px; }
+  .hero h1 { font-size: clamp(2.3rem, 6.2vw, 3.6rem); line-height: 1.02; margin: 0 0 18px; max-width: 17ch; }
+  .thesis { font-size: clamp(1.02rem, 1.9vw, 1.14rem); max-width: 66ch; color: var(--ink-2); margin: 0; }
+  .thesis strong { color: var(--ink); font-weight: 600; }
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin: 22px 0 0; padding: 0; list-style: none; }
+  .chip {
+    font-family: var(--f-display); font-weight: 700; font-size: 12.5px;
+    border: 2px solid var(--rule); border-radius: 999px; padding: 4px 12px; background: var(--surface);
+  }
+  .chip.flag { background: var(--flag); color: #14120f; border-color: #14120f; }
+
+  /* ---------- sections ---------- */
+  section { padding-block: 40px; border-top: 2px dashed var(--line); scroll-margin-top: 62px; }
+  section:first-of-type { border-top: none; }
+  .eyebrow { display: flex; align-items: baseline; gap: 10px; margin-bottom: 6px; }
+  .eyebrow .num {
+    font-family: var(--f-display); font-weight: 800; font-size: 12px;
+    color: var(--ink); background: var(--flag); border: 2px solid #14120f; border-radius: 999px;
+    padding: 1px 9px; line-height: 1.5;
+  }
+  .eyebrow .src { font-size: 11.5px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.1em; color: var(--ink-3); }
+  section > h2 { font-size: clamp(1.55rem, 3.6vw, 2.05rem); margin: 0 0 10px; }
+  .lede { color: var(--ink-2); max-width: 66ch; margin: 0 0 24px; }
+  p { max-width: 68ch; }
+
+  /* ---------- cards ---------- */
+  .card {
+    background: var(--surface); border: 2px solid var(--rule); border-radius: 18px;
+    box-shadow: 4px 4px 0 0 var(--shadow); padding: 20px;
+  }
+  .card-flat { background: var(--surface); border: 2px solid var(--rule); border-radius: 18px; padding: 20px; }
+  .grid { display: grid; gap: 16px; align-items: start; }
+  @media (min-width: 720px) { .g2 { grid-template-columns: 1fr 1fr; } .g3 { grid-template-columns: repeat(3, 1fr); } }
+
+  /* ---------- conclusions ---------- */
+  ol.findings { list-style: none; counter-reset: f; padding: 0; margin: 0; display: grid; gap: 12px; }
+  ol.findings li {
+    counter-increment: f; position: relative;
+    background: var(--surface); border: 2px solid var(--rule); border-radius: 16px;
+    padding: 16px 18px 16px 56px;
+  }
+  ol.findings li::before {
+    content: counter(f); position: absolute; left: 16px; top: 15px;
+    font-family: var(--f-display); font-weight: 800; font-size: 1.25rem; line-height: 1;
+    color: var(--ink-3);
+  }
+  ol.findings h3 { font-size: 1.04rem; margin: 0 0 4px; }
+  ol.findings p { margin: 0; color: var(--ink-2); font-size: 15px; max-width: 62ch; }
+  ol.findings .ref { font-size: 11.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: var(--ink-3); }
+
+  /* ---------- tables ---------- */
+  .scroll { overflow-x: auto; border: 2px solid var(--rule); border-radius: 16px; background: var(--surface); }
+  table { border-collapse: collapse; width: 100%; min-width: 520px; font-size: 14.5px; }
+  th, td { text-align: left; padding: 11px 14px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  thead th {
+    font-family: var(--f-display); font-weight: 700; font-size: 12px; text-transform: uppercase;
+    letter-spacing: 0.07em; color: var(--ink-2); background: var(--paper-2); border-bottom: 2px solid var(--rule);
+    white-space: nowrap;
+  }
+  tbody tr:last-child td { border-bottom: none; }
+  td.num, th.num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  tbody tr.accent td { background: var(--flag-soft); }
+  td strong { font-weight: 600; }
+
+  /* ---------- verdict pills ---------- */
+  .pill {
+    display: inline-block; font-family: var(--f-display); font-weight: 700; font-size: 11.5px;
+    text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 9px; border-radius: 999px;
+    border: 1.5px solid currentColor; white-space: nowrap;
+  }
+  .pill.yes  { color: var(--turf);   background: var(--turf-soft); }
+  .pill.no   { color: var(--danger); background: var(--danger-soft); }
+  .pill.wait { color: var(--sky);    background: var(--sky-soft); }
+
+  /* ---------- model ---------- */
+  .controls { display: grid; gap: 18px; margin-bottom: 18px; }
+  @media (min-width: 620px) { .controls { grid-template-columns: 1fr 1fr; } }
+  .control label { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; font-size: 13px; font-weight: 600; color: var(--ink-2); margin-bottom: 6px; }
+  .control output { font-family: var(--f-display); font-weight: 800; font-size: 1.15rem; color: var(--ink); font-variant-numeric: tabular-nums; }
+  input[type="range"] { width: 100%; accent-color: var(--turf); height: 26px; }
+  .assumption { font-size: 12.5px; color: var(--ink-3); margin: 14px 0 0; max-width: none; }
+
+  /* ---------- tiers ---------- */
+  .tier h3 { margin: 0 0 2px; font-size: 1.2rem; }
+  .tier .price { font-family: var(--f-display); font-weight: 800; font-size: 1.9rem; line-height: 1.1; margin: 6px 0 12px; }
+  .tier .price span { font-size: 0.85rem; font-weight: 600; color: var(--ink-2); }
+  .tier ul { margin: 0; padding-left: 18px; font-size: 14.5px; color: var(--ink-2); display: grid; gap: 5px; }
+  .tier.hi { box-shadow: 4px 4px 0 0 var(--shadow); border-color: var(--rule); }
+  .tier.hi .price { color: var(--turf); }
+
+  /* ---------- timeline ---------- */
+  .timeline { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+  @media (min-width: 860px) { .timeline { grid-template-columns: repeat(5, 1fr); } }
+  .timeline li { border: 2px solid var(--rule); border-radius: 14px; padding: 14px; background: var(--surface); }
+  .timeline .when { font-family: var(--f-display); font-weight: 800; font-size: 12px; text-transform: uppercase; letter-spacing: 0.06em; color: var(--ink-3); }
+  .timeline h4 { margin: 4px 0 6px; font-size: 1rem; }
+  .timeline p { margin: 0; font-size: 13.5px; color: var(--ink-2); max-width: none; }
+  .timeline li.deadline { background: var(--flag-soft); border-color: var(--rule); box-shadow: 4px 4px 0 0 var(--shadow); }
+  .timeline li.deadline .when { color: var(--ink); }
+
+  /* ---------- callout ---------- */
+  .callout {
+    border: 2px solid var(--rule); border-left-width: 8px; border-radius: 14px;
+    background: var(--surface); padding: 16px 18px; margin: 22px 0 0;
+  }
+  .callout p { margin: 0; }
+  .callout.warn { border-left-color: var(--danger); }
+  .callout.good { border-left-color: var(--turf); }
+  .callout.note { border-left-color: var(--flag); }
+  .callout .label { font-family: var(--f-display); font-weight: 800; font-size: 11.5px; text-transform: uppercase; letter-spacing: 0.09em; color: var(--ink-3); display: block; margin-bottom: 4px; }
+
+  /* ---------- doc index ---------- */
+  .docs { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
+  @media (min-width: 720px) { .docs { grid-template-columns: 1fr 1fr; } }
+  .docs li { display: flex; gap: 12px; align-items: baseline; border: 2px solid var(--rule); border-radius: 14px; padding: 12px 15px; background: var(--surface); }
+  .docs .n { font-family: var(--f-display); font-weight: 800; color: var(--ink-3); font-size: 13px; flex: none; }
+  .docs code { font-family: var(--f-sans); font-weight: 600; font-size: 14px; }
+  .docs .d { display: block; font-size: 13px; color: var(--ink-2); }
+
+  footer { border-top: 2px solid var(--rule); margin-top: 40px; }
+  footer .wrap { padding-block: 24px 40px; font-size: 13px; color: var(--ink-3); }
+
+  .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0; }
+
+  @media (prefers-reduced-motion: reduce) { * { animation: none !important; transition: none !important; } }
+</style>
+
+<header class="masthead">
+  <div class="wrap">
+    <svg class="mark" width="38" height="38" viewBox="0 0 38 38" aria-hidden="true">
+      <rect x="1.5" y="1.5" width="35" height="35" rx="9" fill="var(--flag)" stroke="var(--rule)" stroke-width="2.5"/>
+      <g stroke="#14120f" stroke-width="2.6" stroke-linecap="round">
+        <path d="M10 11v11M15 11v11M20 11v11M25 11v11"/>
+        <path d="M8 23.5L27 9.5"/>
+      </g>
+    </svg>
+    <span class="wordmark">Tally</span>
+    <span class="kicker">Business Plan · September 2026</span>
+  </div>
+</header>
+
+<nav class="toc" aria-label="Sections">
+  <div class="wrap">
+    <a href="#thesis">Thesis</a>
+    <a href="#conclusions">Conclusions</a>
+    <a href="#market">Market</a>
+    <a href="#money">Monetization</a>
+    <a href="#economics">Economics</a>
+    <a href="#engagement">Engagement</a>
+    <a href="#gtm">Go-to-market</a>
+    <a href="#partners">Partners &amp; capital</a>
+    <a href="#brand">Brand</a>
+    <a href="#docs">The documents</a>
+  </div>
+</nav>
+
+<main class="wrap">
+
+  <div class="hero" id="thesis">
+    <h1>Everyone else is running toward gambling.</h1>
+    <p class="thesis">
+      Splash Sports has raised <strong>$28.6M</strong> and just partnered with Polymarket. Sleeper is at a
+      <strong>$400M valuation</strong> with roughly 60% of revenue from real-money picks. That leaves the largest
+      part of the market unserved: the ordinary group pool played for twenty dollars and bragging rights — the one
+      that includes somebody's kid and somebody's father-in-law who will not be creating an account.
+      Tally already owns the hardest asset for serving it: <strong>joining is typing your name</strong>. The
+      business is to become the default way a <em>group</em> keeps score across every season of the year, and to
+      charge the one person with the pain — the commissioner.
+    </p>
+    <ul class="chips">
+      <li class="chip flag">~54M Americans in pools yearly</li>
+      <li class="chip">$0.00013 / player / month to run</li>
+      <li class="chip">~98% gross margin at every scale</li>
+      <li class="chip">Brackets due Feb 2027</li>
+    </ul>
+  </div>
+
+  <section id="conclusions">
+    <div class="eyebrow"><span class="num">01</span><span class="src">The short version</span></div>
+    <h2>Eight conclusions</h2>
+    <p class="lede">If you read nothing else, read these. Each links to the document that argues it.</p>
+
+    <ol class="findings">
+      <li>
+        <h3>Don't touch prize money — ever.</h3>
+        <p>It triggers money-transmitter licensing in up to 50 states and Apple Guideline 5.3, which forces
+        real-money apps to be free on the App Store and bars IAP for entry credit. That single rule would kill the
+        subscription business inside the iOS app. Build a kitty <em>tracker</em> that hands off to Venmo instead —
+        it's more useful for a 15-person pool and carries none of the liability.</p>
+        <span class="ref">02 · Monetization</span>
+      </li>
+      <li>
+        <h3>Charge the commissioner. Never the players, never per-player.</h3>
+        <p>Per-player pricing makes the commissioner do arithmetic about the eleventh invite — the one behaviour
+        that must never happen. Every pricing page in this category gets it wrong.</p>
+        <span class="ref">02 · Monetization</span>
+      </li>
+      <li>
+        <h3>The 2026 NFL window has closed. March Madness 2027 is the first real swing.</h3>
+        <p>Pools form in the two weeks before Week 1 and essentially never after. That makes <strong>Brackets
+        shipped by mid-February</strong> the only hard deadline on the roadmap — missing it costs a full year.</p>
+        <span class="ref">05 · Go-to-market</span>
+      </li>
+      <li>
+        <h3>Cost is not a variable in this business.</h3>
+        <p>Gross margin holds at ~98% from 20 players to 3 million. Stop optimising infrastructure — there is
+        nothing there. Spend every available hour on distribution.</p>
+        <span class="ref">03 · Unit economics</span>
+      </li>
+      <li>
+        <h3>The Weekly Recap is the highest-value unbuilt feature.</h3>
+        <p>An AI-written wrap of the group's week, by name. It costs about $0.002 per pool per week, it is the most
+        natural paywall in the product, and it is <em>distribution</em> — it's the thing a commissioner forwards
+        into the group chat with a link attached.</p>
+        <span class="ref">06 · Engagement</span>
+      </li>
+      <li>
+        <h3>Side games run on standing, not money.</h3>
+        <p>Being named in front of people you know, loss-aversion on a streak, and social debt. Not one of the
+        mechanics worth building needs a prize.</p>
+        <span class="ref">06 · Engagement</span>
+      </li>
+      <li>
+        <h3>Don't raise.</h3>
+        <p>There is nothing to spend it on at $60/year of infrastructure, the metric that would justify it takes
+        twelve months to measure, and venture money will push the product toward exactly the gambling model this
+        whole plan avoids. Bootstrapping to ~$196k/year at 98% margin is the better founder outcome.</p>
+        <span class="ref">07 · Partnerships &amp; investment</span>
+      </li>
+      <li>
+        <h3>Measure one number above all others.</h3>
+        <p>What percentage of commissioners run a second season. Below ~35% this is a novelty; above 50% it's a
+        business. Nothing else is decidable until it's known — and it takes a full year to find out, so start now.</p>
+        <span class="ref">05 · Go-to-market</span>
+      </li>
+    </ol>
+  </section>
+
+  <section id="market">
+    <div class="eyebrow"><span class="num">02</span><span class="src">Strategy · doc 01</span></div>
+    <h2>The market, and the gap in it</h2>
+    <p class="lede">
+      The addressable universe is roughly 54 million American pool participants a year. At 15 people per pool
+      that's about 3.6 million pools. Splash's 2M users represent maybe 130,000 of them. <strong>The incumbents
+      have captured single-digit percentages.</strong> The real competitor isn't Splash — it's Excel.
+    </p>
+
+    <div class="scroll">
+      <table>
+        <caption class="sr-only">Competitive positioning</caption>
+        <thead>
+          <tr>
+            <th scope="col"></th>
+            <th scope="col">Sleeper / Underdog</th>
+            <th scope="col">Splash (RYP / OFP)</th>
+            <th scope="col">ESPN / Yahoo</th>
+            <th scope="col">Tally</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <th scope="row">Core business</th>
+            <td>Real-money picks</td>
+            <td>Paid host tools → guaranteed contests</td>
+            <td>Ad-supported filler</td>
+            <td><strong>Commissioner subscription</strong></td>
+          </tr>
+          <tr class="accent">
+            <th scope="row">To join a pool</th>
+            <td>Create account</td>
+            <td>Create account</td>
+            <td>Create account</td>
+            <td><strong>Type your name</strong></td>
+          </tr>
+          <tr>
+            <th scope="row">Enter for your kid?</th>
+            <td>No</td>
+            <td>Clumsy</td>
+            <td>No</td>
+            <td><strong>Yes — already built</strong></td>
+          </tr>
+          <tr>
+            <th scope="row">Feels like gambling?</th>
+            <td>Yes, deliberately</td>
+            <td>Increasingly</td>
+            <td>No, but abandoned</td>
+            <td><strong>No, deliberately</strong></td>
+          </tr>
+          <tr>
+            <th scope="row">Cost per player / mo</th>
+            <td class="num">High</td>
+            <td class="num">Medium</td>
+            <td class="num">High</td>
+            <td class="num"><strong>$0.00013</strong></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout good">
+      <span class="label">Why the gap is defensible</span>
+      <p>A company whose business model is real-money gaming cannot be the product you put your 11-year-old on, or
+      text to your mother-in-law, or run in a company Slack. Splash and Sleeper are structurally barred from
+      following Tally here, because doing so means building a product that cannibalizes their own revenue.</p>
+    </div>
+
+    <div class="grid g3" style="margin-top:22px">
+      <div class="card">
+        <h3 style="margin:0 0 6px;font-size:1.02rem">Frictionless identity</h3>
+        <p style="margin:0;font-size:14.5px;color:var(--ink-2)">Name → in, with a passkey offered on the way past
+        and device codes for a second phone. Competitors lose 40–70% of invited players at account creation.
+        Tally loses almost none. <strong>Already shipped.</strong></p>
+      </div>
+      <div class="card">
+        <h3 style="margin:0 0 6px;font-size:1.02rem">Managed entries</h3>
+        <p style="margin:0;font-size:14.5px;color:var(--ink-2)">One account runs up to 12 entries — kids, a partner,
+        the friend who won't install anything. No competitor does this, because their model needs every entry to be
+        a monetizable account. <strong>Already shipped.</strong></p>
+      </div>
+      <div class="card">
+        <h3 style="margin:0 0 6px;font-size:1.02rem">Cost structure</h3>
+        <p style="margin:0;font-size:14.5px;color:var(--ink-2)">One Cloudflare Worker, one D1 database. At 1.5M
+        players the bill is about $1,500/year. It's what makes a genuinely good free tier permanently
+        affordable.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="money">
+    <div class="eyebrow"><span class="num">03</span><span class="src">Monetization · doc 02</span></div>
+    <h2>The freemium ladder</h2>
+    <p class="lede">
+      The paywall's job is to be invisible to a first-time commissioner and obvious to a returning one. Nothing
+      that makes a pool <em>work</em> is ever paid. What's paid is everything that makes a pool persist, multiply,
+      and be fun to run.
+    </p>
+
+    <div class="grid g3">
+      <div class="card-flat tier">
+        <h3>Free</h3>
+        <div class="price">$0 <span>forever</span></div>
+        <ul>
+          <li>One pool, up to 20 players</li>
+          <li>The full game and both boards</li>
+          <li>Face ID, device codes, managed entries</li>
+          <li>iOS app, push, Live Activities</li>
+          <li>Automatic results and schedule sync</li>
+        </ul>
+        <p style="margin:14px 0 0;font-size:13px;color:var(--ink-3)">The free tier <em>is</em> the marketing budget:
+        every free pool is 15 people being shown the product by someone they trust.</p>
+      </div>
+      <div class="card tier hi">
+        <h3>Tally Plus</h3>
+        <div class="price">$29 <span>/ season · $49 / yr</span></div>
+        <ul>
+          <li><strong>Up to 200 players</strong> — the 21st person is the trigger</li>
+          <li><strong>The Weekly Recap</strong></li>
+          <li>Multiple simultaneous pools</li>
+          <li>Season archive &amp; history</li>
+          <li>Side games — props, dares, rivalries</li>
+          <li>The kitty tracker + split-the-ante</li>
+          <li>Custom pool branding</li>
+        </ul>
+      </div>
+      <div class="card-flat tier">
+        <h3>Clubhouse</h3>
+        <div class="price">$99 <span>/ year, per group</span></div>
+        <ul>
+          <li>Everything, across unlimited pools</li>
+          <li>A group home at <code>/g/&lt;slug&gt;</code></li>
+          <li>Cross-season standings — Group of the Year</li>
+          <li>Co-commissioners</li>
+          <li>All-time record book</li>
+        </ul>
+        <p style="margin:14px 0 0;font-size:13px;color:var(--ink-3)">The retention product. A group four years in has
+        a trophy case it cannot export.</p>
+      </div>
+    </div>
+
+    <div class="callout note">
+      <span class="label">The move worth making</span>
+      <p><strong>Split the ante.</strong> Most pools already collect money. A "the group covers it" flow — the
+      commissioner taps <em>split with the pool</em>, everyone sees "$2.50 each" — reframes a $29 ask as pocket
+      change. It rides free on the kitty tracker and matches how the money already moves.</p>
+    </div>
+  </section>
+
+  <section id="economics">
+    <div class="eyebrow"><span class="num">04</span><span class="src">Unit economics · doc 03</span></div>
+    <h2>What it costs to run</h2>
+    <p class="lede">
+      Modelled from published Cloudflare and Anthropic rates. Drag the assumptions — infrastructure cost doesn't
+      move, because it never does.
+    </p>
+
+    <div class="card">
+      <div class="controls">
+        <div class="control">
+          <label for="conv">Free → paid commissioner conversion <output id="convOut" for="conv">8%</output></label>
+          <input type="range" id="conv" min="2" max="15" step="1" value="8">
+        </div>
+        <div class="control">
+          <label for="arpu">Blended ARPU per paying commissioner <output id="arpuOut" for="arpu">$49</output></label>
+          <input type="range" id="arpu" min="25" max="99" step="2" value="49">
+        </div>
+      </div>
+
+      <div class="scroll">
+        <table id="modelTable">
+          <thead>
+            <tr>
+              <th scope="col">Scenario</th>
+              <th scope="col" class="num">Pools</th>
+              <th scope="col" class="num">Players</th>
+              <th scope="col" class="num">Paying</th>
+              <th scope="col" class="num">Revenue</th>
+              <th scope="col" class="num">Run cost</th>
+              <th scope="col" class="num">Margin</th>
+            </tr>
+          </thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <p class="assumption">
+        Run cost includes Workers, D1, Apple's developer program, the domain, and AI recap generation at optimised
+        Haiku 4.5 rates. Revenue = pools × conversion × ARPU. Conversion and ARPU are <strong>assumptions, not
+        measurements</strong> — they are the two numbers to go validate.
+      </p>
+    </div>
+
+    <div class="grid g2" style="margin-top:20px">
+      <div class="card-flat">
+        <h3 style="margin:0 0 8px;font-size:1.02rem">The per-player arithmetic</h3>
+        <div class="scroll" style="border:none;border-radius:0">
+          <table style="min-width:0;font-size:13.5px">
+            <tbody>
+              <tr><td>Requests · 215/mo × $0.30/M</td><td class="num">$0.0000645</td></tr>
+              <tr><td>CPU · 645 ms × $0.02/M ms</td><td class="num">$0.0000129</td></tr>
+              <tr><td>D1 reads · 10,750 rows</td><td class="num">$0.0000108</td></tr>
+              <tr><td>D1 writes · ~45 rows</td><td class="num">$0.0000450</td></tr>
+              <tr class="accent"><td><strong>Per player, per month</strong></td><td class="num"><strong>$0.00013</strong></td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin:12px 0 0;font-size:13.5px;color:var(--ink-2)">One paying commissioner at $29/season covers
+        the infrastructure for roughly <strong>18,000 players for a month</strong>.</p>
+      </div>
+      <div class="card-flat">
+        <h3 style="margin:0 0 8px;font-size:1.02rem">The one cost that scales</h3>
+        <p style="margin:0 0 10px;font-size:14.5px;color:var(--ink-2)">The Weekly Recap is the only component whose
+        cost grows with usage. At Haiku 4.5 rates a recap runs $0.0065 — dropping to about <strong>$0.002</strong>
+        with the batch API and prompt caching, since the voice and format prompt is identical across every pool.</p>
+        <div class="scroll" style="border:none;border-radius:0">
+          <table style="min-width:0;font-size:13.5px">
+            <thead><tr><th>Scale</th><th class="num">Naïve</th><th class="num">Optimised</th></tr></thead>
+            <tbody>
+              <tr><td>10,000 pools</td><td class="num">$1,170</td><td class="num">~$360</td></tr>
+              <tr><td>50,000 pools</td><td class="num">$5,850</td><td class="num">~$1,800</td></tr>
+              <tr><td>200,000 pools</td><td class="num">$23,400</td><td class="num">~$7,200</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p style="margin:12px 0 0;font-size:13px;color:var(--ink-3)">Per season. Gate it to paid tiers — not because
+        the cost is threatening, but because it aligns the one usage-scaling cost with the revenue that pays for it.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="engagement">
+    <div class="eyebrow"><span class="num">05</span><span class="src">Engagement · doc 06</span></div>
+    <h2>Games on top, and why anyone plays them</h2>
+    <p class="lede">
+      Tally can't offer prizes, and shouldn't want to. That forces the honest question: why do people keep playing
+      a pool they're losing? Not for the $200 — because twelve people they know will see the result.
+    </p>
+
+    <div class="callout note">
+      <span class="label">The design rule</span>
+      <p>A side game is worth building if it produces something the group will <strong>talk about</strong>. If it only
+      produces a number, it's a leaderboard, and nobody needs another leaderboard.</p>
+    </div>
+
+    <div class="scroll" style="margin-top:22px">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">Mechanic</th>
+            <th scope="col">The actual incentive</th>
+            <th scope="col">Effort</th>
+            <th scope="col">Verdict</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="accent">
+            <th scope="row">The Weekly Recap</th>
+            <td>Being named in front of people you know</td>
+            <td>Low</td>
+            <td><span class="pill yes">Build first</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Survivor on the same link</th>
+            <td>Elimination — being out while friends are alive</td>
+            <td>Medium</td>
+            <td><span class="pill yes">Build</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Prop of the Week</th>
+            <td>A way to win when you're losing</td>
+            <td>Low</td>
+            <td><span class="pill yes">Build</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Streaks</th>
+            <td>Loss aversion on something you've kept going</td>
+            <td>Low</td>
+            <td><span class="pill yes">Build</span></td>
+          </tr>
+          <tr>
+            <th scope="row">The Rivalry</th>
+            <td>A named opponent</td>
+            <td>Low</td>
+            <td><span class="pill yes">Build</span></td>
+          </tr>
+          <tr>
+            <th scope="row">The Forfeit Ledger</th>
+            <td>Social debt — you owe someone something</td>
+            <td>Low</td>
+            <td><span class="pill wait">After a season</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Pick Personality</th>
+            <td>A shareable identity, in January</td>
+            <td>Low</td>
+            <td><span class="pill wait">After a season</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Group of the Year</th>
+            <td>Years of history you'd have to abandon</td>
+            <td>Medium</td>
+            <td><span class="pill wait">Year two</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Virtual currency / chips</th>
+            <td>Imports casino grammar into a non-casino brand</td>
+            <td>—</td>
+            <td><span class="pill no">No</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Live odds, expert picks</th>
+            <td>A fight with handicapping products Tally can't win</td>
+            <td>—</td>
+            <td><span class="pill no">No</span></td>
+          </tr>
+          <tr>
+            <th scope="row">In-app chat</th>
+            <td>The group chat exists and Tally loses to it</td>
+            <td>—</td>
+            <td><span class="pill no">Build for it instead</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="card" style="margin-top:22px">
+      <h3 style="margin:0 0 10px;font-size:1.05rem">What the Weekly Recap sounds like</h3>
+      <p style="margin:0 0 10px;font-size:15px;color:var(--ink-2);font-style:italic">
+        Dana won the week with 13, which she will mention. The 5-pointer on Detroit was the only one anybody had,
+        and she had it while the rest of the group took Kansas City for the fourth week running.
+      </p>
+      <p style="margin:0 0 10px;font-size:15px;color:var(--ink-2);font-style:italic">
+        Corey is now 0–3 on his own 5-point picks and has not moved off the Bears. This is week four.
+      </p>
+      <p style="margin:0;font-size:15px;color:var(--ink-2);font-style:italic">
+        Everyone survived. Nobody is more than 11 back. Thursday is Green Bay at Chicago, and one of you should
+        probably take Green Bay.
+      </p>
+      <p style="margin:14px 0 0;font-size:13px;color:var(--ink-3)">
+        A competitor can copy the feature in a week. They cannot copy four years of your group's history feeding
+        the prompt.
+      </p>
+    </div>
+  </section>
+
+  <section id="gtm">
+    <div class="eyebrow"><span class="num">06</span><span class="src">Go-to-market · doc 05</span></div>
+    <h2>The calendar decides everything</h2>
+    <p class="lede">
+      One commissioner brings fifteen players. Players cost nothing to acquire. <strong>Commissioners are the entire
+      funnel</strong> — so every hour of GTM answers one of two questions: how does a commissioner find Tally, and
+      how does a player become one?
+    </p>
+
+    <ol class="timeline">
+      <li>
+        <span class="when">Sep – Dec 2026</span>
+        <h4>Instrument</h4>
+        <p>Ship iOS. Build the Recap and the CSV importer. Get 10–20 pools from your own network and watch every
+        setup un-coached.</p>
+      </li>
+      <li>
+        <span class="when">January 2027</span>
+        <h4>Spreadsheet Amnesty</h4>
+        <p>End-of-season artifacts while the Excel pain is fresh. Brackets build starts — this is the month it has
+        to.</p>
+      </li>
+      <li class="deadline">
+        <span class="when">Mid-Feb 2027 · deadline</span>
+        <h4>Brackets live</h4>
+        <p>The only hard date on the roadmap. March Madness is the widest funnel in American sports and it will not
+        wait a year.</p>
+      </li>
+      <li>
+        <span class="when">Feb – Mar 2027</span>
+        <h4>March Madness</h4>
+        <p>First real acquisition push. Paywall on for new pools. Bracket commissioners convert to NFL
+        commissioners in August.</p>
+      </li>
+      <li>
+        <span class="when">Aug 2027</span>
+        <h4>The season</h4>
+        <p>Everything above was preparation for these three weeks. A year of SEO matures at once.</p>
+      </li>
+    </ol>
+
+    <div class="grid g2" style="margin-top:24px">
+      <div class="card-flat">
+        <h3 style="margin:0 0 10px;font-size:1.02rem">Channels worth the hours</h3>
+        <ol style="margin:0;padding-left:20px;font-size:14.5px;color:var(--ink-2);display:grid;gap:7px">
+          <li><strong>Your own network, instrumented.</strong> No strategy substitutes for watching a commissioner
+          who isn't you get stuck.</li>
+          <li><strong>"Steal the spreadsheet."</strong> A CSV importer that targets the exact switching moment. A day
+          or two of work; it's a feature, a landing page and a Reddit post at once.</li>
+          <li><strong>Reddit, earned.</strong> Answer the "best free pick'em site" threads honestly. Agents draft;
+          humans post.</li>
+          <li><strong>The App Store.</strong> SwiftUI on iOS 26 with Liquid Glass, passkeys and Live Activities is
+          exactly what Apple features. Worth more than any paid channel available.</li>
+          <li><strong>SEO, agent-written.</strong> Pages published in October rank in March. Target 30–50 before
+          February.</li>
+        </ol>
+      </div>
+      <div class="card-flat">
+        <h3 style="margin:0 0 10px;font-size:1.02rem">Channels to skip</h3>
+        <p style="margin:0 0 12px;font-size:14.5px;color:var(--ink-2)">Paid social, paid search, and influencer
+        deals in any sports-adjacent keyword are priced by sportsbooks with ~$300 LTVs. You cannot compete at $49
+        ARPU and shouldn't try.</p>
+        <p style="margin:0;font-size:14.5px;color:var(--ink-2)">Sportsbook affiliate revenue is the easiest money in
+        this category and the fastest way to become the thing Tally exists in opposition to.
+        <strong>Decline it in advance</strong>, so it isn't decided later under revenue pressure.</p>
+      </div>
+    </div>
+
+    <div class="scroll" style="margin-top:22px">
+      <table>
+        <thead>
+          <tr>
+            <th scope="col">The five metrics</th>
+            <th scope="col" class="num">Target</th>
+            <th scope="col">Why it's on the list</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr class="accent">
+            <th scope="row">Commissioner season-over-season return</th>
+            <td class="num">&gt;50%</td>
+            <td>The business. Below 35%, rethink everything.</td>
+          </tr>
+          <tr><th scope="row">Invite → first pick conversion</th><td class="num">&gt;70%</td><td>The differentiator, quantified.</td></tr>
+          <tr><th scope="row">Player → commissioner rate</th><td class="num">&gt;5% / season</td><td>The viral loop — the compounding term.</td></tr>
+          <tr><th scope="row">Weeks played per player</th><td class="num">&gt;12 of 18</td><td>What the side games move.</td></tr>
+          <tr><th scope="row">Free → paid conversion</th><td class="num">&gt;6%</td><td>Revenue. Meaningless before the first two are healthy.</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="callout warn">
+      <span class="label">Don't build a dashboard yet</span>
+      <p>At twenty pools, a SQL query and a Tuesday morning beat a dashboard — and you'll learn more.</p>
+    </div>
+  </section>
+
+  <section id="partners">
+    <div class="eyebrow"><span class="num">07</span><span class="src">Partnerships &amp; capital · doc 07</span></div>
+    <h2>Partners, and the case against raising</h2>
+
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th scope="col">Partner</th><th scope="col">What it's actually worth</th><th scope="col">Verdict</th></tr>
+        </thead>
+        <tbody>
+          <tr class="accent">
+            <th scope="row">Apple</th>
+            <td>Editorial featuring around the NFL season and March Madness. Costs nothing but craft, and the app
+            already has the profile Apple promotes. Blocked only on shipping.</td>
+            <td><span class="pill yes">Pursue now</span></td>
+          </tr>
+          <tr>
+            <th scope="row">nflverse</th>
+            <td>The free community feed the whole results pipeline depends on, with no SLA. Sponsor it, and budget a
+            commercial fallback before you need one.</td>
+            <td><span class="pill yes">Pursue now</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Venmo / Cash App</th>
+            <td>Deep links from the kitty tracker. Deliberately <em>not</em> a partnership — no API, no agreement, no
+            money touched.</td>
+            <td><span class="pill yes">Build the links</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Slack / Discord</th>
+            <td>A bot posting the board where the office pool already lives. Free marketplace distribution into the
+            segment sportsbooks can't enter.</td>
+            <td><span class="pill wait">Year two</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Clubs, leagues, offices</th>
+            <td>White-label pools at $500–2,500/yr. High ACV, low volume, real support burden. Worth 5–10 pilots to
+            learn the shape.</td>
+            <td><span class="pill wait">Pilot only</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Sportsbooks</th>
+            <td>The most available money in the category, and the end of the positioning.</td>
+            <td><span class="pill no">Decline</span></td>
+          </tr>
+          <tr>
+            <th scope="row">Prediction markets</th>
+            <td>Splash has taken this road. That road is taken and it isn't Tally's.</td>
+            <td><span class="pill no">Decline</span></td>
+          </tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="grid g2" style="margin-top:22px">
+      <div class="card">
+        <h3 style="margin:0 0 10px;font-size:1.05rem">Why not to raise</h3>
+        <ul style="margin:0;padding-left:18px;font-size:14.5px;color:var(--ink-2);display:grid;gap:8px">
+          <li><strong>Nothing to spend it on.</strong> Infrastructure is ~$60/year today. The constraint is founder
+          attention, which capital doesn't buy back for two people with day jobs.</li>
+          <li><strong>The key metric doesn't exist yet.</strong> Commissioner retention takes twelve months to
+          measure. Raising first means raising on a story.</li>
+          <li><strong>Venture math doesn't fit.</strong> $100M revenue at $49 ARPU means 2M paying commissioners —
+          about 25M pools, seven times the entire estimated US market.</li>
+          <li><strong>Capital pushes toward gambling.</strong> A board looking at Sleeper's revenue mix asks the
+          obvious question every quarter.</li>
+        </ul>
+      </div>
+      <div class="card-flat">
+        <h3 style="margin:0 0 10px;font-size:1.05rem">The likeliest good outcome</h3>
+        <p style="margin:0 0 10px;font-size:14.5px;color:var(--ink-2)">An acquisition — most plausibly by
+        <strong>Splash</strong>, who are consolidating this exact category and cannot build a free family tier
+        themselves. What they'd be buying, in order:</p>
+        <ol style="margin:0;padding-left:18px;font-size:14.5px;color:var(--ink-2);display:grid;gap:5px">
+          <li>The identity system — droppable into their own funnel on day one</li>
+          <li>Commissioner retention data</li>
+          <li>The non-gambling brand, worth more as the category gets politically expensive</li>
+          <li>A 98% gross margin cost structure</li>
+        </ol>
+        <p style="margin:12px 0 0;font-size:13px;color:var(--ink-3)">Which argues for the same things bootstrapping
+        does: don't take sportsbook money, don't build a real-money feature, don't sign an exclusive.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="brand">
+    <div class="eyebrow"><span class="num">08</span><span class="src">Brand · doc 04</span></div>
+    <h2>Where your group keeps score</h2>
+    <p class="lede">
+      Before there were apps there was a sheet of paper on the break-room wall. Somebody drew the grid, somebody
+      wrote the names down the side, and every Monday one person updated it in pen. That person is the reason any
+      of it happened — the keeper of the tally.
+    </p>
+
+    <div class="callout warn">
+      <span class="label">The enemy</span>
+      <p>Somebody decided the best thing about the pool — that everybody's in it — was a customer acquisition cost.
+      So they put an account form in front of it, then a deposit screen, then live odds down the side. The pool
+      still exists. It just isn't for your kid anymore, or your mother-in-law, or the guy in accounts who doesn't
+      have the app. <strong>We think the pool was fine.</strong></p>
+    </div>
+
+    <div class="grid g2" style="margin-top:22px">
+      <div class="card-flat">
+        <h3 style="margin:0 0 10px;font-size:1.02rem">The voice already exists</h3>
+        <p style="margin:0 0 8px;font-size:14.5px;color:var(--ink-2)">The product's own copy is the strongest brand
+        asset Tally has — dry, plain-spoken, generous, never hyped:</p>
+        <p style="margin:0 0 6px;font-size:14.5px;font-style:italic">"Showing up late is okay — pick from the games
+        that are left."</p>
+        <p style="margin:0 0 6px;font-size:14.5px;font-style:italic">"A winner every week. One bad Sunday is never
+        fatal."</p>
+        <p style="margin:0;font-size:14.5px;font-style:italic">"Fill it in, watch it burn by the second round."</p>
+      </div>
+      <div class="card-flat">
+        <h3 style="margin:0 0 10px;font-size:1.02rem">Words Tally doesn't use</h3>
+        <p style="margin:0 0 12px;font-size:14.5px;color:var(--ink-2)">bet · wager · odds · action · degen · sweat ·
+        juice · cash out · deposit · parlay · book</p>
+        <p style="margin:0;font-size:14.5px;color:var(--ink-2)">A hard list. The premise is that Tally isn't that
+        thing, and one stray "lock of the week" undoes a lot of careful work. Protect the visual system for the
+        same reason — <strong>the distance from a sportsbook <em>is</em> the positioning.</strong></p>
+      </div>
+    </div>
+
+    <div class="grid g3" style="margin-top:22px">
+      <div class="card">
+        <h3 style="margin:0 0 6px;font-size:1rem">"Your friends join by typing their name."</h3>
+        <p style="margin:0;font-size:14px;color:var(--ink-2)">Demonstrably true, technically hard, and the thing no
+        competitor can say.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin:0 0 6px;font-size:1rem">"You can enter picks for your kids."</h3>
+        <p style="margin:0;font-size:14px;color:var(--ink-2)">Instantly legible, emotionally specific, zero
+        competitors.</p>
+      </div>
+      <div class="card">
+        <h3 style="margin:0 0 6px;font-size:1rem">"There's no money in it, and that's the feature."</h3>
+        <p style="margin:0;font-size:14px;color:var(--ink-2)">Reframes the missing sportsbook as the reason to
+        choose it.</p>
+      </div>
+    </div>
+  </section>
+
+  <section id="docs">
+    <div class="eyebrow"><span class="num">09</span><span class="src">The full plan</span></div>
+    <h2>The documents</h2>
+    <p class="lede">
+      This page is the summary. The arguments, the workings and the sources live in
+      <code>docs/business/</code> in the repo.
+    </p>
+
+    <ul class="docs">
+      <li><span class="n">01</span><span><code>01-strategy.md</code><span class="d">Market sizing, competitive read, positioning, the three defensible assets, honest risks</span></span></li>
+      <li><span class="n">02</span><span><code>02-monetization.md</code><span class="d">The money rule, freemium ladder, pricing, revenue scenarios</span></span></li>
+      <li><span class="n">03</span><span><code>03-unit-economics.md</code><span class="d">Cost to run modelled to 3M players, the AI cost line, margin analysis</span></span></li>
+      <li><span class="n">04</span><span><code>04-brand.md</code><span class="d">The story, voice rules, visual identity, naming architecture, the enemy</span></span></li>
+      <li><span class="n">05</span><span><code>05-gtm.md</code><span class="d">The timing call, channels ranked, the work split, four campaigns, first 90 days</span></span></li>
+      <li><span class="n">06</span><span><code>06-engagement.md</code><span class="d">Games on top, the incentive model, the Weekly Recap, retention moments</span></span></li>
+      <li><span class="n">07</span><span><code>07-partnerships-investors.md</code><span class="d">Partner tiers, the case against raising, the acquisition path</span></span></li>
+      <li><span class="n">08</span><span><code>08-roadmap.md</code><span class="d">Sequencing, AI agent autonomy, what's explicitly not being built</span></span></li>
+    </ul>
+
+    <div class="callout good">
+      <span class="label">Three things block revenue right now</span>
+      <p>The APNs key (push is fully built and sends nothing without it), an App Store listing, and a paywall that
+      doesn't exist yet. <strong>None of them is hard.</strong></p>
+    </div>
+  </section>
+
+</main>
+
+<footer>
+  <div class="wrap">
+    Figures sourced from the American Gaming Association (via ESPN), Business Wire, Front Office Sports, Tracxn,
+    Cloudflare and Anthropic published rates. Conversion rates, ARPU and churn are stated assumptions, not
+    measurements — every one of them is labelled in the underlying documents.
+  </div>
+</footer>
+
+<script>
+  (function () {
+    var SCENARIOS = [
+      { name: "A — Today",              pools: 1,      players: 20,        cost: 114 },
+      { name: "B — Friends & referrals", pools: 500,    players: 7500,      cost: 174 },
+      { name: "C — First real season",   pools: 10000,  players: 150000,    cost: 763 },
+      { name: "D — Two-person business", pools: 50000,  players: 750000,    cost: 4534 },
+      { name: "E — Venture-scale",       pools: 200000, players: 3000000,   cost: 16900 }
+    ];
+
+    var conv = document.getElementById("conv");
+    var arpu = document.getElementById("arpu");
+    var convOut = document.getElementById("convOut");
+    var arpuOut = document.getElementById("arpuOut");
+    var tbody = document.querySelector("#modelTable tbody");
+
+    var n = new Intl.NumberFormat("en-US");
+    var usd = new Intl.NumberFormat("en-US", { style: "currency", currency: "USD", maximumFractionDigits: 0 });
+
+    function render() {
+      var c = Number(conv.value) / 100;
+      var a = Number(arpu.value);
+      convOut.textContent = conv.value + "%";
+      arpuOut.textContent = "$" + arpu.value;
+
+      tbody.textContent = "";
+      SCENARIOS.forEach(function (s, i) {
+        var paying = Math.round(s.pools * c);
+        var revenue = paying * a;
+        var margin = revenue > 0 ? (1 - s.cost / revenue) * 100 : 0;
+
+        var tr = document.createElement("tr");
+        if (i === 3) tr.className = "accent";
+
+        function cell(text, cls, tag) {
+          var el = document.createElement(tag || "td");
+          if (cls) el.className = cls;
+          el.textContent = text;
+          return el;
+        }
+
+        var th = cell(s.name, null, "th");
+        th.setAttribute("scope", "row");
+        tr.appendChild(th);
+        tr.appendChild(cell(n.format(s.pools), "num"));
+        tr.appendChild(cell(n.format(s.players), "num"));
+        tr.appendChild(cell(n.format(paying), "num"));
+        tr.appendChild(cell(revenue > 0 ? usd.format(revenue) : "—", "num"));
+        tr.appendChild(cell(usd.format(s.cost) + "/yr", "num"));
+        tr.appendChild(cell(revenue > s.cost ? margin.toFixed(1) + "%" : "—", "num"));
+        tbody.appendChild(tr);
+      });
+    }
+
+    conv.addEventListener("input", render);
+    arpu.addEventListener("input", render);
+    render();
+  })();
+</script>
