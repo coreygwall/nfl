@@ -39,6 +39,21 @@ Nothing else needs doing in the developer portal. The Push Notifications capabil
 `ios/Tally/Tally.entitlements`, and Xcode enables it on the App ID itself when it provisions with
 automatic signing — the same way it already handles associated domains.
 
+## Two offices, one PIN that is no longer a login
+
+`migrations/0010_roles.sql` split what used to be "admin" in two:
+
+- **Commissioner** (`pool_commissioners`) runs one pool — roster, name, invite, export. `/api/commissioner/*`.
+- **Super admin** (`platform_admins`) runs the league — results, schedule, feed. `/api/league/*`.
+  Every pool scores the same NFL games, so results are never a commissioner's to set.
+
+Both are grants against an **account** (the owner player row), never a managed entry, and both are
+reported in `/api/bootstrap` as `roles` so a client can hide what it cannot open rather than
+guessing from a stored secret. `ADMIN_PIN` now does exactly one thing — `POST /api/roles/claim`
+attaches both offices to the calling account — and stays valid as a break-glass header on both
+route groups. There is one `pools` row today, seeded from `POOL_SLUG`/`POOL_NAME`; `currentPool()`
+in `worker/roles.ts` is the seam where a second one arrives.
+
 ## Deploying is a push, and only to one branch
 
 There is no `main`. Cloudflare Workers Builds deploys from **`claude/nfl-pool-app-9tv2om`**, so a

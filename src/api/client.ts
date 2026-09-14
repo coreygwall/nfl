@@ -23,17 +23,26 @@ export interface ApiInit {
   token?: string;
 }
 
-export async function api<T>(path: string, init: ApiInit = {}): Promise<T> {
-  const url = new URL(`/api${path}`, window.location.origin);
-  const override = nowOverride();
-  if (override) url.searchParams.set("now", override);
+/**
+ * Who this request is from. Shared with the handful of fetches that want a file rather than JSON,
+ * so a download carries exactly the identity every other call does.
+ */
+export function authHeaders(init: Pick<ApiInit, "pin" | "token"> = {}): Record<string, string> {
   const headers: Record<string, string> = { accept: "application/json" };
-  if (init.body !== undefined) headers["content-type"] = "application/json";
   const token = init.token ?? loadPlayer()?.token;
   if (token) headers["x-player-token"] = token;
   const active = loadPlayer();
   if (active?.accountId && (!init.token || init.token === active.token)) headers["x-entry-id"] = active.id;
   if (init.pin) headers["x-admin-pin"] = init.pin;
+  return headers;
+}
+
+export async function api<T>(path: string, init: ApiInit = {}): Promise<T> {
+  const url = new URL(`/api${path}`, window.location.origin);
+  const override = nowOverride();
+  if (override) url.searchParams.set("now", override);
+  const headers = authHeaders(init);
+  if (init.body !== undefined) headers["content-type"] = "application/json";
   // Nothing here is worth waiting on forever. Without a deadline a hung request leaves the lock
   // button disabled and "Saving…" on screen with no way out but a reload — and the request can
   // still land afterwards, writing picks the person believed abandoned. The app already tells a

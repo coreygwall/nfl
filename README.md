@@ -20,8 +20,8 @@ results entered by the commissioner in about a minute a week.
 | Identity | Type your name on first visit; the device is handed a token and a short **device code**. The token rides in `localStorage` *and* in a long-lived `HttpOnly` cookie, so a browser that clears one still knows you — you stay signed in indefinitely. The code claims the same name on a second device and stays hidden behind **Pick on another device** until you need it. A claimed name cannot be taken without the code; a name nobody holds is claimed by the first device that asks, which is how everyone who joined before codes existed keeps their place. |
 | Face ID / Touch ID | Offered on the way past after every sign-in, and never required. Turning it on is the one step that makes every other surface free: the **iOS app tries it the moment it opens** and signs you straight in, and on the web the passkey waits in the name field's own suggestions (`autocomplete="username webauthn"`), so a returning player taps their name rather than hunting for a code. The credential names the player, so nothing is typed either way. A passkey belongs to the domain it was created on (`worker/routes/passkeys.ts` takes the relying party from the request), so one made on `workers.dev` is not offered on `playtally.app`; the device code covers that, and every browser without biometrics. |
 | Moving to a second device | Tap your name → **Play on another device** → **Send myself a sign-in link**. Texting or AirDropping that link signs the next device in with one tap — and opens the iOS app rather than the browser on any iPhone that has it. The code is still there underneath for reading aloud. |
-| Picking for others | Anyone can add entries their account manages (account sheet → **Add an entry**) — for kids, a partner, a friend who won't install anything. Each entry gets its own picks, its own row on the board and no sign-in of its own: the account's passkey or code is the way back in, and up to 12 hang off one account. Switching between them is one tap. The commissioner can also put an existing player on their own phone with the admin PIN; those devices are marked admin-issued, so the CSV export's `entered_by` column reads `commissioner` rather than `player`. |
-| Limits | The two doors a stranger with the link can push on are counted per caller (`migrations/0007_rate_limits.sql`): 8 wrong admin PINs earns a 15-minute cool-off, and 20 new names an hour from one address is the ceiling. A room full of friends joining over one wifi never reaches it; a script trying to fill all 200 seats does. The counter is per caller, so nobody can lock the commissioner out by hammering the PIN. |
+| Picking for others | Anyone can add entries their account manages (account sheet → **Add an entry**) — for kids, a partner, a friend who won't install anything. Each entry gets its own picks, its own row on the board and no sign-in of its own: the account's passkey or code is the way back in, and up to 12 hang off one account. Switching between them is one tap. When someone texts their picks in, the commissioner can enter them on their behalf; the CSV export's `entered_by` column then reads `commissioner` rather than `player`. |
+| Limits | The two doors a stranger with the link can push on are counted per caller (`migrations/0007_rate_limits.sql`): 8 wrong owner PINs earns a 15-minute cool-off, and 20 new names an hour from one address is the ceiling. A room full of friends joining over one wifi never reaches it; a script trying to fill all 200 seats does. The counter is per caller, so nobody can lock the commissioner out by hammering the PIN. |
 
 ## Deploying (one-time, ~5 minutes)
 
@@ -32,7 +32,7 @@ database heals on its own.)
 
 1. Cloudflare dashboard → **Workers & Pages** → **Create** → **Import a repository** → pick `coreygwall/nfl`.
 2. Worker name **`nfl`** (must match `name` in `wrangler.jsonc`, and Cloudflare defaults it to the repo name). Build command `npm run build`. Deploy command `npx wrangler deploy` (the default). Root directory `/`.
-3. After the first deploy: Worker → **Settings** → **Variables and Secrets** → add a **secret** `ADMIN_PIN` (the commissioner PIN). Redeploy or push again.
+3. After the first deploy: Worker → **Settings** → **Variables and Secrets** → add a **secret** `ADMIN_PIN` (the owner PIN — typed once to take the keys, see [Two offices](#two-offices)). Redeploy or push again.
 4. Optional: **Settings → Builds** → enable non-production branch builds to get a preview URL on every pull request.
    When the iOS app is set up, `APPLE_APP_IDS` in `wrangler.jsonc` names it (see [`ios/README.md`](ios/README.md)).
 5. Share `https://playtally.app/p/high-five` (or the `workers.dev` URL, which still works). Pool name and slug are `POOL_NAME` and `POOL_SLUG` in `wrangler.jsonc`.
@@ -103,7 +103,7 @@ The app is **Tally** (`playtally.app`); **High Five** is a pool *type*; this sea
 | `/` | The Tally landing page (`src/screens/Landing.tsx`) — what Tally is, and each pool type's own explainer in a sheet. It links to no live pool on purpose. |
 | `/p/<slug>` | A pool instance. The React app mounts here: the router's basename is read from the URL (`src/lib/basename.ts`), so every in-app link is still written as if it were at the root, and the same bundle will serve any pool. |
 | `/api/*` | The API. Single-pool today; the natural shape for many is `/api/pools/<slug>/*`. |
-| `/welcome`, `/week/*`, `/board*`, `/rules`, `/admin` | Where the pool used to live. They 301 into `/p/<slug>/…`, query string intact, so links already texted around keep working. |
+| `/welcome`, `/week/*`, `/board*`, `/rules`, `/admin`, `/commissioner`, `/league` | Where the pool used to live. They 301 into `/p/<slug>/…`, query string intact, so links already texted around keep working. `/admin` is the old name for `/commissioner` and redirects to it. |
 
 `POOL_SLUG`, `POOL_NAME` and `POOL_TYPE` in `wrangler.jsonc` name this instance. Renaming the pool's
 URL is a one-line change there (people's sign-in links change with it, so do it before sharing widely).
@@ -136,21 +136,45 @@ One thing to plan for: **browser storage is per-origin, so every device forgets 
 address.** Nobody loses picks, points or history — those live in D1 against the player, not the device —
 but each person has to claim their name again. Two ways through it:
 
-- **Send everyone a sign-in link.** Open `/admin` **on the new domain** → Players → **Copy sign-in link**
+- **Send everyone a sign-in link.** Open `/commissioner` **on the new domain** → Players → **Copy sign-in link**
   for each person and text it to them. One tap signs that device in; the code is stripped from the
   address bar afterwards.
 - **Or let them do it:** open the new address, tap **I already entered**, pick their name, and type the
-  code they can still read on the old address (or that you read to them from `/admin`).
+  code they can still read on the old address (or that you read to them from `/commissioner`).
 
 Passkeys follow the same rule — one created on `workers.dev` will not work on `playtally.app`, and the person just adds another (or uses their code).
+
+## Two offices
+
+Two different jobs used to share one PIN.
+
+**The commissioner** runs a pool: its roster, its name, its invite, who still needs chasing, the
+backup. That is attached to an *account* — `pool_commissioners` in `migrations/0010_roles.sql` —
+so it travels with the person rather than with whoever knows a secret. `/commissioner` on the web;
+Account → **Commissioner** in the app, and the button is not drawn at all for anyone else.
+
+**The league office** owns the results, the schedule and the score feed. Every Tally pool scores
+the same fourteen NFL games, so there is exactly one authority on who won them and it sits above
+every pool rather than inside one — a pool that could set its own results is a pool that can
+disagree with the one next door. That is `platform_admins`, and it is `/league` on the web,
+Account → **League office** in the app. Today it is a person with a feed to pull from; when it is
+fully automated the screen becomes a window onto a job that runs itself and nothing else moves.
+
+**`ADMIN_PIN` is now break-glass, not a login.** It does one thing: `POST /api/roles/claim` attaches
+both offices to the account that typed it. Sign in, open `/commissioner`, click *I own this pool and
+lost access*, type it once. Losing that account is still recoverable — typing it again attaches the
+offices to the new one — and it remains a valid header on both route groups so a locked-out owner is
+never stuck. It is counted per caller: 8 wrong guesses earns a 15-minute cool-off, and the counter
+is per address so nobody can lock the commissioner out by hammering it.
 
 ## Weekly ops
 
 - **Results:** mostly they arrive on their own. A Cron Trigger sweeps every half hour through the
   windows games end in — Sunday afternoon and evening, and Sunday, Monday and Thursday nights — and
-  fills in any game the commissioner has not already recorded. You can still open `/admin`, enter
-  the PIN, and tap **Pull final scores** yourself, or set the winner of each game by hand (tap again
-  to clear, or **Tie**). Boards update instantly. Any device works.
+  fills in any game that has no result yet. A super admin can still open `/league`, tap **Pull final
+  scores**, or set the winner of each game by hand (tap again to clear, or **Tie**). Every pool's
+  board updates instantly. Results are deliberately *not* a commissioner's job — see
+  [Two offices](#two-offices).
 - **Why the automatic pull is safe to leave running:** it only fills blanks. A result already
   recorded is either confirmed or reported as a conflict for you to settle — never overwritten, so
   a winner you entered by hand always stands. It ignores games that have not kicked off, refuses
@@ -164,26 +188,26 @@ Passkeys follow the same rule — one created on `workers.dev` will not work on 
 - **About the pull:** it only fills games with no result recorded, only after kickoff, and only from a feed that still covers the schedule. Anything you entered by hand stands; if the feed disagrees it says so and changes nothing — clear that game and pull again to take the feed's version. nflverse usually posts a final within an hour or two of the whistle.
 - **Someone texted picks after kickoff:** the commissioner can backfill past locks:
   ```sh
-  curl -X PUT https://<host>/api/admin/players/<playerId>/weeks/3/picks \
-    -H 'x-admin-pin: <PIN>' -H 'content-type: application/json' \
+  curl -X PUT https://<host>/api/commissioner/players/<playerId>/weeks/3/picks \
+    -H 'x-player-token: <the commissioner's device token>' -H 'content-type: application/json' \
     -d '{"picks":[{"gameId":"2026_03_KC_BUF","team":"KC","rank":1}]}'
   ```
   Player ids are listed at `GET /api/bootstrap`; game ids look like `2026_03_AWAY_HOME`.
-- **Rename / remove a player:** `/admin` → Players.
+- **Rename / remove a player:** `/commissioner` → Players.
 - **If someone says their picks are gone:** they are not. Every set of picks ever saved is copied
   into an append-only `pick_history` table in the same transaction as the save, and nothing in the
   app ever deletes from it — not even removing the player. Read it back at
-  `/api/admin/pick-history?name=<name>&week=<n>` with the admin PIN, which returns every save
-  newest first, including ones belonging to a player who no longer exists.
+  `/api/commissioner/pick-history?name=<name>&week=<n>` as the commissioner, which returns every
+  save newest first, including ones belonging to a player who no longer exists.
   This is deliberately *not* D1's own point-in-time recovery, which is there as a backstop but is
   all-or-nothing: rolling the database back to before a mistake also throws away every pick
   everybody else made in between. On a Sunday that cure is worse than the disease. The history
   table puts one person's picks back exactly, and touches nothing else.
-- **Who's squared away:** `/admin` → Players → tap the circle beside a name. Filter with **All / Ready / Waiting** to see who still needs chasing. It is commissioner-only: nothing about it reaches the pool, the board, or the API anyone else can call.
-- **Picking for your family:** tap your name → **Add an entry** → give it a name. It appears beside you in the account sheet and switching is a tap; the entry has no separate sign-in, so your account is its recovery. To put an *existing* player on your phone instead, use the admin PIN option in the same sheet — their own devices keep working.
-- **Lost code / locked out / wrong person claimed a name:** `/admin` → Players → **Reset access**. It issues a new code and signs out that player's devices; send them the code and the next device to use it becomes them. Eight wrong codes locks claiming for 15 minutes; a reset clears the lock.
-- **Flexed kickoff times:** handled for you. A Cron Trigger checks nflverse every morning (10:00 UTC) and moves any kickoff the NFL has flexed. It only ever changes kickoff time and venue, never picks, results, weeks or teams, and it refuses to apply a feed that doesn't cover the games it already knows. `/admin` → Tools shows when it last ran and has a "Check nflverse now" button.
-- **Backup:** `/admin` → Tools → "Download picks CSV" gives every pick with its game, result and points.
+- **Who's squared away:** `/commissioner` → Players → tap the circle beside a name. Filter with **All / Ready / Waiting** to see who still needs chasing. It is commissioner-only: nothing about it reaches the pool, the board, or the API anyone else can call.
+- **Picking for your family:** tap your name → **Add an entry** → give it a name. It appears beside you in the account sheet and switching is a tap; the entry has no separate sign-in, so your account is its recovery.
+- **Lost code / locked out / wrong person claimed a name:** `/commissioner` → Players → **Reset access**. It issues a new code and signs out that player's devices; send them the code and the next device to use it becomes them. A reset also puts the name behind its code for good: zero devices is how an *untouched* roster name lets its owner in without one, and a name that has been claimed before should never go back on the shelf. Eight wrong codes locks claiming for 15 minutes; a reset clears the lock.
+- **Flexed kickoff times:** handled for you. A Cron Trigger checks nflverse every morning (10:00 UTC) and moves any kickoff the NFL has flexed. It only ever changes kickoff time and venue, never picks, results, weeks or teams, and it refuses to apply a feed that doesn't cover the games it already knows. `/league` → Schedule & feed shows when it last ran and has a "Check nflverse now" button.
+- **Backup:** `/commissioner` → Pool → "Download picks CSV" gives every pick with its game, result and points.
 - **From Claude:** with the Cloudflare MCP connected, results can also be recorded straight into D1, e.g. `UPDATE games SET winner = 'KC' WHERE id = '2026_03_KC_BUF'`.
 
 ## Development
@@ -199,7 +223,7 @@ Time travel in dev: add `?now=2026-09-13T20:00:00Z` to any URL. The client forwa
 | Command | What it does |
 |---|---|
 | `npm test` | Unit tests (pick validation, scoring, week logic, DST, CSV parsing) and API tests running inside `workerd` against real D1, including the schedule-sync guards |
-| `npm run test:e2e` | Playwright smoke test: two players, picks, ranking, admin results, frozen picks after kickoff |
+| `npm run test:e2e` | Playwright smoke test: two players, picks, ranking, the two offices, frozen picks after kickoff |
 | `npm run typecheck` | Type-checks the client and the Worker |
 | `npm run schedule:build` | Regenerates the schedule JSON from nflverse (`games.csv`) |
 | `npm run logos:extract` | Rebuilds `public/logos` from the npm package plus `scripts/custom-logos/` (tight-cropped, with a baked die-cut outline) |
@@ -210,7 +234,7 @@ Time travel in dev: add `?now=2026-09-13T20:00:00Z` to any URL. The client forwa
 
 ```
 shared/     pure rules shared by client and Worker: validatePicks (locks, frozen ranks), scoring, week windows, teams
-worker/     Hono API on Cloudflare Workers + D1; self-bootstraps schema + schedule; admin routes behind ADMIN_PIN
+worker/     Hono API on Cloudflare Workers + D1; self-bootstraps schema + schedule; /commissioner and /league behind account roles
 src/        React 19 + Vite + Tailwind 4 + motion; TanStack Query for data; react-router
 migrations/ D1 schema (players, games, picks, meta)
 scripts/    schedule builder, logo extractor, iOS asset + font builders
@@ -219,9 +243,9 @@ public/logos  32 team stickers (30 vectors from react-nfl-logos, Browns + Titans
 ```
 
 API (all JSON, under `/api`): `GET /bootstrap`, `POST /players`, `GET /weeks/:w`, `PUT /weeks/:w/picks`,
-`GET /board/week/:w`, `GET /board/season`, and `x-admin-pin` guarded `/admin/*` routes for results, players,
-backfill, schedule sync, status and `export.csv`. Player identity is the `x-player-id` header the client sends
-from localStorage.
+`GET /board/week/:w`, `GET /board/season`, and two role-guarded groups: `/commissioner/*` (roster, pool
+settings, backfill, pick history, `export.csv`) and `/league/*` (results, schedule sync, feed status).
+Identity is the `x-player-token` header the client holds; `/roles` reports what that identity may open.
 
 Resilience notes: the client reloads itself if a redeploy invalidates a cached chunk and shows an "update ready"
 bar when the server's build id changes; drafts live in localStorage so a killed tab loses nothing; the Worker

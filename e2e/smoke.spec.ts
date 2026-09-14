@@ -72,7 +72,7 @@ test.describe.serial("pool flow", () => {
     await expect(page.getByRole("link", { name: "Back to my picks" })).toBeVisible();
   });
 
-  test("a second player is guarded against stealing a name, can't see hidden picks, admin scores the week", async ({ page }) => {
+  test("a second player is guarded against stealing a name, can't see hidden picks, and the offices split", async ({ page }) => {
     await enablePlatformBiometrics(page);
     // First run on a new device asks for a name; the roster is one link away.
     await page.goto(`/welcome?now=${BEFORE}`);
@@ -124,18 +124,29 @@ test.describe.serial("pool flow", () => {
     const slots = page.getByRole("list", { name: "Picks, most confident first" }).first();
     await expect(slots.getByRole("listitem")).toHaveCount(5);
 
-    // Admin records the opener.
+    // The commissioner's office belongs to an account, not to whoever knows a PIN — so a player
+    // who wanders in is told whose pool it is rather than handed a box to guess at. The PIN is
+    // still the way the owner takes the keys, and it is entered exactly once.
     await page.goto("/admin");
-    await page.getByLabel("Admin PIN").fill("0000");
-    await page.getByRole("button", { name: "Open up" }).click();
+    await expect(page).toHaveURL(/\/commissioner$/);
+    await expect(page.getByRole("heading", { name: "This isn't your pool to run" })).toBeVisible();
+    await page.getByRole("button", { name: /I own this pool/ }).click();
+    await page.getByLabel("Owner PIN").fill("0000");
+    await page.getByRole("button", { name: "Take the keys" }).click();
     await expect(page.getByText("Wrong PIN")).toBeVisible();
-    await page.getByLabel("Admin PIN").fill("1234");
-    await page.getByRole("button", { name: "Open up" }).click();
+    await page.getByLabel("Owner PIN").fill("1234");
+    await page.getByRole("button", { name: "Take the keys" }).click();
+    await expect(page.getByRole("tab", { name: "Pool" })).toBeVisible();
+
+    // Results are not in there. Every pool scores the same games, so they are set once, centrally.
+    await page.getByRole("link", { name: "Open the league office" }).click();
+    await expect(page).toHaveURL(/\/league$/);
     await expect(page.getByText("0 of 16 final")).toBeVisible();
     await page.getByRole("button", { name: /Seahawks/ }).first().click();
     await expect(page.getByText("1 of 16 final")).toBeVisible();
 
     // The ready list: tick someone off, then narrow to who is still outstanding.
+    await page.goto("/commissioner");
     await page.getByRole("tab", { name: "Players" }).click();
     await expect(page.getByText(/0 of \d+ ready to go/)).toBeVisible();
     await page.getByRole("switch", { name: "Corey ready to go" }).click();
@@ -268,7 +279,7 @@ test("one phone can pick for the whole family, and the code stays out of the way
   await expect(page.getByRole("button", { name: "Pick Seattle Seahawks" })).toHaveAttribute("aria-pressed", "false");
 
   // This is an ordinary player action, not a commissioner override.
-  const csv = await request.get("/api/admin/export.csv", { headers: { "x-admin-pin": "1234" } });
+  const csv = await request.get("/api/commissioner/export.csv", { headers: { "x-admin-pin": "1234" } });
   const rows = (await csv.text()).split("\n").filter((l) => l.includes(`Kid ${stamp}`));
   expect(rows.length).toBe(1);
   expect(rows[0]!.endsWith("player")).toBe(true);
@@ -312,9 +323,9 @@ test("an entry removed by the commissioner doesn't strand the device that held i
   await expect(chip).toContainText("Robin");
 
   // The commissioner clears Robin out of the roster while this phone is still picking as Robin.
-  const roster = await page.request.get("/api/admin/players", { headers: { "x-admin-pin": "1234" } });
+  const roster = await page.request.get("/api/commissioner/players", { headers: { "x-admin-pin": "1234" } });
   const robin = ((await roster.json()) as { players: { id: string; name: string }[] }).players.find((p) => p.name === "Robin")!;
-  expect((await page.request.delete(`/api/admin/players/${robin.id}`, { headers: { "x-admin-pin": "1234" } })).status()).toBe(200);
+  expect((await page.request.delete(`/api/commissioner/players/${robin.id}`, { headers: { "x-admin-pin": "1234" } })).status()).toBe(200);
 
   // Every request from this device is now refused. It should land back on the account rather than
   // on an error with a retry button that can never work.

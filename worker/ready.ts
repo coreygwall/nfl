@@ -7,9 +7,10 @@ import entriesSchema from "../migrations/0006_account_entries.sql?raw";
 import rateLimitSchema from "../migrations/0007_rate_limits.sql?raw";
 import pickHistorySchema from "../migrations/0008_pick_history.sql?raw";
 import pushSchema from "../migrations/0009_push.sql?raw";
+import rolesSchema from "../migrations/0010_roles.sql?raw";
 import schedule from "../shared/schedule-2026.json";
 import { finalsFromCsv, gamesFromCsv, NFLVERSE_GAMES_CSV } from "../shared/nflverse.ts";
-import { applyResults, getMeta, listGames, setMeta, updateKickoffs, upsertGames } from "./db.ts";
+import { applyResults, ensurePool, getMeta, listGames, setMeta, updateKickoffs, upsertGames } from "./db.ts";
 import { isDev, type Env } from "./env.ts";
 import type { Winner } from "../shared/types.ts";
 
@@ -24,7 +25,7 @@ const split = (sql: string) =>
 
 const statements = split(schema);
 // Everything after the initial schema: additive, and safe to re-run.
-const alterStatements = [...split(devicesSchema), ...split(householdSchema), ...split(readySchema), ...split(passkeySchema), ...split(entriesSchema), ...split(rateLimitSchema), ...split(pickHistorySchema), ...split(pushSchema)];
+const alterStatements = [...split(devicesSchema), ...split(householdSchema), ...split(readySchema), ...split(passkeySchema), ...split(entriesSchema), ...split(rateLimitSchema), ...split(pickHistorySchema), ...split(pushSchema), ...split(rolesSchema)];
 
 async function applySchema(db: D1Database): Promise<void> {
   await db.batch(statements.map((s) => db.prepare(s)));
@@ -209,6 +210,13 @@ export function ensureReady(env: Env): Promise<void> {
   const run = (async () => {
     await applySchema(env.DB);
     await syncSchedule(env.DB);
+    await ensurePool(env.DB, {
+      slug: env.POOL_SLUG || "high-five",
+      name: env.POOL_NAME || env.POOL_TYPE || "High Five",
+      type: env.POOL_TYPE || "High Five",
+      season: SEASON,
+      now: new Date().toISOString(),
+    });
   })();
   ready = run.catch((err) => {
     ready = null;

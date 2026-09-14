@@ -75,6 +75,10 @@ public struct BootstrapResponse: Codable, Sendable {
     public let build: String
     public let season: Int
     public let poolName: String
+    /// The pool as a row rather than a name. Optional so an older Worker still decodes.
+    public let pool: PoolDTO?
+    /// What this account may open. Absent (and so `.none`) on a Worker that predates the offices.
+    public let roles: Roles?
     /// Week where picking should happen right now.
     public let currentWeek: Int
     /// Latest week with started games — the results view default.
@@ -92,6 +96,8 @@ public struct BootstrapResponse: Codable, Sendable {
     public let myPasskeys: Int?
 
     public var maxWeek: Int { weeks.map(\.week).max() ?? WeekLogic.weeks }
+    /// Every screen that hides a control reads this, rather than guessing from a stored PIN.
+    public var grants: Roles { roles ?? .none }
     /// Weeks before this one crown their own winner but do not carry into the season race.
     public var seasonStartsAt: Int { seasonFromWeek ?? 1 }
 }

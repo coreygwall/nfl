@@ -24,8 +24,11 @@ struct RootView: View {
             // Back from the background: the week may have moved on, a game may have kicked off.
             if phase == .active { Task { await model.refreshBootstrap() } }
         }
-        .sheet(isPresented: $model.showAdmin) {
-            AdminView()
+        .sheet(isPresented: $model.showCommissioner) {
+            CommissionerView()
+        }
+        .sheet(isPresented: $model.showLeagueOffice) {
+            LeagueOfficeView()
         }
         .sheet(isPresented: $model.showPools) {
             PoolsView()

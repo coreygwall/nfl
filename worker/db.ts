@@ -28,6 +28,7 @@ interface PlayerRow {
   claim_locked_until: string | null;
   ready: number | null;
   ready_at: string | null;
+  claim_requires_code: number | null;
 }
 
 interface PickRow {
@@ -50,6 +51,8 @@ export interface PlayerRecord extends Player {
   /** Commissioner's checkmark: squared away for the season. Admin-only, never public. */
   ready: boolean;
   readyAt: string | null;
+  /** True once this name has been claimed and reset: zero devices no longer means "open". */
+  claimRequiresCode: boolean;
 }
 
 export interface ScheduleGame {
@@ -87,6 +90,7 @@ const toPlayer = (r: PlayerRow): PlayerRecord => ({
   claimLockedUntil: r.claim_locked_until ?? null,
   ready: r.ready === 1,
   readyAt: r.ready_at ?? null,
+  claimRequiresCode: r.claim_requires_code === 1,
 });
 
 const toPick = (r: PickRow): PlayerPick => ({ playerId: r.player_id, gameId: r.game_id, team: r.team as Abbr, rank: r.rank });
@@ -246,14 +250,6 @@ export async function addDevice(
     .run();
 }
 
-/** How many of a player's devices the commissioner handed out, rather than the player claiming them. */
-export async function adminDeviceCounts(db: D1Database): Promise<Map<string, number>> {
-  const { results } = await db
-    .prepare("SELECT player_id, count(*) AS n FROM devices WHERE issued_by = 'admin' GROUP BY player_id")
-    .all<{ player_id: string; n: number }>();
-  return new Map(results.map((r) => [r.player_id, r.n]));
-}
-
 export async function countDevices(db: D1Database, playerId: string): Promise<number> {
   const row = await db.prepare("SELECT count(*) AS n FROM devices WHERE player_id = ?").bind(playerId).first<{ n: number }>();
   return row?.n ?? 0;
@@ -270,10 +266,17 @@ export async function revokeDevices(db: D1Database, playerId: string): Promise<v
   await db.prepare("DELETE FROM devices WHERE player_id = ?").bind(playerId).run();
 }
 
-/** Sets a fresh claim code and clears any lockout. */
-export async function setClaimCode(db: D1Database, playerId: string, code: string): Promise<void> {
+/**
+ * Sets a fresh claim code and clears any lockout. `requireCode` is what a commissioner's reset
+ * sets: the devices are gone, but the name is not back on the shelf for whoever asks first.
+ */
+export async function setClaimCode(db: D1Database, playerId: string, code: string, requireCode = false): Promise<void> {
   await db
-    .prepare("UPDATE players SET claim_code = ?, claim_attempts = 0, claim_locked_until = NULL WHERE id = ?")
+    .prepare(
+      requireCode
+        ? "UPDATE players SET claim_code = ?, claim_attempts = 0, claim_locked_until = NULL, claim_requires_code = 1 WHERE id = ?"
+        : "UPDATE players SET claim_code = ?, claim_attempts = 0, claim_locked_until = NULL WHERE id = ?",
+    )
     .bind(code, playerId)
     .run();
 }
@@ -390,10 +393,10 @@ export async function listAllPicks(db: D1Database): Promise<PlayerPick[]> {
   return results.map(toPick);
 }
 
-/** Which picks came from a device the commissioner put on their own phone. */
-export async function adminWrittenPickKeys(db: D1Database): Promise<Set<string>> {
+/** Which picks the commissioner typed in on someone's behalf, rather than the player saving them. */
+export async function commissionerWrittenPickKeys(db: D1Database): Promise<Set<string>> {
   const { results } = await db
-    .prepare("SELECT p.player_id, p.game_id FROM picks p JOIN devices d ON d.id = p.device_id WHERE d.issued_by = 'admin'")
+    .prepare("SELECT player_id, game_id FROM picks WHERE entered_by = 'commissioner'")
     .all<{ player_id: string; game_id: string }>();
   return new Set(results.map((r) => `${r.player_id}:${r.game_id}`));
 }
@@ -413,6 +416,8 @@ export async function replacePicks(
   deviceId: string | null = null,
   /** Carried into the history copy so it stays readable after the player is gone. */
   playerName?: string,
+  /** "commissioner" when someone else typed these in, which is what the export reports. */
+  enteredBy: "player" | "commissioner" = "player",
 ): Promise<void> {
   const del = ignoreLocks
     ? db.prepare("DELETE FROM picks WHERE player_id = ?1 AND week = ?2").bind(playerId, week)
@@ -423,7 +428,7 @@ export async function replacePicks(
         )
         .bind(playerId, week, now);
   const ins = db.prepare(
-    "INSERT INTO picks (player_id, game_id, week, team, rank, created_at, updated_at, device_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+    "INSERT INTO picks (player_id, game_id, week, team, rank, created_at, updated_at, device_id, entered_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
   );
   // The same picks, appended to a table nothing ever deletes from, inside the same transaction:
   // if the save happened, the copy happened. The name is denormalised on purpose — it has to
@@ -434,7 +439,7 @@ export async function replacePicks(
   const name = playerName ?? playerId;
   await db.batch([
     del,
-    ...picks.map((p) => ins.bind(playerId, p.gameId, week, p.team, p.rank, now, now, deviceId)),
+    ...picks.map((p) => ins.bind(playerId, p.gameId, week, p.team, p.rank, now, now, deviceId, enteredBy)),
     ...picks.map((p) => log.bind(now, playerId, name, week, p.gameId, p.team, p.rank, deviceId)),
   ]);
 }
@@ -738,4 +743,127 @@ export async function noteDelivered(db: D1Database, id: string, delivered: numbe
 /** Undo a claim whose send found nobody to send to, so a later run can try again. */
 export async function releaseNotification(db: D1Database, id: string): Promise<void> {
   await db.prepare("DELETE FROM notifications_sent WHERE id = ?").bind(id).run();
+}
+
+// ---- pools and roles ----
+
+export interface PoolRecord {
+  id: string;
+  slug: string;
+  name: string;
+  type: string;
+  season: number;
+  createdAt: string;
+  createdBy: string | null;
+}
+
+interface PoolRow {
+  id: string;
+  slug: string;
+  name: string;
+  type: string;
+  season: number;
+  created_at: string;
+  created_by: string | null;
+}
+
+const toPool = (r: PoolRow): PoolRecord => ({
+  id: r.id,
+  slug: r.slug,
+  name: r.name,
+  type: r.type,
+  season: r.season,
+  createdAt: r.created_at,
+  createdBy: r.created_by ?? null,
+});
+
+export async function getPoolBySlug(db: D1Database, slug: string): Promise<PoolRecord | null> {
+  const row = await db.prepare("SELECT * FROM pools WHERE slug = ?").bind(slug).first<PoolRow>();
+  return row ? toPool(row) : null;
+}
+
+/**
+ * The pool row, created on first sight from the deployment's own settings. Renaming it later is
+ * the commissioner's to do, so the name is only ever written here when the row is new.
+ */
+export async function ensurePool(
+  db: D1Database,
+  pool: { slug: string; name: string; type: string; season: number; now: string },
+): Promise<PoolRecord> {
+  const existing = await getPoolBySlug(db, pool.slug);
+  if (existing) return existing;
+  await db
+    .prepare("INSERT OR IGNORE INTO pools (id, slug, name, type, season, created_at) VALUES (?, ?, ?, ?, ?, ?)")
+    .bind(pool.slug, pool.slug, pool.name, pool.type, pool.season, pool.now)
+    .run();
+  return (await getPoolBySlug(db, pool.slug))!;
+}
+
+export async function renamePool(db: D1Database, poolId: string, name: string): Promise<void> {
+  await db.prepare("UPDATE pools SET name = ? WHERE id = ?").bind(name, poolId).run();
+}
+
+export interface Roles {
+  commissioner: boolean;
+  platformAdmin: boolean;
+}
+
+export const NO_ROLES: Roles = { commissioner: false, platformAdmin: false };
+
+/** Both memberships in one round trip, because every guarded request needs both answers. */
+export async function rolesFor(db: D1Database, poolId: string, playerId: string): Promise<Roles> {
+  const row = await db
+    .prepare(
+      `SELECT EXISTS(SELECT 1 FROM pool_commissioners WHERE pool_id = ? AND player_id = ?) AS commish,
+              EXISTS(SELECT 1 FROM platform_admins WHERE player_id = ?) AS platform`,
+    )
+    .bind(poolId, playerId, playerId)
+    .first<{ commish: number; platform: number }>();
+  return { commissioner: row?.commish === 1, platformAdmin: row?.platform === 1 };
+}
+
+export async function grantCommissioner(
+  db: D1Database,
+  poolId: string,
+  playerId: string,
+  now: string,
+  grantedBy: string | null,
+): Promise<void> {
+  await db
+    .prepare("INSERT OR IGNORE INTO pool_commissioners (pool_id, player_id, granted_at, granted_by) VALUES (?, ?, ?, ?)")
+    .bind(poolId, playerId, now, grantedBy)
+    .run();
+}
+
+export async function revokeCommissioner(db: D1Database, poolId: string, playerId: string): Promise<void> {
+  await db.prepare("DELETE FROM pool_commissioners WHERE pool_id = ? AND player_id = ?").bind(poolId, playerId).run();
+}
+
+export async function listCommissioners(db: D1Database, poolId: string): Promise<{ id: string; name: string; grantedAt: string }[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT p.id, p.name, c.granted_at FROM pool_commissioners c
+         JOIN players p ON p.id = c.player_id
+        WHERE c.pool_id = ? ORDER BY c.granted_at`,
+    )
+    .bind(poolId)
+    .all<{ id: string; name: string; granted_at: string }>();
+  return results.map((r) => ({ id: r.id, name: r.name, grantedAt: r.granted_at }));
+}
+
+export async function grantPlatformAdmin(db: D1Database, playerId: string, now: string, grantedBy: string | null): Promise<void> {
+  await db
+    .prepare("INSERT OR IGNORE INTO platform_admins (player_id, granted_at, granted_by) VALUES (?, ?, ?)")
+    .bind(playerId, now, grantedBy)
+    .run();
+}
+
+export async function listPlatformAdmins(db: D1Database): Promise<{ id: string; name: string; grantedAt: string }[]> {
+  const { results } = await db
+    .prepare(
+      `SELECT p.id, p.name, a.granted_at FROM platform_admins a
+         JOIN players p ON p.id = a.player_id ORDER BY a.granted_at`,
+    )
+    .all<{ id: string; name: string; granted_at: string }>();
+  return results.map((r) => ({ id: r.id, name: r.name, grantedAt: r.granted_at }));
 }

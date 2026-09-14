@@ -45,6 +45,7 @@ import {
   touchPlayer,
 } from "../db.ts";
 import { SEASON } from "../ready.ts";
+import { currentPool, rolesOf } from "../roles.ts";
 import { BUILD_ID } from "../index.ts";
 
 export const toGameDTO = (g: Game, now: string): GameDTO => ({ ...g, locked: isLocked(g, now), status: gameStatus(g, now) });
@@ -82,22 +83,28 @@ publicRoutes.get("/bootstrap", async (c) => {
   const now = c.get("now");
   const me = c.get("player");
   const account = c.get("account");
-  const [games, players, devices, ownership] = await Promise.all([
+  const [games, players, devices, ownership, pool] = await Promise.all([
     listGames(c.env.DB, SEASON),
     listPlayers(c.env.DB),
     deviceCounts(c.env.DB),
     c.env.DB.prepare("SELECT player_id, owner_id FROM entry_owners").all<{ player_id: string; owner_id: string }>(),
+    currentPool(c),
   ]);
   if (me) c.executionCtx.waitUntil(touchPlayer(c.env.DB, me.id, now));
   const mine = account ? players.find((p) => p.id === account.id) : null;
   const managedIds = new Set(ownership.results.map((r) => r.player_id));
   const ids = new Set([account?.id, ...ownership.results.filter((r) => r.owner_id === account?.id).map((r) => r.player_id)]);
   const passkeys = account ? await countPasskeys(c.env.DB, account.id, new URL(c.req.url).hostname) : 0;
+  // What this account may open. Every screen that hides a control reads this rather than guessing
+  // from a PIN it happens to have in the Keychain.
+  const roles = await rolesOf(c);
   const body: BootstrapResponse = {
     now,
     build: BUILD_ID,
     season: SEASON,
-    poolName: c.env.POOL_NAME || "High Five",
+    poolName: pool.name,
+    pool: { id: pool.id, slug: pool.slug, name: pool.name, type: pool.type },
+    roles,
     currentWeek: pickWeek(games, now),
     boardWeek: boardWeek(games, now),
     seasonFromWeek: SEASON_START_WEEK,
@@ -199,7 +206,10 @@ publicRoutes.post("/players/:id/claim", async (c) => {
   const body = (await c.req.json().catch(() => ({}))) as { code?: unknown };
 
   const held = await countDevices(c.env.DB, player.id);
-  if (held === 0) {
+  // A name nobody has ever held is claimed on sight, which is how a roster the commissioner typed
+  // in gets its players onto their phones. A name whose access was *reset* has been held before,
+  // so it stays behind its code even though the reset left it at zero devices.
+  if (held === 0 && !player.claimRequiresCode) {
     // Unclaimed: first device in wins, and gets a code for the next one.
     const code = player.claimCode ?? generateCode();
     if (!player.claimCode) await setClaimCode(c.env.DB, player.id, code);

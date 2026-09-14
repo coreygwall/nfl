@@ -3,13 +3,15 @@ import type { Context } from "hono";
 import type { AppEnv, Env } from "./env.ts";
 import { isDev } from "./env.ts";
 import { ApiError } from "./errors.ts";
-import { getPlayer, playerForToken, publicPlayer } from "./db.ts";
+import { getPlayer, getPoolBySlug, playerForToken, publicPlayer } from "./db.ts";
 import { hashToken, tokenFromCookie } from "./auth.ts";
 import { withAbsoluteUrls, withAppBanner, withUnfurlTags } from "./unfurl.ts";
 import { appleAppSiteAssociation } from "./apple.ts";
 import { ensureReady, SCHEDULE_VERSION, SEASON, syncResultsFromSource, syncScheduleFromSource } from "./ready.ts";
 import { publicRoutes } from "./routes/public.ts";
-import { adminRoutes } from "./routes/admin.ts";
+import { commissionerRoutes } from "./routes/commissioner.ts";
+import { leagueRoutes } from "./routes/league.ts";
+import { roleRoutes } from "./routes/roles.ts";
 import { passkeyRoutes } from "./routes/passkeys.ts";
 import { pushRoutes } from "./routes/push.ts";
 import { configFrom } from "./apns.ts";
@@ -55,13 +57,17 @@ app.use("/api/*", async (c, next) => {
     c.set("player", entry ? publicPlayer(entry) : null);
   }
   c.set("deviceId", found?.deviceId ?? null);
+  c.set("pool", null);
+  c.set("roles", null);
   await next();
 });
 
 app.get("/api/health", (c) => c.json({ ok: true, now: c.get("now"), schedule: SCHEDULE_VERSION, build: BUILD_ID }));
 app.route("/api", publicRoutes);
 app.route("/api/passkeys", passkeyRoutes);
-app.route("/api/admin", adminRoutes);
+app.route("/api/roles", roleRoutes);
+app.route("/api/commissioner", commissionerRoutes);
+app.route("/api/league", leagueRoutes);
 app.route("/api/push", pushRoutes);
 
 /**
@@ -69,9 +75,9 @@ app.route("/api/push", pushRoutes);
  * domain installs as Tally (public/manifest.webmanifest). Generated rather than a second file, so
  * a pool that is renamed or moved does not leave a stale one behind.
  */
-app.get("/p/:slug/manifest.webmanifest", (c) => {
+app.get("/p/:slug/manifest.webmanifest", async (c) => {
   const slug = c.req.param("slug");
-  const poolName = c.env.POOL_NAME || c.env.POOL_TYPE || "High Five";
+  const poolName = (await poolNameFor(c.env, slug)) ?? c.env.POOL_TYPE ?? "High Five";
   return c.json({
     name: `${poolName} — a ${c.env.APP_NAME || "Tally"} pool`,
     short_name: poolName,
@@ -100,8 +106,23 @@ for (const path of AASA_PATHS) {
   });
 }
 
+/**
+ * The name the commissioner gave the pool, which is the one the share card, the tab and the home
+ * screen icon should all say. It is a primary-key read on a page load rather than an API poll, so
+ * it costs a row once per visit; a deployment whose database has not been touched yet falls back
+ * to its configured name.
+ */
+async function poolNameFor(env: Env, slug: string): Promise<string | null> {
+  try {
+    const pool = await getPoolBySlug(env.DB, slug);
+    return pool?.name ?? env.POOL_NAME ?? null;
+  } catch {
+    return env.POOL_NAME ?? null;
+  }
+}
+
 /** Page routes that used to live at the root, before the pool moved under /p/<slug>. */
-const MOVED = ["/welcome", "/rules", "/admin", "/board", "/week"];
+const MOVED = ["/welcome", "/rules", "/admin", "/commissioner", "/league", "/board", "/week"];
 
 app.notFound(async (c) => {
   const path = c.req.path;
@@ -111,7 +132,6 @@ app.notFound(async (c) => {
   const slug = c.env.POOL_SLUG || "high-five";
   const appName = c.env.APP_NAME || "Tally";
   const poolType = c.env.POOL_TYPE || "High Five";
-  const poolName = c.env.POOL_NAME || poolType;
   const url = new URL(c.req.url);
 
   // Old links — texted, bookmarked, still in someone's history — land where the pool lives now.
@@ -126,6 +146,7 @@ app.notFound(async (c) => {
   // which it is from the path. Only the tags differ.
   const isPool = path === "/p" || path.startsWith("/p/");
   if (isPool || path === "/") {
+    const poolName = (isPool ? await poolNameFor(c.env, path.split("/")[2] ?? slug) : null) ?? poolType;
     const doc = await c.env.ASSETS.fetch(new Request(new URL("/index.html", url.origin), { headers: c.req.raw.headers }));
     if (!doc.ok) return doc;
     const page = new Response(doc.body, doc);

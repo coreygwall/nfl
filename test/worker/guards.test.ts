@@ -17,10 +17,15 @@ async function signUp(name: string): Promise<{ id: string; token: string }> {
   return { id: body.player.id, token: body.token };
 }
 
-describe("admin PIN", () => {
+/**
+ * The PIN is no longer the commissioner — an account is — but it is still how the first account
+ * gets its keys and how a locked-out owner gets back in, so it still has to resist guessing.
+ * `/league/status` is the cheapest thing behind it.
+ */
+describe("owner PIN", () => {
   it("locks a caller out after a run of wrong guesses, and lets the real PIN back in", async () => {
     const guess = (pin: string, ip = "203.0.113.7") =>
-      SELF.fetch("http://pool.test/api/admin/verify", { method: "POST", headers: { "x-admin-pin": pin, "cf-connecting-ip": ip } });
+      SELF.fetch("http://pool.test/api/league/status", { headers: { "x-admin-pin": pin, "cf-connecting-ip": ip } });
 
     for (let i = 0; i < 7; i++) expect((await guess("0000")).status).toBe(401);
     // The eighth wrong guess starts the cool-off; everything after it is refused outright.
@@ -38,7 +43,7 @@ describe("admin PIN", () => {
   it("clears the count once the right PIN lands", async () => {
     const ip = "203.0.113.9";
     const guess = (pin: string) =>
-      SELF.fetch("http://pool.test/api/admin/verify", { method: "POST", headers: { "x-admin-pin": pin, "cf-connecting-ip": ip } });
+      SELF.fetch("http://pool.test/api/league/status", { headers: { "x-admin-pin": pin, "cf-connecting-ip": ip } });
     for (let i = 0; i < 4; i++) expect((await guess("nope")).status).toBe(401);
     expect((await guess("1234")).status).toBe(200);
     // Back to a full allowance rather than one guess from a lockout.
@@ -103,7 +108,7 @@ describe("names", () => {
 
   it("still lets the commissioner set any name, so a false positive is fixable", async () => {
     const me = await signUp("Renamable");
-    const res = await SELF.fetch(`http://pool.test/api/admin/players/${me.id}`, {
+    const res = await SELF.fetch(`http://pool.test/api/commissioner/players/${me.id}`, {
       method: "PATCH",
       headers: { ...json, "x-admin-pin": "1234" },
       body: JSON.stringify({ name: "Scunthorpe United" }),

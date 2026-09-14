@@ -8,7 +8,8 @@ import { ErrorState, Spinner } from "./components/Common.tsx";
 import { Welcome } from "./screens/Welcome.tsx";
 import { PickFlow } from "./screens/PickFlow.tsx";
 import { Board } from "./screens/Board.tsx";
-import { Admin } from "./screens/Admin.tsx";
+import { Commissioner } from "./screens/Commissioner.tsx";
+import { League } from "./screens/League.tsx";
 import { Rules } from "./screens/Rules.tsx";
 import { Landing } from "./screens/Landing.tsx";
 import { POOL_SLUG } from "./lib/basename.ts";
@@ -66,7 +67,10 @@ export default function App() {
           <Route path="board" element={<BoardIndex />} />
           <Route path="board/week/:week" element={<Board tab="week" />} />
           <Route path="board/season" element={<Board tab="season" />} />
-          <Route path="admin" element={<Admin />} />
+          {/* Two different offices: a pool's, and the league's. `/admin` was both. */}
+          <Route path="commissioner" element={<Commissioner />} />
+          <Route path="league" element={<League />} />
+          <Route path="admin" element={<Navigate to="/commissioner" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Routes>

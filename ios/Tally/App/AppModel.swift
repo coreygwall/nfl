@@ -69,7 +69,8 @@ final class AppModel {
     var boardSort: BoardSort = .points
     /// The entry switcher over the name chip. Account settings live on their own tab.
     var showEntrySwitcher = false
-    var showAdmin = false
+    var showCommissioner = false
+    var showLeagueOffice = false
     var showPools = false
     /// The welcome screen over a signed-in device — from a sign-in link or "I'm someone new".
     var showWelcome = false
@@ -81,15 +82,20 @@ final class AppModel {
     /// The pick tray, when the picks screen wants one floating over the tab bar (its `useHideNav`).
     var tray: PickTrayState?
 
-    // MARK: Commissioner
+    // MARK: Offices
 
-    private(set) var adminPin: String?
-    private var adminPinKey: String { "admin.pin.\(pool.host)/\(pool.slug)" }
+    /**
+     What this account may open. It comes down with the bootstrap rather than from a PIN in the
+     Keychain, which is the whole point of the change: a screen can ask *may I* instead of *do I
+     happen to have the secret*, and a player never sees a control they cannot use.
+     */
+    var roles: Roles { boot.value?.grants ?? .none }
+    var isCommissioner: Bool { roles.commissioner }
+    var isLeagueAdmin: Bool { roles.platformAdmin }
 
-    /// The PIN is remembered per pool so the commissioner types it once per phone.
-    func setAdminPin(_ pin: String?) {
-        adminPin = pin
-        if let pin { Keychain.shared.set(pin, forKey: adminPinKey) } else { Keychain.shared.remove(forKey: adminPinKey) }
+    /// Drops any PIN this phone remembered from when the PIN *was* the commissioner.
+    private func forgetLegacyPin() {
+        Keychain.shared.remove(forKey: "admin.pin.\(pool.host)/\(pool.slug)")
     }
 
     private let monitor = NWPathMonitor()
@@ -111,11 +117,11 @@ final class AppModel {
         self.passkeys = PasskeyService(anchor: AppModel.presentationAnchor)
         self.service = AppModel.makeService(pool: pool, session: { SessionBox.shared.store.authHeaders })
         SessionBox.shared.store = session
-        self.adminPin = Keychain.shared.string(forKey: "admin.pin.\(pool.host)/\(pool.slug)")
         monitor.pathUpdateHandler = { [weak self] path in
             Task { @MainActor in self?.online = path.status == .satisfied }
         }
         monitor.start(queue: DispatchQueue(label: "tally.network"))
+        forgetLegacyPin()
         connectPush()
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -290,7 +296,7 @@ final class AppModel {
         session = store
         SessionBox.shared.store = store
         service = AppModel.makeService(pool: ref, session: { SessionBox.shared.store.authHeaders })
-        adminPin = Keychain.shared.string(forKey: adminPinKey)
+        forgetLegacyPin()
         boot = .idle
         pickWeek = nil
         boardWeek = nil
@@ -334,8 +340,10 @@ final class AppModel {
             tab = .board
         case "rules":
             tab = .rules
-        case "admin":
-            showAdmin = true
+        case "admin", "commissioner":
+            showCommissioner = true
+        case "league":
+            showLeagueOffice = true
         default:
             tab = .picks
         }

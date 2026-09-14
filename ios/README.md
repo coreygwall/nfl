@@ -13,7 +13,7 @@ ios/
     App/               AppModel (one pool, one session, the bootstrap), Loadable
     Design/            the design system ported from src/index.css: paper, ink, hard shadows, fonts
     Shell/             tabs, header, account sheet, toasts
-    Features/          Welcome · Picks · Board · Rules · Admin · Pools — one folder per screen
+    Features/          Welcome · Picks · Board · Rules · Office · Pools — one folder per screen
     Resources/Fonts/   Bricolage Grotesque + Inter as static TTFs (scripts/build-ios-fonts.py)
     Assets.xcassets/   32 team stickers, the mark and the icon (scripts/build-ios-assets.ts)
   TallyKit/            a Swift package with everything that is not a screen
@@ -132,8 +132,11 @@ Account-owned entries (a parent picking for the family) ride on the account's to
 - **Sports.** `Sport` supplies teams; `NFL` is the one implementation. Screens never touch a
   global team table, so a second sport is a new `Sport` plus a folder of stickers from
   `scripts/build-ios-assets.ts`.
-- **Commissioners.** The admin screens are the site's `/admin` behind the same PIN, kept per
-  pool in the Keychain. When accounts gain roles the PIN gate becomes a role check in one place.
+- **Two offices.** `Features/Office` is the site's `/commissioner` and `/league`, and neither is
+  behind a PIN any more: `BootstrapResponse.roles` says what this account may open, so a player
+  never sees a button they cannot use. Results live in the league office because every Tally pool
+  scores the same games. The owner PIN survives in one place — `ClaimKeysCard`, reached by opening
+  `playtally.app/p/<slug>/commissioner` — and it hands both offices to the signed-in account.
 
 ## Design
 
