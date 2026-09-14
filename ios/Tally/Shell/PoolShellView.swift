@@ -13,6 +13,11 @@ struct PoolShellView: View {
     var body: some View {
         @Bindable var model = model
         TabView(selection: $model.tab) {
+            Tab("Home", systemImage: "house.fill", value: AppTab.home) {
+                PoolScreen(week: nil, onWeek: { _ in }) {
+                    HomeView()
+                }
+            }
             Tab("Picks", systemImage: "football.fill", value: AppTab.picks) {
                 PoolScreen(week: model.activePickWeek, onWeek: { model.pickWeek = $0 }) {
                     PickFlowView(week: model.activePickWeek)
@@ -33,11 +38,6 @@ struct PoolShellView: View {
                     BoardView()
                 }
             }
-            Tab("Rules", systemImage: "questionmark.circle.fill", value: AppTab.rules) {
-                PoolScreen(week: nil, onWeek: { _ in }) {
-                    RulesView()
-                }
-            }
             Tab("Account", systemImage: "person.crop.circle.fill", value: AppTab.account) {
                 PoolScreen(week: nil, onWeek: { _ in }) {
                     AccountView()
@@ -46,6 +46,9 @@ struct PoolShellView: View {
         }
         .sheet(isPresented: $model.showEntrySwitcher) {
             EntrySwitcherSheet()
+        }
+        .sheet(isPresented: $model.showRules) {
+            RulesSheet()
         }
     }
 }
@@ -64,10 +67,15 @@ struct PoolScreen<Content: View>: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         if !model.online { OfflineBanner() }
-                        Lockup(poolName: model.poolName)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                            .padding(.horizontal, 16)
-                            .padding(.top, 10)
+                        Button { model.showPools = true } label: {
+                            Lockup(poolName: model.poolName, switchable: true)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.cardPress)
+                        .accessibilityLabel("\(model.poolName). Switch pool")
+                        .padding(.horizontal, 16)
+                        .padding(.top, 10)
                         content
                             .padding(.horizontal, 16)
                             .padding(.top, 14)
@@ -103,6 +111,8 @@ struct PoolScreen<Content: View>: View {
 /// "Tally" over the pool's name in small caps — the same lockup as the site header.
 struct Lockup: View {
     let poolName: String
+    /// Draws the chevron that says this is a control. False wherever it is only a wordmark.
+    var switchable = false
 
     var body: some View {
         HStack(spacing: 8) {
@@ -112,7 +122,14 @@ struct Lockup: View {
                 .frame(width: 34, height: 34)
             VStack(alignment: .leading, spacing: 2) {
                 Text("Tally").font(TallyFont.display(21)).foregroundStyle(Color.ink)
-                Text(poolName.uppercased()).font(TallyFont.sans(9, weight: .bold)).tracking(1.4).foregroundStyle(Color.ink2).lineLimit(1)
+                HStack(spacing: 3) {
+                    Text(poolName.uppercased()).font(TallyFont.sans(9, weight: .bold)).tracking(1.4).foregroundStyle(Color.ink2).lineLimit(1)
+                    if switchable {
+                        Image(systemName: "chevron.up.chevron.down")
+                            .font(.system(size: 7, weight: .black))
+                            .foregroundStyle(Color.ink3)
+                    }
+                }
             }
         }
         .accessibilityElement(children: .combine)

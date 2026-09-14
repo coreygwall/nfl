@@ -2,9 +2,14 @@ import SwiftUI
 import TallyKit
 
 /**
- The pools on this phone. One today; a second pool link (tapped, or pasted here) adds another,
- and switching between them swaps the whole app — pool, session, commissioner PIN — because
- `AppModel` only ever holds one. The pool types below are the same cards the landing page shows.
+ The pool switcher, opened from the lockup in the header.
+
+ It is deliberately *not* a tab. Switching pools swaps the whole app — pool, session, board, header
+ — because `AppModel` only ever holds one, so this is a context switch rather than a destination,
+ and the header is where iOS puts those (a workspace picker, an account picker). Home is the tab
+ that lists pools; this is the two-tap way to change which one you are standing in.
+
+ Three jobs, in the order you need them: switch, join, and see what else there is to play.
  */
 struct PoolsView: View {
     @Environment(AppModel.self) private var model
@@ -70,7 +75,21 @@ struct PoolsView: View {
                         }
 
                         VStack(alignment: .leading, spacing: 8) {
-                            SectionLabel(text: "Pool types")
+                            SectionLabel(text: "Start a pool")
+                            HStack(spacing: 8) {
+                                Text("Run your own").font(TallyFont.display(16))
+                                Text("COMING SOON")
+                                    .font(TallyFont.display(10)).tracking(0.8).foregroundStyle(Color.ink2)
+                                    .padding(.horizontal, 8).padding(.vertical, 3)
+                                    .background(Capsule().fill(Color.paper2))
+                                    .overlay(Capsule().strokeBorder(Color.ink, lineWidth: 2))
+                            }
+                            Text("Pick a game, name it, share one link. Until then, a commissioner's link is the way in.")
+                                .sans(14).foregroundStyle(Color.ink2)
+                        }
+
+                        VStack(alignment: .leading, spacing: 8) {
+                            SectionLabel(text: "What Tally plays")
                             ForEach(PoolTypes.all) { type in
                                 VStack(alignment: .leading, spacing: 6) {
                                     HStack(spacing: 8) {

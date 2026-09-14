@@ -30,7 +30,10 @@ export function Welcome() {
   const { player, setPlayer } = usePlayer();
   const nav = useNavigate();
   const [params] = useSearchParams();
-  const next = params.get("next") || "/";
+  // Signing in ends where you came to be: on this week's picks. Home is the landing for every
+  // *later* visit — it answers "which pool, and what needs doing" — but the button that gets you
+  // here says "start picking", so it had better.
+  const next = params.get("next") || `/week/${boot.data?.currentWeek ?? 1}`;
   const claimId = params.get("claim");
   const toast = useToast();
   const create = useCreatePlayer();

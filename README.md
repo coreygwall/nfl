@@ -103,6 +103,7 @@ The app is **Tally** (`playtally.app`); **High Five** is a pool *type*; this sea
 | `/` | The Tally landing page (`src/screens/Landing.tsx`) — what Tally is, and each pool type's own explainer in a sheet. It links to no live pool on purpose. |
 | `/p/<slug>` | A pool instance. The React app mounts here: the router's basename is read from the URL (`src/lib/basename.ts`), so every in-app link is still written as if it were at the root, and the same bundle will serve any pool. |
 | `/api/*` | The API. Single-pool today; the natural shape for many is `/api/pools/<slug>/*`. |
+| `/p/<slug>` | **Home** — which pool you are in, what it wants from you this week, and where you stand. The landing for every visit after the first. |
 | `/welcome`, `/week/*`, `/board*`, `/rules`, `/admin`, `/commissioner`, `/league` | Where the pool used to live. They 301 into `/p/<slug>/…`, query string intact, so links already texted around keep working. `/admin` is the old name for `/commissioner` and redirects to it. |
 
 `POOL_SLUG`, `POOL_NAME` and `POOL_TYPE` in `wrangler.jsonc` name this instance. Renaming the pool's
@@ -143,6 +144,25 @@ but each person has to claim their name again. Two ways through it:
   code they can still read on the old address (or that you read to them from `/commissioner`).
 
 Passkeys follow the same rule — one created on `workers.dev` will not work on `playtally.app`, and the person just adds another (or uses their code).
+
+## Where things are
+
+Four places, on both surfaces:
+
+| | What it answers |
+| --- | --- |
+| **Home** | Which pool am I in, and what does it want from me? One card per pool: the week, whose picks are missing, where you stand. At one pool it is one card; at five it is five. |
+| **Picks** | This week's five. |
+| **Board** | Who is winning. |
+| **Account** | Your entries, signing in, notifications — and the office doors, for whoever holds one. |
+
+Two things deliberately *not* in that list:
+
+- **Switching pools** is a context change, not a destination — it swaps the whole app. It lives on
+  the lockup in the header (tap "Tally / HIGH FIVE"), where iOS and the web both put workspace and
+  account pickers. It costs nothing at one pool: the header looks exactly as it did.
+- **Rules** is a document you read once and then send to someone. It was holding a quarter of the
+  navigation; it now opens from Home and from the board, which is where the question occurs.
 
 ## Two offices
 

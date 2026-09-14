@@ -68,3 +68,31 @@ struct HowToPlay: View {
         }
     }
 }
+
+/**
+ Rules stopped being a tab.
+
+ It is a document you read once and then send to someone else — the only screen in the app you
+ would visit fewer than five times in a season — and it was holding a quarter of the navigation.
+ It opens over whatever you were looking at instead, from the board and from home, which is also
+ where the question actually occurs to people.
+ */
+struct RulesSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                PaperBackground()
+                ScrollView {
+                    RulesView()
+                        .padding(16)
+                        .padding(.bottom, 40)
+                }
+            }
+            .navigationTitle("How it works")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
+        }
+    }
+}

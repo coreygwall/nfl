@@ -179,3 +179,17 @@ private struct Shimmer: ViewModifier {
 private extension View {
     func shimmer(delay: Double = 0) -> some View { modifier(Shimmer(delay: delay)) }
 }
+
+/// One line of text that has not arrived — for a card whose shape is already on screen.
+struct SkeletonLine: View {
+    var width: CGFloat = 140
+    var height: CGFloat = 14
+
+    var body: some View {
+        Capsule()
+            .fill(Color.paper2)
+            .frame(width: width, height: height)
+            .shimmer()
+            .accessibilityHidden(true)
+    }
+}

@@ -37,7 +37,7 @@ test.describe.serial("pool flow", () => {
     await welcome.getByRole("button", { name: "Not now — start picking →" }).click();
     await expect(page).toHaveURL(/\/week\/1$/);
     await expect(page.locator('header img[src="/icon.svg"]')).toBeVisible();
-    await expect(page.getByRole("link", { name: "Tally — High Five" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "High Five. Switch pool" })).toBeVisible();
     await expect(page.getByText("No weekly deadline")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Pick 5 winners" })).toBeVisible();
 
@@ -65,7 +65,14 @@ test.describe.serial("pool flow", () => {
     await expect(page.getByText("Your five")).toBeVisible();
     await expect(page.getByRole("button", { name: "Switch player" })).toContainText("Corey");
 
-    await page.getByRole("link", { name: "Rules" }).click();
+    // Rules left the nav bar: it is a document you read once, reached from home and the board,
+    // which is also where the question occurs to people.
+    await expect(page.getByRole("link", { name: "Rules" })).toHaveCount(0);
+    await page.getByRole("link", { name: "Home" }).first().click();
+    await expect(page).toHaveURL(/\/p\/high-five\/?$/);
+    await expect(page.getByRole("heading", { name: "High Five" })).toBeVisible();
+    await expect(page.getByText("Your picks are in.")).toBeVisible();
+    await page.getByRole("link", { name: "How scoring works" }).click();
     await expect(page).toHaveURL(/\/rules$/);
     await expect(page.getByRole("heading", { name: "How to play High Five" })).toBeVisible();
     await expect(page.getByText("Pick five. Rank your confidence. Score up to 15 points every week.")).toBeVisible();

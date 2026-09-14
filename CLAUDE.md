@@ -39,6 +39,19 @@ Nothing else needs doing in the developer portal. The Push Notifications capabil
 `ios/Tally/Tally.entitlements`, and Xcode enables it on the App ID itself when it provisions with
 automatic signing — the same way it already handles associated domains.
 
+## Four tabs, and what is deliberately not one
+
+Home · Picks · Board · Account, on both surfaces. Home is the landing and the only screen that can
+say *which pool* and *what needs doing* before a tab is chosen.
+
+- **Switching pools is not a tab.** `AppModel` holds one pool, one session, one service; switching
+  swaps the whole app, so it is a context change and lives on the header lockup. `PoolsView` (iOS)
+  and `PoolSheet` (web) are that sheet.
+- **Rules is not a tab.** `RulesSheet` on iOS, `/rules` on web, linked from Home and the board.
+- Web keeps the pick flow's step in the query string, so switching entries clears it
+  (`AppShell.onSwitch`) and `PickFlowRoute` keys the flow by identity. Without both, the previous
+  entry's "locked in" screen follows you.
+
 ## Two offices, one PIN that is no longer a login
 
 `migrations/0010_roles.sql` split what used to be "admin" in two:

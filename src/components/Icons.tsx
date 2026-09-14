@@ -68,6 +68,13 @@ export const Football = ({ size = 20, ...p }: P) => (
     <path d="M8 16l8-8M10 13l1.5 1.5M13 10l1.5 1.5" />
   </svg>
 );
+export const House = ({ size = 20, ...p }: P) => (
+  <svg {...base(size, p)}>
+    <path d="M4 11.2 12 4l8 7.2" />
+    <path d="M6 10v9h12v-9" />
+    <path d="M10 19v-5h4v5" />
+  </svg>
+);
 export const CircleHelp = ({ size = 20, ...p }: P) => (
   <svg {...base(size, p)}>
     <circle cx="12" cy="12" r="9" />

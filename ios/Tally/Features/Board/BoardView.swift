@@ -22,7 +22,7 @@ struct BoardView: View {
                 SeasonBoardView(sort: model.boardSort)
                     .id(model.player?.id ?? "-")
             }
-            LinkButton(title: "How scoring works", color: .ink3) { model.tab = .rules }
+            LinkButton(title: "How scoring works", color: .ink3) { model.showRules = true }
             .frame(maxWidth: .infinity)
             .padding(.top, 24)
         }
