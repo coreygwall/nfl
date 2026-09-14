@@ -1,7 +1,8 @@
-import { animate, motion, useMotionValue, useReducedMotion, useTransform } from "motion/react";
+import { AnimatePresence, animate, motion, useMotionValue, useReducedMotion, useTransform } from "motion/react";
 import { TallyLoader } from "./TallyLoader.tsx";
-import { useEffect } from "react";
-import type { ReactNode } from "react";
+import { useEffect, useRef, useState } from "react";
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from "react";
+import { MoreHorizontal } from "./Icons.tsx";
 
 /**
  * Kept as the name every screen already imports, so the app has one wait rather than two. What it
@@ -133,5 +134,154 @@ export function CountUp({ value, className }: { value: number; className?: strin
     <motion.span className={className} aria-label={`${value}`}>
       {rounded}
     </motion.span>
+  );
+}
+
+/**
+ * The rare actions, folded away.
+ *
+ * A roster row used to carry five equally-weighted buttons, and thirteen rows carried sixty-five —
+ * every one of them shouting at the same volume whether you use it every Sunday or once a season.
+ * Rename, reset access and remove are once-a-season; they live in here, and what is left on the row
+ * is the thing you actually came to do.
+ *
+ * The `menu` role is a promise about the keyboard, not just a label: a menu takes focus when it
+ * opens and arrow keys walk it, which is why the trigger hands focus to the first item and the
+ * popover owns Up, Down, Home, End, Escape and Tab. Anything less and a keyboard user gets a
+ * widget that announces itself as a menu and then behaves like a stray button.
+ */
+export function Menu({
+  label,
+  items,
+}: {
+  label: string;
+  items: { label: string; onSelect: () => void; danger?: boolean; disabled?: boolean }[];
+}) {
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const wrap = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  const itemRefs = useRef<(HTMLButtonElement | null)[]>([]);
+
+  const enabled = items.reduce<number[]>((acc, item, i) => (item.disabled ? acc : [...acc, i]), []);
+
+  const close = (returnFocus: boolean) => {
+    setOpen(false);
+    // Escape and a chosen item should leave you where you were, not adrift at the top of the page.
+    if (returnFocus) trigger.current?.focus();
+  };
+
+  /** The nth item that can actually be focused, or nothing if every item is busy. */
+  const nth = (n: number) => enabled[Math.max(0, Math.min(n, enabled.length - 1))];
+
+  const openAt = (edge: "first" | "last") => {
+    const at = nth(edge === "first" ? 0 : enabled.length - 1);
+    if (at === undefined) return;
+    setActive(at);
+    setOpen(true);
+  };
+
+  const step = (delta: number) => {
+    if (enabled.length === 0) return;
+    const at = enabled.indexOf(active);
+    const next = nth(at < 0 ? 0 : (at + delta + enabled.length) % enabled.length);
+    if (next !== undefined) setActive(next);
+  };
+
+  // Focus follows the active item, so the arrow keys move the caret and not just a highlight.
+  useEffect(() => {
+    if (!open) return;
+    itemRefs.current[active]?.focus();
+  }, [open, active]);
+
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: MouseEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [open]);
+
+  const onMenuKey = (e: ReactKeyboardEvent) => {
+    if (e.key === "Escape") {
+      e.preventDefault();
+      close(true);
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      step(1);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      step(-1);
+    } else if (e.key === "Home" || e.key === "End") {
+      e.preventDefault();
+      const at = nth(e.key === "Home" ? 0 : enabled.length - 1);
+      if (at !== undefined) setActive(at);
+    } else if (e.key === "Tab") {
+      // Let Tab do what Tab does; the menu just gets out of the way.
+      setOpen(false);
+    }
+  };
+
+  return (
+    <div ref={wrap} className="relative shrink-0">
+      <button
+        ref={trigger}
+        type="button"
+        aria-label={label}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        className="btn btn-sm h-9 min-h-9 px-2"
+        onClick={() => (open ? close(false) : openAt("first"))}
+        onKeyDown={(e) => {
+          if (e.key === "ArrowDown") {
+            e.preventDefault();
+            openAt("first");
+          } else if (e.key === "ArrowUp") {
+            e.preventDefault();
+            openAt("last");
+          }
+        }}
+      >
+        <MoreHorizontal />
+      </button>
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            role="menu"
+            aria-label={label}
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.12 }}
+            onKeyDown={onMenuKey}
+            className="card absolute right-0 top-[calc(100%+6px)] z-30 w-52 overflow-hidden p-1"
+          >
+            {items.map((item, i) => (
+              <button
+                key={item.label}
+                ref={(el) => {
+                  itemRefs.current[i] = el;
+                }}
+                role="menuitem"
+                type="button"
+                tabIndex={i === active ? 0 : -1}
+                disabled={item.disabled}
+                aria-disabled={item.disabled || undefined}
+                className={`block w-full rounded-2xl px-3 py-2.5 text-left font-display text-sm font-bold hover:bg-paper-2 disabled:cursor-not-allowed disabled:opacity-40 ${
+                  item.danger ? "text-danger" : ""
+                }`}
+                onClick={() => {
+                  close(true);
+                  item.onSelect();
+                }}
+              >
+                {item.label}
+              </button>
+            ))}
+          </motion.div>
+        )}
+      </AnimatePresence>
+    </div>
   );
 }

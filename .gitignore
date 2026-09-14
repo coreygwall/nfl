@@ -12,3 +12,6 @@ playwright-report
 .DS_Store
 *.log
 .scratch
+
+# One-off render scripts used to eyeball a screen; never part of the app.
+shot*.mjs

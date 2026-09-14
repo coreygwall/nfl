@@ -162,6 +162,44 @@ test.describe.serial("pool flow", () => {
     await expect(page.getByRole("switch", { name: "Corey ready to go" })).toBeHidden();
     await page.getByRole("tab", { name: /^Ready/ }).click();
     await expect(page.getByRole("switch", { name: "Corey ready to go" })).toBeVisible();
+
+    // The roster is a list by default, with columns rather than thirteen identical cards, and the
+    // once-a-season actions are behind a menu instead of shouting alongside the weekly ones. The
+    // suite runs at phone width, where the columns have already dropped away by design — so the
+    // header is checked where it exists.
+    await page.setViewportSize({ width: 1280, height: 900 });
+    await expect(page.getByText("Code", { exact: true })).toBeVisible();
+    await expect(page.getByRole("button", { name: "Rename" })).toHaveCount(0);
+    await page.getByRole("button", { name: /^More for Corey/ }).click();
+    await expect(page.getByRole("menuitem", { name: "Rename" })).toBeVisible();
+    await expect(page.getByRole("menuitem", { name: "Remove from pool" })).toBeVisible();
+
+    // A `menu` role is a promise about the keyboard: opening hands focus to the first item, and
+    // the arrows walk the list rather than scrolling the page behind it.
+    await expect(page.getByRole("menuitem", { name: "Rename" })).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByRole("menuitem", { name: "Reset access" })).toBeFocused();
+    await page.keyboard.press("End");
+    await expect(page.getByRole("menuitem", { name: "Remove from pool" })).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByRole("menuitem", { name: "Rename" })).toBeFocused();
+
+    // Escape closes it and puts focus back where it was, rather than at the top of the page.
+    await page.keyboard.press("Escape");
+    await expect(page.getByRole("menuitem", { name: "Rename" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^More for Corey/ })).toBeFocused();
+
+    // The bare numbers in a row are only legible next to a column header, which a screen reader
+    // cannot see — so each cell says what it is.
+    await expect(page.getByText(/^\d+ picks$/).first()).toBeAttached();
+    await expect(page.getByText(/^\d+ devices$/).first()).toBeAttached();
+
+    // Cards are the other way to look at the same roster, and the choice is remembered.
+    await page.getByRole("radio", { name: "Cards" }).click();
+    await expect(page.getByText("Code", { exact: true })).toHaveCount(0);
+    await page.reload();
+    await page.getByRole("tab", { name: "Players" }).click();
+    await expect(page.getByRole("radio", { name: "Cards" })).toHaveAttribute("aria-checked", "true");
   });
 
   test("after kickoff the pick is frozen and the board reveals it", async ({ page }) => {

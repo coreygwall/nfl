@@ -106,6 +106,32 @@ export const Sparkle = ({ size = 16, ...p }: P) => (
     <path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8L12 3z" />
   </svg>
 );
+export const MoreHorizontal = ({ size = 20, ...p }: P) => (
+  <svg {...base(size, p)}>
+    <circle cx="5" cy="12" r="1.4" fill="currentColor" stroke="none" />
+    <circle cx="12" cy="12" r="1.4" fill="currentColor" stroke="none" />
+    <circle cx="19" cy="12" r="1.4" fill="currentColor" stroke="none" />
+  </svg>
+);
+export const LinkIcon = ({ size = 16, ...p }: P) => (
+  <svg {...base(size, p)}>
+    <path d="M10 13a4 4 0 006 .5l2-2a4 4 0 00-5.7-5.7L11 7" />
+    <path d="M14 11a4 4 0 00-6-.5l-2 2A4 4 0 0011.7 18l1.3-1.3" />
+  </svg>
+);
+export const Rows = ({ size = 18, ...p }: P) => (
+  <svg {...base(size, p)}>
+    <path d="M4 7h16M4 12h16M4 17h16" />
+  </svg>
+);
+export const Cards = ({ size = 18, ...p }: P) => (
+  <svg {...base(size, p)}>
+    <rect x="4" y="4" width="7" height="7" rx="2" />
+    <rect x="13" y="4" width="7" height="7" rx="2" />
+    <rect x="4" y="13" width="7" height="7" rx="2" />
+    <rect x="13" y="13" width="7" height="7" rx="2" />
+  </svg>
+);
 export const Share = ({ size = 16, ...p }: P) => (
   <svg {...base(size, p)}>
     <path d="M12 4v11M8 8l4-4 4 4" />
