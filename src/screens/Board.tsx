@@ -66,10 +66,6 @@ export function Board({ tab }: { tab: "week" | "season" }) {
         <Link to="/rules" className="underline">
           How scoring works
         </Link>
-        {" · "}Commissioner?{" "}
-        <Link to="/admin" className="underline">
-          Enter results
-        </Link>
       </p>
     </div>
   );
@@ -91,7 +87,7 @@ function SideRail({ tab, week }: { tab: "week" | "season"; week: number }) {
   const seasonPending = tab === "season" && (seasonBoard.data?.throughWeek ?? 0) === 0;
   return (
     <aside className="mt-6 hidden lg:sticky lg:top-24 lg:mt-0 lg:block">
-      <div className="card-flat bg-white p-4">
+      <div className="card-flat bg-surface p-4">
         <h2 className="font-display text-[11px] font-extrabold uppercase tracking-wider text-ink-3">
           {tab === "week" ? `Week ${week}` : "Season"}
         </h2>
@@ -123,7 +119,7 @@ function SideRail({ tab, week }: { tab: "week" | "season"; week: number }) {
           {player ? "Make my picks" : "Join the pool"}
         </Link>
       </div>
-      <div className="card-flat mt-3 bg-white p-4">
+      <div className="card-flat mt-3 bg-surface p-4">
         <h2 className="font-display text-[11px] font-extrabold uppercase tracking-wider text-ink-3">Scoring</h2>
         <ul className="mt-2 space-y-1.5">
           {[1, 2, 3, 4, 5].map((r) => (
@@ -138,10 +134,6 @@ function SideRail({ tab, week }: { tab: "week" | "season"; week: number }) {
         <p className="mt-3 text-xs text-ink-3">
           <Link to="/rules" className="underline">
             How scoring works
-          </Link>
-          {" · "}
-          <Link to="/admin" className="underline">
-            Enter results
           </Link>
         </p>
       </div>
@@ -171,7 +163,7 @@ function ordinal(n: number): string {
 function PlaceBadge({ place, size = "md", muted = false }: { place: number; size?: "md" | "sm"; muted?: boolean }) {
   const tone = muted
     ? "bg-paper-2 text-ink-3"
-    : place === 1 ? "bg-flag" : place === 2 ? "bg-paper-3" : place === 3 ? "bg-[#e9c9a6]" : "bg-white";
+    : place === 1 ? "bg-flag" : place === 2 ? "bg-paper-3" : place === 3 ? "bg-[#e9c9a6]" : "bg-surface";
   const dims = size === "sm" ? "h-7 w-7 text-xs" : "h-9 w-9 text-sm";
   return (
     <span className={`flex shrink-0 items-center justify-center rounded-full border-2 border-ink font-display font-extrabold tabular ${tone} ${dims}`}>
@@ -244,14 +236,14 @@ function WeekRowItem({ row, index, open, onToggle, isMe, week, started }: { row:
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 400, damping: 30, delay: Math.min(index * 0.03, 0.3) }}
-      className={`card-flat overflow-hidden ${isMe ? "bg-flag-soft shadow-hard" : "bg-white"}`}
+      className={`card-flat overflow-hidden ${isMe ? "bg-flag-soft shadow-hard" : "bg-surface"}`}
     >
       <button className="row-hover flex w-full items-center gap-3 p-3 text-left" onClick={onToggle} aria-expanded={open}>
         <PlaceBadge place={row.place} muted={!started} />
         <div className="min-w-0 flex-1">
           <div className="font-display flex items-center gap-2 truncate text-[17px] font-extrabold">
             <span className="truncate">{row.name}</span>
-            {isMe && <span className="chip bg-white py-0 text-[10px]">you</span>}
+            {isMe && <span className="chip bg-surface py-0 text-[10px]">you</span>}
           </div>
           <div className="text-xs text-ink-2">
             {row.picksMade === 0 ? (
@@ -348,14 +340,14 @@ function EmptySlot({ rank, locked }: { rank: number; locked: boolean }) {
     // an empty rank and a hidden pick both announced only their number. Naming the `li` itself
     // would work too, but overriding its role costs the list its `listitem`s.
     <li
-      className={`${SLOT} ${locked ? "border-ink/25 bg-white" : "border-dashed border-line bg-paper-2/50"}`}
+      className={`${SLOT} ${locked ? "border-ink/25 bg-surface" : "border-dashed border-line bg-paper-2/50"}`}
       title={said}
     >
       <span className="sr-only">{said}</span>
       <span className={SLOT_ICON} aria-hidden="true">
         {locked ? <Lock size={13} className="text-ink-2" /> : <span className="text-[13px] font-bold text-ink-3">–</span>}
       </span>
-      <span className={`${SLOT_BADGE} ${locked ? "bg-white text-ink" : "text-ink-3"}`} aria-hidden="true">
+      <span className={`${SLOT_BADGE} ${locked ? "bg-surface text-ink" : "text-ink-3"}`} aria-hidden="true">
         {stake}
       </span>
     </li>
@@ -375,12 +367,12 @@ function PickChip({ pick }: { pick: ScoredPick }) {
   // as one from across the row. A tie stays neutral: it scored nothing, but it was not wrong.
   const [tone, badge, value, said] =
     pick.outcome === "win"
-      ? ["border-turf bg-turf-soft", "bg-turf text-white", `${pick.points}`, `won ${pick.points} points`]
+      ? ["border-turf bg-turf-soft", "bg-turf text-on-turf", `${pick.points}`, `won ${pick.points} points`]
       : pick.outcome === "loss"
-        ? ["border-danger/55 bg-danger-soft", "bg-white text-danger", "0", "got nothing"]
+        ? ["border-danger/55 bg-danger-soft", "bg-surface text-danger", "0", "got nothing"]
         : pick.outcome === "tie"
-          ? ["border-line bg-paper-2", "bg-white text-ink-3", "0", "tied, so no points"]
-          : ["border-ink/25 bg-white", "bg-white text-ink", `${stake}`, `still playing, worth ${stake} points`];
+          ? ["border-line bg-paper-2", "bg-surface text-ink-3", "0", "tied, so no points"]
+          : ["border-ink/25 bg-surface", "bg-surface text-ink", `${stake}`, `still playing, worth ${stake} points`];
   return (
     <li className={`${SLOT} ${tone}`} title={`${t.city} ${t.nickname} — ${said}`}>
       {/* The logo's alt text gave the team but never the outcome — colour alone carried that. */}
@@ -440,14 +432,14 @@ function SeasonRowItem({ row, index, isMe, open, onToggle, throughWeek }: { row:
       initial={{ opacity: 0, y: 8 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ type: "spring", stiffness: 400, damping: 30, delay: Math.min(index * 0.03, 0.3) }}
-      className={`card-flat overflow-hidden ${isMe ? "bg-flag-soft shadow-hard" : "bg-white"}`}
+      className={`card-flat overflow-hidden ${isMe ? "bg-flag-soft shadow-hard" : "bg-surface"}`}
     >
       <button className="row-hover flex w-full items-center gap-3 p-3 text-left" onClick={onToggle} aria-expanded={open}>
         <PlaceBadge place={row.place} muted={throughWeek === 0} />
         <div className="min-w-0 flex-1">
           <div className="font-display flex items-center gap-2 truncate text-[17px] font-extrabold">
             <span className="truncate">{row.name}</span>
-            {isMe && <span className="chip bg-white py-0 text-[10px]">you</span>}
+            {isMe && <span className="chip bg-surface py-0 text-[10px]">you</span>}
           </div>
           <div className="text-xs text-ink-2">
             {row.weeksPlayed === 0

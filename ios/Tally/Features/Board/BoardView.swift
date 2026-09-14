@@ -22,7 +22,7 @@ struct BoardView: View {
                 SeasonBoardView(sort: model.boardSort)
                     .id(model.player?.id ?? "-")
             }
-            LinkButton(title: "How scoring works", color: .ink3) { model.tab = .rules }
+            LinkButton(title: "How scoring works", color: .ink3) { model.showRules = true }
             .frame(maxWidth: .infinity)
             .padding(.top, 24)
         }
@@ -352,7 +352,7 @@ struct BoardRowCard<Detail: View>: View {
         }
         // No .clipped() here: the card's own offset shadow lives outside its bounds, and clipping
         // sliced it off on the highlighted row.
-        .modifier(TallyCard(hard: isMe || crowned, fill: isMe || crowned ? .flagSoft : .white, border: .ink, radius: TallyRadius.card, dashed: false))
+        .modifier(TallyCard(hard: isMe || crowned, fill: isMe || crowned ? .flagSoft : .surface, border: .ink, radius: TallyRadius.card, dashed: false))
     }
 }
 
@@ -407,12 +407,12 @@ struct EmptySlotChip: View {
                 .monospacedDigit()
                 .foregroundStyle(locked ? Color.ink : Color.ink3)
                 .frame(minWidth: PillFit.Chip.badge, minHeight: PillFit.Chip.badge)
-                .background(Circle().fill(locked ? Color.white : Color.clear))
+                .background(Circle().fill(locked ? Color.surface : Color.clear))
         }
         .padding(.leading, PillFit.Chip.leading)
         .padding(.trailing, PillFit.Chip.trailing)
         .padding(.vertical, PillFit.Chip.vertical)
-        .background(Capsule().fill(locked ? Color.white : Color.paper2.opacity(0.5)))
+        .background(Capsule().fill(locked ? Color.surface : Color.paper2.opacity(0.5)))
         .overlay(
             Capsule().strokeBorder(
                 locked ? Color.ink.opacity(0.25) : Color.line,
@@ -445,10 +445,10 @@ struct PickChip: View {
      */
     private var style: Style {
         switch pick.outcome {
-        case .win: return Style(border: .turf, fill: .turfSoft, badgeFill: .turf, badgeText: .white, value: "\(pick.points)")
-        case .loss: return Style(border: Color.danger.opacity(0.55), fill: .dangerSoft, badgeFill: .white, badgeText: .danger, value: "0")
-        case .tie: return Style(border: .line, fill: .paper2, badgeFill: .white, badgeText: .ink3, value: "0")
-        case .pending: return Style(border: Color.ink.opacity(0.25), fill: .white, badgeFill: .white, badgeText: .ink, value: "\(Scoring.points(forRank: pick.rank))")
+        case .win: return Style(border: .turf, fill: .turfSoft, badgeFill: .turf, badgeText: .onFill, value: "\(pick.points)")
+        case .loss: return Style(border: Color.danger.opacity(0.55), fill: .dangerSoft, badgeFill: .surface, badgeText: .danger, value: "0")
+        case .tie: return Style(border: .line, fill: .paper2, badgeFill: .surface, badgeText: .ink3, value: "0")
+        case .pending: return Style(border: Color.ink.opacity(0.25), fill: .surface, badgeFill: .surface, badgeText: .ink, value: "\(Scoring.points(forRank: pick.rank))")
         }
     }
 

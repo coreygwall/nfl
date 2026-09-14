@@ -117,7 +117,7 @@ function StatusTag({ status }: { status: PoolTypeContent["status"] }) {
   return (
     <span
       className={`font-display rounded-full border-2 px-2.5 py-0.5 text-[11px] font-extrabold uppercase tracking-[0.06em] ${
-        live ? "border-turf bg-turf text-white" : "border-ink bg-paper-2 text-ink-2"
+        live ? "border-turf bg-turf text-on-turf" : "border-ink bg-paper-2 text-ink-2"
       }`}
     >
       {live ? "Live now" : "Coming soon"}

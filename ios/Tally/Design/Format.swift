@@ -39,6 +39,18 @@ enum Format {
         return f.localizedString(for: date, relativeTo: now)
     }
 
+    /// "1st", "2nd", "3rd", "11th" — for the one place a badge is not the right shape.
+    static func ordinal(_ n: Int) -> String {
+        let tens = n % 100
+        if tens >= 11 && tens <= 13 { return "\(n)th" }
+        switch n % 10 {
+        case 1: return "\(n)st"
+        case 2: return "\(n)nd"
+        case 3: return "\(n)rd"
+        default: return "\(n)th"
+        }
+    }
+
     static func plural(_ n: Int, _ singular: String, _ plural: String? = nil) -> String {
         n == 1 ? "\(n) \(singular)" : "\(n) \(plural ?? singular + "s")"
     }

@@ -6,7 +6,36 @@ import TallyKit
 import UIKit
 
 enum AppTab: Hashable {
-    case picks, board, rules, account
+    /// Home is first and is where a launch lands: it is the only screen that can say *which* pool
+    /// and *what needs doing* before you have picked a tab. Rules stopped being one — it is a
+    /// document you read once, not a place you go, so it opens over whatever you were looking at.
+    case home, picks, board, account
+}
+
+/**
+ Light, dark, or whatever the phone is doing.
+
+ "System" is the default and is stored as the absence of a choice, so a phone that turns dark at
+ sunset takes the app with it without anyone having picked anything.
+ */
+enum ThemeChoice: String, CaseIterable, Hashable {
+    case system, light, dark
+
+    var label: String {
+        switch self {
+        case .system: return "System"
+        case .light: return "Light"
+        case .dark: return "Dark"
+        }
+    }
+
+    var scheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
 }
 
 enum BoardScope: String, Hashable {
@@ -62,13 +91,14 @@ final class AppModel {
 
     // MARK: Navigation
 
-    var tab: AppTab = .picks
+    var tab: AppTab = .home
     var pickWeek: Int?
     var boardWeek: Int?
     var boardScope: BoardScope = .week
     var boardSort: BoardSort = .points
     /// The entry switcher over the name chip. Account settings live on their own tab.
     var showEntrySwitcher = false
+    var showRules = false
     var showCommissioner = false
     var showLeagueOffice = false
     var showPools = false
@@ -113,6 +143,18 @@ final class AppModel {
         Keychain.shared.remove(forKey: legacyPinKey)
     }
 
+    // MARK: Appearance
+
+    private static let themeKey = "tally.theme"
+
+    var theme: ThemeChoice = .system {
+        didSet {
+            guard theme != oldValue else { return }
+            if theme == .system { UserDefaults.standard.removeObject(forKey: AppModel.themeKey) }
+            else { UserDefaults.standard.set(theme.rawValue, forKey: AppModel.themeKey) }
+        }
+    }
+
     private let monitor = NWPathMonitor()
     private var refreshTask: Task<Void, Never>?
 
@@ -136,6 +178,7 @@ final class AppModel {
             Task { @MainActor in self?.online = path.status == .satisfied }
         }
         monitor.start(queue: DispatchQueue(label: "tally.network"))
+        theme = UserDefaults.standard.string(forKey: AppModel.themeKey).flatMap(ThemeChoice.init(rawValue:)) ?? .system
         loadLegacyPin()
         connectPush()
         refreshTask = Task { [weak self] in
@@ -354,11 +397,13 @@ final class AppModel {
             if query["sort"] == "possible" { boardSort = .possible }
             tab = .board
         case "rules":
-            tab = .rules
+            showRules = true
         case "admin", "commissioner":
             showCommissioner = true
         case "league":
             showLeagueOffice = true
+        case "home", "":
+            tab = .home
         default:
             tab = .picks
         }

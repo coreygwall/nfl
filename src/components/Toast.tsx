@@ -33,7 +33,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
               exit={{ opacity: 0, y: -10, scale: 0.98 }}
               transition={{ type: "spring", stiffness: 500, damping: 30 }}
               className={`card-flat pointer-events-auto max-w-sm px-4 py-2.5 text-sm font-semibold shadow-hard-sm ${
-                t.kind === "error" ? "bg-danger-soft" : t.kind === "success" ? "bg-turf-soft" : "bg-white"
+                t.kind === "error" ? "bg-danger-soft" : t.kind === "success" ? "bg-turf-soft" : "bg-surface"
               }`}
             >
               {t.message}

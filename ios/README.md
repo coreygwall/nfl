@@ -13,7 +13,7 @@ ios/
     App/               AppModel (one pool, one session, the bootstrap), Loadable
     Design/            the design system ported from src/index.css: paper, ink, hard shadows, fonts
     Shell/             tabs, header, account sheet, toasts
-    Features/          Welcome · Picks · Board · Rules · Office · Pools — one folder per screen
+    Features/          Welcome · Home · Picks · Board · Rules · Office · Pools — one folder per screen
     Resources/Fonts/   Bricolage Grotesque + Inter as static TTFs (scripts/build-ios-fonts.py)
     Assets.xcassets/   32 team stickers, the mark and the icon (scripts/build-ios-assets.ts)
   TallyKit/            a Swift package with everything that is not a screen

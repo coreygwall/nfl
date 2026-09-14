@@ -41,6 +41,7 @@ struct CommissionerView: View {
                     .padding(.bottom, 40)
                 }
             }
+            .noZoom()
             .navigationTitle("Commissioner")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }

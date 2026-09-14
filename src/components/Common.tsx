@@ -41,7 +41,7 @@ export function RankBadge({ rank, size = "md", muted = false }: { rank: number; 
   return (
     <div
       className={`flex shrink-0 flex-col items-center justify-center rounded-xl border-2 border-ink font-display font-extrabold leading-none tabular ${dims} ${
-        muted ? "bg-paper-2 text-ink-3" : rank === 1 ? "bg-flag" : "bg-white"
+        muted ? "bg-paper-2 text-ink-3" : rank === 1 ? "bg-flag" : "bg-surface"
       }`}
       aria-label={`Rank ${rank}, ${points} points`}
     >

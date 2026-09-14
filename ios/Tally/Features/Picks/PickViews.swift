@@ -41,7 +41,7 @@ struct GameCard: View {
             side(game.home, count: counts?.home)
         }
         .padding(2)
-        .cardFlat(fill: locked ? Color.paper2.opacity(0.7) : .white)
+        .cardFlat(fill: locked ? Color.paper2.opacity(0.7) : .surface)
         .background {
             if selection != nil, !locked {
                 RoundedRectangle(cornerRadius: TallyRadius.card, style: .continuous).fill(Color.ink).offset(x: 4, y: 4)
@@ -158,7 +158,7 @@ struct PickTrayView: View {
             Button(action: state.onNext) {
                 Text(label)
                     .font(TallyFont.display(full ? 17 : 15, weight: .bold))
-                    .foregroundStyle(full ? Color.white : Color.paper)
+                    .foregroundStyle(full ? Color.onFill : Color.paper)
                     .padding(.horizontal, full ? 18 : 14)
                     .frame(minHeight: full ? 46 : 40)
                     .background(Capsule().fill(full ? Color.turf : Color.ink))
@@ -199,7 +199,7 @@ enum OutcomeStyle {
         case .loss: return .dangerSoft
         case .tie: return .paper2
         case .live: return .flagSoft
-        case .pending: return .white
+        case .pending: return .surface
         }
     }
 
@@ -345,7 +345,7 @@ struct RankRow<G: Gesture>: View {
         .background {
             ZStack {
                 if lifted { RoundedRectangle(cornerRadius: TallyRadius.card, style: .continuous).fill(Color.ink).offset(x: 6, y: 6) }
-                RoundedRectangle(cornerRadius: TallyRadius.card, style: .continuous).fill(Color.white)
+                RoundedRectangle(cornerRadius: TallyRadius.card, style: .continuous).fill(Color.surface)
                 RoundedRectangle(cornerRadius: TallyRadius.card, style: .continuous).strokeBorder(Color.ink, lineWidth: 2)
             }
         }

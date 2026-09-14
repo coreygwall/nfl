@@ -37,6 +37,7 @@ struct LeagueOfficeView: View {
                     .padding(.bottom, 40)
                 }
             }
+            .noZoom()
             .navigationTitle("League office")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
@@ -58,7 +59,7 @@ private struct LeagueResultsView: View {
             HStack {
                 WeekMenu(week: activeWeek, max: model.maxWeek, onChange: { week = $0 })
                     .padding(.horizontal, 12).padding(.vertical, 6)
-                    .background(Capsule().fill(Color.white))
+                    .background(Capsule().fill(Color.surface))
                     .overlay(Capsule().strokeBorder(Color.ink, lineWidth: 2))
                 Spacer()
                 Button(pulling ? "Pulling…" : "Pull final scores") { Task { await pull() } }
@@ -146,7 +147,7 @@ private struct LeagueGameRow: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .cardFlat(fill: game.winner != nil ? .turfSoft : .white)
+        .cardFlat(fill: game.winner != nil ? .turfSoft : .surface)
     }
 
     private func choice(_ team: Team, selected: Bool, action: @escaping () -> Void) -> some View {

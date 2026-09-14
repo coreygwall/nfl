@@ -4,12 +4,12 @@ import { AnimatePresence, motion } from "motion/react";
 import { useBootstrap, useClaimPlayer } from "../api/queries.ts";
 import { usePlayer } from "../lib/player.tsx";
 import { useChrome } from "./Chrome.tsx";
-import { ChevronDown, ChevronLeft, ChevronRight, CircleHelp, Football, Swap, Trophy, X } from "./Icons.tsx";
+import { ChevronDown, ChevronLeft, ChevronRight, Football, House, Swap, Trophy, X } from "./Icons.tsx";
 import { useToast } from "./Toast.tsx";
 import { useOnline } from "../lib/online.ts";
+import { useTheme, type Theme } from "../lib/theme.ts";
 import { api, ApiClientError } from "../api/client.ts";
 import type { Identity } from "../lib/identity.ts";
-import type { RosterPlayer } from "../../shared/api.ts";
 import { formatCode } from "../../shared/codes.ts";
 import { poolUrl } from "../lib/basename.ts";
 import { isVulgar, VULGAR_MESSAGE } from "../../shared/profanity.ts";
@@ -25,6 +25,7 @@ export function AppShell() {
   const toast = useToast();
   const { navHidden, headerWeek, changeWeek } = useChrome();
   const [switching, setSwitching] = useState(false);
+  const [poolSheet, setPoolSheet] = useState(false);
   const poolName = boot.data?.poolName ?? "High Five";
   const online = useOnline();
   const updateReady = !!boot.data && boot.data.build !== __BUILD_ID__ && __BUILD_ID__ !== "test";
@@ -107,35 +108,43 @@ export function AppShell() {
 
   const onWelcome = loc.pathname.startsWith("/welcome");
   const currentWeek = boot.data?.currentWeek ?? 1;
+  // Home is first and is the only screen that can say *which* pool and *what needs doing* before
+  // you have picked a tab. Rules left the bar: a document you read once was holding a third of it.
   const tabs = [
+    { to: "/", match: "/", exact: true, label: "Home", icon: <House /> },
     { to: `/week/${currentWeek}`, match: "/week", label: "Picks", icon: <Football /> },
     { to: "/board", match: "/board", label: "Board", icon: <Trophy /> },
-    { to: "/rules", match: "/rules", label: "Rules", icon: <CircleHelp /> },
   ];
+  const isActive = (t: { match: string; exact?: boolean }) =>
+    t.exact ? loc.pathname === "/" : loc.pathname.startsWith(t.match);
 
   return (
     <div className="relative mx-auto flex min-h-dvh w-full max-w-[1180px] flex-col">
       <header data-scrolled={scrolled} className="app-header sticky top-0 z-30 bg-paper/90 backdrop-blur">
         <div className="flex items-center gap-3 px-4 py-3 sm:px-6 sm:py-3.5 lg:px-8">
-          <Link
-            to="/"
-            aria-label={`Tally — ${poolName}`}
-            className="flex min-w-0 shrink-0 items-center gap-2.5"
+          <button
+            type="button"
+            aria-label={`${poolName}. Switch pool`}
+            className="flex min-w-0 shrink-0 items-center gap-2.5 text-left"
+            onClick={() => setPoolSheet(true)}
           >
             <img src="/icon.svg" alt="" className="h-10 w-10 shrink-0 sm:h-11 sm:w-11" />
             <span className="flex min-w-0 flex-col leading-none">
               <span className="font-display truncate text-[1.55rem] font-extrabold tracking-tight sm:text-[1.8rem]">Tally</span>
-              <span className="mt-1 truncate text-[0.68rem] font-bold uppercase tracking-[0.16em] text-ink-2 sm:text-[0.72rem]">{poolName}</span>
+              <span className="mt-1 flex items-center gap-1 truncate text-[0.68rem] font-bold uppercase tracking-[0.16em] text-ink-2 sm:text-[0.72rem]">
+                {poolName}
+                <Swap className="shrink-0 text-ink-3" size={11} />
+              </span>
             </span>
-          </Link>
+          </button>
           {player && !onWelcome && (
             <>
               <nav className="ml-4 hidden items-center gap-1 md:flex" aria-label="Primary navigation">
                 {tabs.map((t) => {
-                  const active = loc.pathname.startsWith(t.match);
+                  const active = isActive(t);
                   return (
                     <Link
-                      key={t.match}
+                      key={t.label}
                       to={t.to}
                       aria-current={active ? "page" : undefined}
                       className={`relative isolate z-0 flex items-center gap-2 rounded-full px-4 py-1.5 font-display text-[15px] font-bold ${
@@ -189,10 +198,10 @@ export function AppShell() {
           <div className="mx-auto max-w-[560px] px-4 pb-[max(env(safe-area-inset-bottom),12px)]">
             <div className="card flex p-1.5">
               {tabs.map((t) => {
-                const active = loc.pathname.startsWith(t.match);
+                const active = isActive(t);
                 return (
                   <Link
-                    key={t.match}
+                    key={t.label}
                     to={t.to}
                     aria-current={active ? "page" : undefined}
                     className={`relative isolate z-0 flex flex-1 items-center justify-center gap-1.5 rounded-2xl py-2.5 font-display text-[15px] font-bold transition-colors ${
@@ -218,29 +227,40 @@ export function AppShell() {
       )}
 
       <AnimatePresence>
+        {poolSheet && <PoolSheet poolName={poolName} poolType={boot.data?.pool?.type} onClose={() => setPoolSheet(false)} />}
+      </AnimatePresence>
+
+      <AnimatePresence>
         {switching && (
           <Sheet title="Your account" onClose={() => setSwitching(false)}>
             <AccountSheet
               player={player}
               people={people}
-              roster={boot.data?.players ?? []}
               accountName={boot.data?.account?.name ?? player?.name ?? ""}
               accountId={boot.data?.account?.id ?? null}
               myCode={boot.data?.myCode ?? null}
               hasPasskey={(boot.data?.myPasskeys ?? 0) > 0}
+              // Switching entries leaves you on the same screen — you are usually comparing two
+              // cards on the same week, and being thrown elsewhere loses your place. Only one piece
+              // of route state goes stale: the pick flow keeps its step in the query, and "you just
+              // locked in" is emphatically not true of the entry you switched to. Everything else
+              // in the query describes the *screen* rather than the player — the board's sort, for
+              // one — so it stays.
               onSwitch={(id) => {
                 switchTo(id);
                 setSwitching(false);
-                nav("/");
+                if (new URLSearchParams(loc.search).has("step")) {
+                  const next = new URLSearchParams(loc.search);
+                  next.delete("step");
+                  const query = next.toString();
+                  nav(`${loc.pathname}${query ? `?${query}` : ""}`, { replace: true });
+                }
               }}
+              // Adding one does move you — the button says "and make picks".
               onAdded={(p) => {
                 setPlayer(p);
                 setSwitching(false);
-                nav("/");
-              }}
-              onClaimElsewhere={(id) => {
-                setSwitching(false);
-                nav(`/welcome?claim=${id}`);
+                nav(`/week/${currentWeek}`);
               }}
               onNew={() => {
                 setSwitching(false);
@@ -262,26 +282,22 @@ export function AppShell() {
 function AccountSheet({
   player,
   people,
-  roster,
   myCode,
   accountName,
   accountId,
   hasPasskey,
   onSwitch,
   onAdded,
-  onClaimElsewhere,
   onNew,
 }: {
   player: Identity | null;
   people: Identity[];
-  roster: RosterPlayer[];
   myCode: string | null;
   accountName: string;
   accountId: string | null;
   hasPasskey: boolean;
   onSwitch: (id: string) => void;
   onAdded: (p: Identity) => void;
-  onClaimElsewhere: (id: string) => void;
   onNew: () => void;
 }) {
   const [showCode, setShowCode] = useState(false);
@@ -312,6 +328,7 @@ function AccountSheet({
 
       <p className="mt-2 text-sm text-ink-2">Add entries for your kids, family, or friends. Each gets their own picks and score, all managed by your account.</p>
       <PasskeyRow key={player?.accountId ?? player?.id} hasPasskey={hasPasskey} />
+      <ThemeRow />
 
       {adding ? (
         <AddPerson
@@ -339,24 +356,39 @@ function AccountSheet({
               I'm someone new
             </button>
           </div>
-          {roster.length > people.length && (
-            <p className="pt-1 text-xs text-ink-3">
-              Someone else's turn on this device?{" "}
-              {roster
-                .filter((p) => !people.some((x) => x.id === p.id))
-                .slice(0, 6)
-                .map((p, i) => (
-                  <span key={p.id}>
-                    {i > 0 && " · "}
-                    <button className="font-bold text-ink-2 underline" onClick={() => onClaimElsewhere(p.id)}>
-                      {p.name}
-                    </button>
-                  </span>
-                ))}
-            </p>
-          )}
         </div>
       )}
+    </div>
+  );
+}
+
+/**
+ * Light, dark, or the device's own mind. "System" is the default and is the absence of a choice,
+ * so a phone that turns dark at sunset takes the app with it.
+ */
+function ThemeRow() {
+  const [theme, setTheme] = useTheme();
+  const options: { value: Theme; label: string }[] = [
+    { value: "system", label: "System" },
+    { value: "light", label: "Light" },
+    { value: "dark", label: "Dark" },
+  ];
+  return (
+    <div className="mt-4 border-t-2 border-dashed border-line pt-4">
+      <h3 className="font-display mb-2 text-sm font-extrabold uppercase tracking-wider text-ink-3">Appearance</h3>
+      <div className="flex gap-2" role="radiogroup" aria-label="Appearance">
+        {options.map((o) => (
+          <button
+            key={o.value}
+            role="radio"
+            aria-checked={theme === o.value}
+            className={`btn btn-sm flex-1 ${theme === o.value ? "btn-primary" : ""}`}
+            onClick={() => setTheme(o.value)}
+          >
+            {o.label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -593,7 +625,7 @@ export function Sheet({
         transition={{ type: "spring", stiffness: 400, damping: 32 }}
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 -mx-5 mb-3 flex items-center justify-between bg-white px-5 pb-3">
+        <div className="sticky top-0 -mx-5 mb-3 flex items-center justify-between bg-surface px-5 pb-3">
           <h2 className="font-display text-xl font-extrabold">{title}</h2>
           <button className="btn btn-ghost btn-sm px-2" onClick={onClose} aria-label="Close">
             <X />
@@ -602,5 +634,34 @@ export function Sheet({
         {children}
       </motion.div>
     </motion.div>
+  );
+}
+
+
+/**
+ * The pool switcher. One pool today, so it mostly answers "where am I" — which is the job the
+ * lockup was already doing silently. Joining is a link someone sends you; every pool lives at its
+ * own address, which is why there is nothing to type here.
+ */
+function PoolSheet({ poolName, poolType, onClose }: { poolName: string; poolType?: string; onClose: () => void }) {
+  return (
+    <Sheet title="Pools" onClose={onClose}>
+      <h3 className="font-display mb-2 text-sm font-extrabold uppercase tracking-wider text-ink-3">Your pool</h3>
+      <div className="card-flat flex items-center gap-3 bg-surface p-3">
+        <div className="min-w-0">
+          <div className="font-display truncate font-extrabold">{poolName}</div>
+          <div className="truncate text-xs text-ink-2">{poolType ?? "High Five"}</div>
+        </div>
+        <span className="chip ml-auto shrink-0 bg-flag py-0.5 text-[11px]">open</span>
+      </div>
+      <p className="mt-4 border-t-2 border-dashed border-line pt-4 text-sm text-ink-2">
+        Every pool lives at its own address, so a commissioner's link is the way into another one.
+        Opening it signs you in there; this one stays exactly as it is.
+      </p>
+      <p className="mt-3 text-sm text-ink-2">
+        <b className="font-display text-ink">Start a pool</b>{" "}
+        <span className="chip bg-paper-2 py-0 text-[10px]">coming soon</span>
+      </p>
+    </Sheet>
   );
 }

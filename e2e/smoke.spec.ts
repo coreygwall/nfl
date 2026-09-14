@@ -37,7 +37,7 @@ test.describe.serial("pool flow", () => {
     await welcome.getByRole("button", { name: "Not now — start picking →" }).click();
     await expect(page).toHaveURL(/\/week\/1$/);
     await expect(page.locator('header img[src="/icon.svg"]')).toBeVisible();
-    await expect(page.getByRole("link", { name: "Tally — High Five" })).toBeVisible();
+    await expect(page.getByRole("button", { name: "High Five. Switch pool" })).toBeVisible();
     await expect(page.getByText("No weekly deadline")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Pick 5 winners" })).toBeVisible();
 
@@ -65,7 +65,14 @@ test.describe.serial("pool flow", () => {
     await expect(page.getByText("Your five")).toBeVisible();
     await expect(page.getByRole("button", { name: "Switch player" })).toContainText("Corey");
 
-    await page.getByRole("link", { name: "Rules" }).click();
+    // Rules left the nav bar: it is a document you read once, reached from home and the board,
+    // which is also where the question occurs to people.
+    await expect(page.getByRole("link", { name: "Rules" })).toHaveCount(0);
+    await page.getByRole("link", { name: "Home" }).first().click();
+    await expect(page).toHaveURL(/\/p\/high-five\/?$/);
+    await expect(page.getByRole("heading", { name: "High Five" })).toBeVisible();
+    await expect(page.getByText("Your picks are in.")).toBeVisible();
+    await page.getByRole("link", { name: "How scoring works" }).click();
     await expect(page).toHaveURL(/\/rules$/);
     await expect(page.getByRole("heading", { name: "How to play High Five" })).toBeVisible();
     await expect(page.getByText("Pick five. Rank your confidence. Score up to 15 points every week.")).toBeVisible();
@@ -333,6 +340,39 @@ test("an entry removed by the commissioner doesn't strand the device that held i
   await expect(chip).toContainText("Dana");
   await expect(page.getByText("isn't on this account any more")).toBeVisible();
   await expect(page.getByRole("heading", { name: /Pick 5 winners/ })).toBeVisible();
+});
+
+test("home never says your picks are in off a board it could not load", async ({ page }) => {
+  await page.goto(`/p/high-five/welcome?now=${BEFORE}`);
+  await page.getByPlaceholder("Your name").fill(`Offline ${Date.now().toString(36)}`);
+  await page.getByRole("button", { name: "Let's go" }).click();
+  await page.waitForURL(/\/week\/1$/);
+
+  // The week board is the only thing that knows whether the picks are in. With it refused, the
+  // absence of "owing" entries is ignorance, not success — and "Your picks are in" off a failed
+  // request is the one sentence on this screen that can cost someone their week.
+  await page.route("**/api/board/week/**", (route) => route.abort());
+  await page.goto(`/p/high-five/?now=${BEFORE}`);
+  await expect(page.getByText("Couldn't check your picks.")).toBeVisible();
+  await expect(page.getByText("Your picks are in.")).toHaveCount(0);
+});
+
+test("dark mode follows the device, and a choice overrides it", async ({ page }) => {
+  // The tokens are the theme: nothing re-renders, the custom properties are redefined on <html>.
+  await page.emulateMedia({ colorScheme: "dark" });
+  await page.goto(`/p/high-five/welcome?now=${BEFORE}`);
+  const ground = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
+  expect(await ground()).toBe("rgb(26, 23, 19)");
+
+  await page.emulateMedia({ colorScheme: "light" });
+  expect(await ground()).toBe("rgb(246, 241, 232)");
+
+  // A saved choice wins over the device, and survives a reload without a flash — the inline
+  // script in index.html puts it on <html> before the stylesheet applies.
+  await page.evaluate(() => localStorage.setItem("tally.theme", "dark"));
+  await page.reload();
+  expect(await page.getAttribute("html", "data-theme")).toBe("dark");
+  expect(await ground()).toBe("rgb(26, 23, 19)");
 });
 
 test("the landing page explains a pool without linking into one", async ({ page }) => {

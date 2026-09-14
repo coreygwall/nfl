@@ -3,8 +3,9 @@ import TallyKit
 
 // MARK: Cards
 
-/// `.card` and `.card-flat` from the web: white, 2pt ink border, 20pt corners, and (hard) the
-/// offset shadow that gives the whole app its sticker-on-paper look.
+/// `.card` and `.card-flat` from the web: a surface fill, 2pt ink border, 20pt corners, and (hard)
+/// the offset shadow that gives the whole app its sticker-on-paper look. The shadow is `.shadow`
+/// rather than `.ink` because `ink` is light in the dark theme, and a light shadow is a glow.
 struct TallyCard: ViewModifier {
     var hard: Bool
     var fill: Color
@@ -18,7 +19,7 @@ struct TallyCard: ViewModifier {
                 ZStack {
                     if hard {
                         RoundedRectangle(cornerRadius: radius, style: .continuous)
-                            .fill(Color.ink)
+                            .fill(Color.shadow)
                             .offset(x: 4, y: 4)
                     }
                     RoundedRectangle(cornerRadius: radius, style: .continuous)
@@ -31,11 +32,11 @@ struct TallyCard: ViewModifier {
 }
 
 extension View {
-    func card(hard: Bool = true, fill: Color = .white, border: Color = .ink, radius: CGFloat = TallyRadius.card, dashed: Bool = false) -> some View {
+    func card(hard: Bool = true, fill: Color = .surface, border: Color = .ink, radius: CGFloat = TallyRadius.card, dashed: Bool = false) -> some View {
         modifier(TallyCard(hard: hard, fill: fill, border: border, radius: radius, dashed: dashed))
     }
 
-    func cardFlat(fill: Color = .white, border: Color = .ink, radius: CGFloat = TallyRadius.card, dashed: Bool = false) -> some View {
+    func cardFlat(fill: Color = .surface, border: Color = .ink, radius: CGFloat = TallyRadius.card, dashed: Bool = false) -> some View {
         modifier(TallyCard(hard: false, fill: fill, border: border, radius: radius, dashed: dashed))
     }
 }
@@ -55,7 +56,7 @@ struct TallyButtonStyle: ButtonStyle {
 
     private var background: Color {
         switch kind {
-        case .plain: return .white
+        case .plain: return .surface
         case .primary: return .ink
         case .turf: return .turf
         case .flag: return .flag
@@ -67,7 +68,7 @@ struct TallyButtonStyle: ButtonStyle {
     private var foreground: Color {
         switch kind {
         case .primary: return .paper
-        case .turf, .danger: return .white
+        case .turf, .danger: return .onFill
         default: return .ink
         }
     }
@@ -84,7 +85,7 @@ struct TallyButtonStyle: ButtonStyle {
             .background {
                 ZStack {
                     if !ghost {
-                        Capsule().fill(Color.ink).offset(x: pressed ? 0 : 2, y: pressed ? 0 : 2)
+                        Capsule().fill(Color.shadow).offset(x: pressed ? 0 : 2, y: pressed ? 0 : 2)
                     }
                     Capsule().fill(background)
                     if !ghost { Capsule().strokeBorder(Color.ink, lineWidth: 2) }
@@ -156,7 +157,7 @@ enum PillFit {
 
 struct Chip: View {
     let text: String
-    var fill: Color = .white
+    var fill: Color = .surface
     var display = false
     var size: CGFloat = 12.5
 
@@ -194,7 +195,7 @@ struct RankBadge: View {
         }
         .foregroundStyle(muted ? Color.ink3 : Color.ink)
         .frame(width: side, height: side)
-        .background(RoundedRectangle(cornerRadius: TallyRadius.badge, style: .continuous).fill(muted ? Color.paper2 : rank == 1 ? Color.flag : Color.white))
+        .background(RoundedRectangle(cornerRadius: TallyRadius.badge, style: .continuous).fill(muted ? Color.paper2 : rank == 1 ? Color.flag : Color.surface))
         .overlay(RoundedRectangle(cornerRadius: TallyRadius.badge, style: .continuous).strokeBorder(Color.ink, lineWidth: 2))
         .accessibilityLabel("Rank \(rank), \(points) points")
     }
@@ -210,7 +211,7 @@ struct PlaceBadge: View {
     var crowned = false
 
     var body: some View {
-        let tone: Color = muted ? .paper2 : place == 1 ? .flag : place == 2 ? .paper3 : place == 3 ? .bronze : .white
+        let tone: Color = muted ? .paper2 : place == 1 ? .flag : place == 2 ? .paper3 : place == 3 ? .bronze : .surface
         Group {
             if crowned {
                 Image(systemName: "trophy.fill")
@@ -334,6 +335,23 @@ extension EmptyState where Action == EmptyView {
     }
 }
 
+// MARK: Gestures
+
+extension View {
+    /**
+     Pinch does nothing here.
+
+     Tally has no zoomable content — no maps, no photographs, nothing you would ever want closer
+     than the layout puts it — so a pinch that scales the page is always an accident, and one that
+     leaves it scaled *and* panned is a screen with no obvious way back. A gesture that recognises
+     the pinch and does nothing with it keeps anything underneath from acting on it. Scrolling is a
+     one-finger gesture and is untouched.
+     */
+    func noZoom() -> some View {
+        highPriorityGesture(MagnifyGesture(minimumScaleDelta: 0))
+    }
+}
+
 // MARK: Controls
 
 /// Two or three options in a bordered track, with an ink pill sliding under the active one.
@@ -384,7 +402,7 @@ struct TallyFieldStyle: ViewModifier {
             .multilineTextAlignment(centered ? .center : .leading)
             .padding(.horizontal, 16)
             .padding(.vertical, 13)
-            .background(RoundedRectangle(cornerRadius: TallyRadius.inner, style: .continuous).fill(Color.white))
+            .background(RoundedRectangle(cornerRadius: TallyRadius.inner, style: .continuous).fill(Color.surface))
             .overlay(RoundedRectangle(cornerRadius: TallyRadius.inner, style: .continuous).strokeBorder(Color.ink, lineWidth: 2))
     }
 }

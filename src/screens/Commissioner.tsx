@@ -201,7 +201,7 @@ function PoolSettings() {
 
   return (
     <div className="grid items-start gap-3 lg:grid-cols-2">
-      <div className="card-flat bg-white p-4">
+      <div className="card-flat bg-surface p-4">
         <h3 className="font-display font-extrabold">Pool name</h3>
         <p className="mb-2 text-sm text-ink-2">What everyone sees on the board, in a shared link and on a home screen.</p>
         <form className="flex flex-wrap gap-2" onSubmit={save}>
@@ -221,7 +221,7 @@ function PoolSettings() {
         </p>
       </div>
 
-      <div className="card-flat bg-white p-4">
+      <div className="card-flat bg-surface p-4">
         <h3 className="font-display font-extrabold">Who's in</h3>
         <p className="text-sm text-ink-2">
           {overview.data.playerCount} {overview.data.playerCount === 1 ? "entry" : "entries"} ·{" "}
@@ -238,7 +238,7 @@ function PoolSettings() {
         onChanged={() => void overview.refetch()}
       />
 
-      <div className="card-flat bg-white p-4">
+      <div className="card-flat bg-surface p-4">
         <h3 className="font-display font-extrabold">Backup</h3>
         <p className="mb-3 text-sm text-ink-2">
           Every pick with its game, result and points, as a spreadsheet. Grab one whenever you like; it settles arguments.
@@ -275,7 +275,7 @@ function Commissioners({ holders, onChanged }: { holders: RoleHolder[]; onChange
   };
 
   return (
-    <div className="card-flat bg-white p-4">
+    <div className="card-flat bg-surface p-4">
       <h3 className="font-display font-extrabold">Commissioners</h3>
       <ul className="mb-3 text-sm text-ink-2">
         {holders.map((c) => (
@@ -399,7 +399,7 @@ function Players() {
           <p className="text-sm text-ink-2">{filter === "ready" ? "Nobody marked ready yet." : "Everyone is ready."}</p>
         )}
         {shown.map((p) => (
-          <li key={p.id} className={`card-flat p-3 ${p.ready ? "bg-turf-soft" : "bg-white"}`}>
+          <li key={p.id} className={`card-flat p-3 ${p.ready ? "bg-turf-soft" : "bg-surface"}`}>
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
               <button
                 role="switch"
@@ -408,7 +408,7 @@ function Players() {
                 disabled={setReady.isPending}
                 onClick={() => void toggleReady(p.id, p.name, !p.ready)}
                 className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-ink transition-colors ${
-                  p.ready ? "bg-turf text-white" : "bg-white text-transparent hover:text-ink-3"
+                  p.ready ? "bg-turf text-on-turf" : "bg-surface text-transparent hover:text-ink-3"
                 }`}
               >
                 <Check />

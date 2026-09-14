@@ -89,9 +89,37 @@ async function main() {
         </svg></div></body></html>`,
   );
   await page.screenshot({ path: path.join(icon, "AppIcon.png") });
+
+  // The dark icon (iOS 18+). Not the light one dimmed: the relationship inverts. On a home screen
+  // full of dark icons the yellow square was the loudest thing on the page, so at night the ground
+  // becomes the app's own warm near-black and the ball becomes the yellow — the same two colours,
+  // the other way round, which is what the rest of the app does when it goes dark.
+  await page.setContent(
+    `<!doctype html><html><body style="margin:0;background:#1A1713">
+      <div style="width:1024px;height:1024px;background:#1A1713;display:flex;align-items:center;justify-content:center">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="1024" height="1024">
+          <rect width="128" height="128" fill="#1A1713"/>
+          <rect x="9" y="9" width="110" height="110" rx="26" fill="none" stroke="#FFD23F" stroke-width="7"/>
+          <g transform="rotate(-32 64 64)">
+            <path d="M19 64C33 34 48 27 64 27s31 7 45 37C95 94 80 101 64 101S33 94 19 64Z" fill="#FFD23F"/>
+            <path d="M43 64h42M52 55v18M64 55v18M76 55v18" fill="none" stroke="#1A1713" stroke-width="6" stroke-linecap="round"/>
+          </g>
+        </svg></div></body></html>`,
+  );
+  await page.screenshot({ path: path.join(icon, "AppIcon-Dark.png") });
+
   writeFileSync(
     path.join(icon, "Contents.json"),
-    contents([{ filename: "AppIcon.png", idiom: "universal", platform: "ios", size: "1024x1024" }]),
+    contents([
+      { filename: "AppIcon.png", idiom: "universal", platform: "ios", size: "1024x1024" },
+      {
+        appearances: [{ appearance: "luminosity", value: "dark" }],
+        filename: "AppIcon-Dark.png",
+        idiom: "universal",
+        platform: "ios",
+        size: "1024x1024",
+      },
+    ]),
   );
 
   if (!existsSync(path.join(CATALOG, "Contents.json"))) {

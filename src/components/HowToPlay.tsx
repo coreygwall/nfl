@@ -21,7 +21,7 @@ export function HowToPlay({
     <>
       <ol className="grid gap-4 md:grid-cols-3">
         {pool.steps.map((step, index) => (
-          <li key={step.title} className="card bg-white p-5">
+          <li key={step.title} className="card bg-surface p-5">
             <span
               className="font-display flex h-9 w-9 items-center justify-center rounded-full bg-flag text-lg font-extrabold"
               aria-hidden="true"

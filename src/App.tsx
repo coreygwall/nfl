@@ -8,19 +8,22 @@ import { ErrorState, Spinner } from "./components/Common.tsx";
 import { Welcome } from "./screens/Welcome.tsx";
 import { PickFlow } from "./screens/PickFlow.tsx";
 import { Board } from "./screens/Board.tsx";
+import { Home } from "./screens/Home.tsx";
 import { Commissioner } from "./screens/Commissioner.tsx";
 import { League } from "./screens/League.tsx";
 import { Rules } from "./screens/Rules.tsx";
 import { Landing } from "./screens/Landing.tsx";
 import { POOL_SLUG } from "./lib/basename.ts";
 
-function Home() {
+/**
+ * The root of a pool is Home now rather than a redirect into this week's picks. Landing straight on
+ * the pick screen was right while the app *was* one pool; it stops being right the moment there is
+ * more than one, and it was never able to say "your picks are in, here's where you stand".
+ */
+function PoolHome() {
   const { player } = usePlayer();
-  const boot = useBootstrap();
   if (!player) return <Navigate to="/welcome" replace />;
-  if (boot.isPending) return <Spinner />;
-  if (boot.error) return <ErrorState message={boot.error.message} onRetry={() => boot.refetch()} />;
-  return <Navigate to={`/week/${boot.data.currentWeek}`} replace />;
+  return <Home />;
 }
 
 function BoardIndex() {
@@ -30,6 +33,17 @@ function BoardIndex() {
   if (boot.error) return <ErrorState message={boot.error.message} onRetry={() => boot.refetch()} />;
   // Carry ?sort= through the redirect, so a shared board link keeps its view.
   return <Navigate to={`/board/week/${boot.data.boardWeek}${search}`} replace />;
+}
+
+/**
+ * The pick flow keeps its own state — which teams are tapped, which step you are on — so it has to
+ * start over when you switch to another entry. It used to be remounted by accident: switching
+ * navigated to "/", which bounced through a redirect back to the same week. Now that switching
+ * leaves you where you are, the identity is the key, exactly as it is on iOS.
+ */
+function PickFlowRoute() {
+  const { player } = usePlayer();
+  return <PickFlow key={player?.id ?? "-"} />;
 }
 
 function RequirePlayer({ children }: { children: ReactNode }) {
@@ -53,14 +67,14 @@ export default function App() {
     <ChromeProvider>
       <Routes>
         <Route element={<AppShell />}>
-          <Route index element={<Home />} />
+          <Route index element={<PoolHome />} />
           <Route path="welcome" element={<Welcome />} />
           <Route path="rules" element={<Rules />} />
           <Route
             path="week/:week"
             element={
               <RequirePlayer>
-                <PickFlow />
+                <PickFlowRoute />
               </RequirePlayer>
             }
           />

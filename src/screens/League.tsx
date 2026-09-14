@@ -165,7 +165,7 @@ function ResultRow({ game, onSet, busy }: { game: GameDTO; onSet: (w: Abbr | "TI
         disabled={busy}
         onClick={() => onSet(on ? null : abbr)}
         aria-pressed={on}
-        className={`flex flex-1 items-center gap-2 rounded-xl border-2 px-2 py-1.5 text-left transition-colors ${on ? "border-ink text-white" : "border-line bg-white"}`}
+        className={`flex flex-1 items-center gap-2 rounded-xl border-2 px-2 py-1.5 text-left transition-colors ${on ? "border-ink text-white" : "border-line bg-surface"}`}
         style={on ? { background: t.primary } : undefined}
       >
         <TeamSticker abbr={abbr} size={32} flat />
@@ -174,7 +174,7 @@ function ResultRow({ game, onSet, busy }: { game: GameDTO; onSet: (w: Abbr | "TI
     );
   };
   return (
-    <li className="card-flat bg-white p-2.5">
+    <li className="card-flat bg-surface p-2.5">
       <div className="mb-2 flex items-center justify-between text-[11px] font-semibold text-ink-2">
         <span>
           {formatShortDay(game.kickoffAt)} · {formatKickoff(game.kickoffAt).split("·")[1]}
@@ -192,7 +192,7 @@ function ResultRow({ game, onSet, busy }: { game: GameDTO; onSet: (w: Abbr | "TI
           disabled={busy}
           onClick={() => onSet(game.winner === "TIE" ? null : "TIE")}
           aria-pressed={game.winner === "TIE"}
-          className={`rounded-xl border-2 px-2 text-xs font-bold ${game.winner === "TIE" ? "border-ink bg-ink text-paper" : "border-line bg-white text-ink-2"}`}
+          className={`rounded-xl border-2 px-2 text-xs font-bold ${game.winner === "TIE" ? "border-ink bg-ink text-paper" : "border-line bg-surface text-ink-2"}`}
         >
           Tie
         </button>
@@ -223,7 +223,7 @@ function Feed() {
   const st = status.data;
   return (
     <div className="grid items-start gap-3 lg:grid-cols-2">
-      <div className="card-flat bg-white p-4">
+      <div className="card-flat bg-surface p-4">
         <h3 className="font-display font-extrabold">Schedule</h3>
         <p className="mb-2 text-sm text-ink-2">
           Every morning Tally checks nflverse for flexed kickoff times and moves them. It never touches picks or results.
@@ -244,7 +244,7 @@ function Feed() {
           </button>
         </div>
       </div>
-      <div className="card-flat bg-white p-4">
+      <div className="card-flat bg-surface p-4">
         <h3 className="font-display font-extrabold">Final scores</h3>
         <p className="mb-2 text-sm text-ink-2">
           Through the game windows Tally looks for finished games and fills in the winners. It only fills blanks —
@@ -257,7 +257,7 @@ function Feed() {
           </p>
         )}
       </div>
-      <div className="card-flat bg-white p-4">
+      <div className="card-flat bg-surface p-4">
         <h3 className="font-display font-extrabold">Who runs the league</h3>
         <ul className="text-sm text-ink-2">
           {(st?.admins ?? []).map((a) => (

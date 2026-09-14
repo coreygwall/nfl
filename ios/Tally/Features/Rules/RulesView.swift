@@ -16,9 +16,12 @@ struct RulesView: View {
             HowToPlay(pool: pool, inApp: true)
             HStack(spacing: 8) {
                 Button(model.player == nil ? "Join the pool" : "Back to my picks") {
+                    // Rules is a sheet now, so "back to my picks" has to close it — otherwise it
+                    // changes the tab behind the modal and looks like it did nothing.
+                    model.showRules = false
                     if model.player == nil { model.showWelcome = true } else { model.tab = .picks }
                 }.buttonStyle(.tally(.primary))
-                Button("View the board") { model.tab = .board }.buttonStyle(.tally(.plain))
+                Button("View the board") { model.showRules = false; model.tab = .board }.buttonStyle(.tally(.plain))
             }
         }
     }
@@ -65,6 +68,35 @@ struct HowToPlay: View {
                     }
                 }
             }
+        }
+    }
+}
+
+/**
+ Rules stopped being a tab.
+
+ It is a document you read once and then send to someone else — the only screen in the app you
+ would visit fewer than five times in a season — and it was holding a quarter of the navigation.
+ It opens over whatever you were looking at instead, from the board and from home, which is also
+ where the question actually occurs to people.
+ */
+struct RulesSheet: View {
+    @Environment(\.dismiss) private var dismiss
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                PaperBackground()
+                ScrollView {
+                    RulesView()
+                        .padding(16)
+                        .padding(.bottom, 40)
+                }
+            }
+            .noZoom()
+            .navigationTitle("How it works")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
         }
     }
 }

@@ -30,7 +30,10 @@ export function Welcome() {
   const { player, setPlayer } = usePlayer();
   const nav = useNavigate();
   const [params] = useSearchParams();
-  const next = params.get("next") || "/";
+  // Signing in ends where you came to be: on this week's picks. Home is the landing for every
+  // *later* visit — it answers "which pool, and what needs doing" — but the button that gets you
+  // here says "start picking", so it had better.
+  const next = params.get("next") || `/week/${boot.data?.currentWeek ?? 1}`;
   const claimId = params.get("claim");
   const toast = useToast();
   const create = useCreatePlayer();
@@ -659,7 +662,7 @@ function Hero() {
           ["Rank them", "1 to 5"],
           ["Score", "5·4·3·2·1"],
         ].map(([a, b], i) => (
-          <li key={a} className="card-flat bg-white px-2 py-2.5">
+          <li key={a} className="card-flat bg-surface px-2 py-2.5">
             <span className="font-display block text-[10px] font-extrabold uppercase tracking-wider text-ink-3">Step {i + 1}</span>
             <span className="font-display block text-[15px] font-extrabold leading-tight">{a}</span>
             <span className="block text-xs text-ink-2">{b}</span>
