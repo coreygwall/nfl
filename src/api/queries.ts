@@ -60,12 +60,19 @@ export function useWeekBoard(week: number | null) {
   });
 }
 
-export function useSeasonBoard() {
+/**
+ * The season board is the most expensive read in the app — it scores every pick of every week for
+ * everyone — and it is also the slowest-moving thing on screen: a standing only changes when a
+ * game finishes. A minute was the week board's cadence borrowed without thinking. Five is plenty,
+ * and results still land within a minute on the week board where people are actually watching.
+ */
+export function useSeasonBoard(enabled = true) {
   const { player } = usePlayer();
   return useQuery({
     queryKey: ["board", "season", player?.id ?? null],
     queryFn: () => api<SeasonBoardResponse>("/board/season"),
-    refetchInterval: 60_000,
+    enabled,
+    refetchInterval: 5 * 60_000,
   });
 }
 

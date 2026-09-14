@@ -126,7 +126,10 @@ function PickFlowInner({ week }: { week: number }) {
   useHeaderWeek(week, (w) => nav(`/week/${w}`));
 
   const setStep = (s: Step | null) => {
-    setParams(s ? { step: s } : {}, { replace: s === "done" ? false : true });
+    // Push, so Back steps back through the flow. It used to replace on every step but "done",
+    // which meant Back from the ranking screen left the week entirely — at the one moment Back
+    // most obviously means "let me change a pick".
+    setParams(s ? { step: s } : {}, { replace: false });
     window.scrollTo({ top: 0 });
   };
 
@@ -169,6 +172,14 @@ function PickFlowInner({ week }: { week: number }) {
       const lead = res.picks.find((p) => p.rank === Math.min(...res.picks.map((x) => x.rank)));
       fireConfetti(lead ? TEAMS[lead.team] : undefined);
     } catch (err) {
+      // A revoked token is the one failure "Try again" can never fix. Bootstrap is what notices we
+      // have been signed out and sends us to the welcome screen; without this nudge the retry
+      // button sat there uselessly until the next poll, up to five minutes later.
+      if (err instanceof ApiClientError && err.status === 401 && err.code === "NO_PLAYER") {
+        setSaveError(null);
+        await boot.refetch();
+        return;
+      }
       if (err instanceof ApiClientError && err.status === 409) {
         const ids = (err.details as { gameIds?: string[] } | undefined)?.gameIds ?? [];
         setDraft((d) => ids.reduce((acc, id) => removeSelection(acc, id), d));
@@ -503,7 +514,7 @@ function PickTray({
               return (
                 <div
                   key={i}
-                  className="flex h-10 w-10 items-center justify-center rounded-xl border-2 border-dashed border-line bg-paper-2/60"
+                  className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border-2 border-dashed border-line bg-paper-2/60"
                 >
                   <AnimatePresence>
                     {p && (
@@ -676,11 +687,14 @@ function RankRow({
             <ChevronDown />
           </button>
         </div>
+        {/* Announced as a button but operable only by pointer drag — no keyboard can reach or fire
+            it. Hidden from assistive tech instead; the labelled Move up / Move down buttons beside
+            it are the accessible path. A control that announces itself and cannot be used is worse
+            than one that stays quiet. */}
         <div
           className="-m-1 cursor-grab touch-none rounded-lg p-3 text-ink-3 active:cursor-grabbing"
           onPointerDown={(e) => controls.start(e)}
-          aria-label="Drag to reorder"
-          role="button"
+          aria-hidden="true"
         >
           <Grip />
         </div>

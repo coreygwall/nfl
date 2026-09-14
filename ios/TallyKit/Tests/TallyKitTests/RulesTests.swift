@@ -66,6 +66,32 @@ final class DraftTests: XCTestCase {
         DraftStore.clear(playerId: "p", week: 3, defaults: defaults)
         XCTAssertNil(DraftStore.load(playerId: "p", week: 3, defaults: defaults))
     }
+
+    /**
+     The regression that made five saved picks look lost.
+
+     Locking in clears the store and then resets the draft to empty, and that reset is itself a
+     change the screen writes back. If an empty draft persists, the next load prefers it over the
+     picks on the server and the tray comes back empty.
+     */
+    func testAnEmptyDraftClearsRatherThanPersisting() {
+        let defaults = UserDefaults(suiteName: "tally-tests-\(UUID().uuidString)")!
+        DraftStore.save(Draft(selections: ["a": "KC"], order: ["a"]), playerId: "p", week: 3, defaults: defaults)
+        XCTAssertNotNil(DraftStore.load(playerId: "p", week: 3, defaults: defaults))
+
+        DraftStore.save(.empty, playerId: "p", week: 3, defaults: defaults)
+        XCTAssertNil(
+            DraftStore.load(playerId: "p", week: 3, defaults: defaults),
+            "an empty draft must read back as no draft, or it wins over the saved picks"
+        )
+    }
+
+    func testADraftWithSelectionsButNoOrderIsAlsoNothing() {
+        // Reachable while a pick is being swapped; there is nothing to restore from it either.
+        let defaults = UserDefaults(suiteName: "tally-tests-\(UUID().uuidString)")!
+        DraftStore.save(Draft(selections: ["a": "KC"], order: []), playerId: "p", week: 3, defaults: defaults)
+        XCTAssertNil(DraftStore.load(playerId: "p", week: 3, defaults: defaults))
+    }
 }
 
 final class ScoringTests: XCTestCase {

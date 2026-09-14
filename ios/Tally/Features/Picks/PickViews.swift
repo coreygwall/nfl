@@ -314,22 +314,31 @@ struct RankRow<G: Gesture>: View {
             TeamSticker(team: model.sport.teamOrPlaceholder(team), size: 48, flat: true)
             MatchupText(pick: Pick(gameId: gameId, team: team, rank: rank), game: game, compact: true)
             Spacer()
-            VStack(spacing: 0) {
-                Button(action: onUp) { Image(systemName: "chevron.up").font(.system(size: 14, weight: .bold)).padding(4) }
+            // 44pt each and not touching. These were 19x25 and flush against one another, which on
+            // a list whose whole purpose is ordering meant a mis-tap moved the pick the wrong way.
+            VStack(spacing: 2) {
+                Button(action: onUp) { Image(systemName: "chevron.up").font(.system(size: 14, weight: .bold)) }
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
                     .buttonStyle(.plain).disabled(!canUp).opacity(canUp ? 1 : 0.3)
                     .accessibilityLabel("Move up")
-                Button(action: onDown) { Image(systemName: "chevron.down").font(.system(size: 14, weight: .bold)).padding(4) }
+                Button(action: onDown) { Image(systemName: "chevron.down").font(.system(size: 14, weight: .bold)) }
+                    .frame(width: 44, height: 44)
+                    .contentShape(Rectangle())
                     .buttonStyle(.plain).disabled(!canDown).opacity(canDown ? 1 : 0.3)
                     .accessibilityLabel("Move down")
             }
             .foregroundStyle(Color.ink2)
+            // Announced as a drag affordance but operable only by dragging, which VoiceOver cannot
+            // do — so it is hidden from it. The two buttons above are the accessible path, and they
+            // are labelled. An announced control that cannot be activated is worse than none.
             Image(systemName: "line.3.horizontal")
                 .font(.system(size: 18, weight: .bold))
                 .foregroundStyle(Color.ink3)
                 .padding(10)
                 .contentShape(Rectangle())
                 .gesture(drag)
-                .accessibilityLabel("Drag to reorder")
+                .accessibilityHidden(true)
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
