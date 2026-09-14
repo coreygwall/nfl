@@ -44,7 +44,7 @@ function ordinal(n: number): string {
 
 function PoolCard() {
   const boot = useBootstrap();
-  const { player, people } = usePlayer();
+  const { player, people, switchTo } = usePlayer();
   const nav = useNavigate();
   const currentWeek = boot.data?.currentWeek ?? 1;
   const week = useWeekBoard(currentWeek);
@@ -89,6 +89,15 @@ function PoolCard() {
         </p>
         {week.isPending ? (
           <div className="shimmer mt-2 h-5 w-48 rounded-full bg-paper-2" aria-hidden="true" />
+        ) : !week.data ? (
+          // Silence is the only safe thing to say here. "Your picks are in" off a request that
+          // failed is the one sentence on this screen that can cost someone their week.
+          <p className="mt-2 text-sm text-ink-2">
+            Couldn't check your picks.{" "}
+            <button className="underline" onClick={() => void week.refetch()}>
+              Try again
+            </button>
+          </p>
         ) : owing.length === 0 ? (
           <p className="mt-2 font-display font-extrabold text-turf">
             {entries.length > 1 ? `All ${entries.length} sets of picks are in.` : "Your picks are in."}
@@ -102,7 +111,15 @@ function PoolCard() {
                   ? `None of your ${entries.length} entries have picked yet.`
                   : `${owing.map((e) => e.name).join(", ")} still ${owing.length === 1 ? "needs" : "need"} picks.`}
             </p>
-            <button className="btn btn-primary btn-sm mt-3" onClick={() => nav(`/week/${currentWeek}`)}>
+            <button
+              className="btn btn-primary btn-sm mt-3"
+              onClick={() => {
+                // The button names someone; switching to them is the half that does the naming true.
+                const first = owing[0];
+                if (first && first.id !== player?.id) switchTo(first.id);
+                nav(`/week/${currentWeek}`);
+              }}
+            >
               {owing.length === 1 && entries.length > 1 && owing[0] ? `Make ${owing[0].name}'s picks` : "Make your picks"}
             </button>
           </>

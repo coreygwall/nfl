@@ -19,6 +19,8 @@ struct HomeView: View {
     @State private var season: Loadable<SeasonBoardResponse> = .idle
 
     private var boot: BootstrapResponse? { model.boot.value }
+    /// Changes when the pool changes *or* when bootstrap finally says which week it is.
+    private var loadKey: String { "\(model.pool.host)/\(model.pool.slug)#\(boot?.currentWeek ?? 0)" }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
@@ -27,8 +29,11 @@ struct HomeView: View {
             moreSection
         }
         // One pass on arrival rather than a poll: nothing here changes between a tap and a glance,
-        // and the board tab is where a live week belongs.
-        .task(id: model.pool) { await load() }
+        // and the board tab is where a live week belongs. The key has to include the week rather
+        // than only the pool, because bootstrap is still idle at the moment the pool changes — on
+        // launch and again after a switch — and a task keyed on the pool alone would run once,
+        // find no week to ask about, and never run again.
+        .task(id: loadKey) { await load() }
     }
 
     // MARK: Your pools
@@ -38,7 +43,7 @@ struct HomeView: View {
             SectionLabel(text: model.catalog.pools.count > 1 ? "Your pools" : "Your pool")
             ForEach(model.catalog.pools) { pool in
                 if pool.ref == model.pool {
-                    ActivePoolCard(pool: pool, week: week.value, season: season.value)
+                    ActivePoolCard(pool: pool, week: week.value, season: season.value, failed: week.error != nil)
                 } else {
                     OtherPoolCard(pool: pool)
                 }
@@ -88,6 +93,8 @@ private struct ActivePoolCard: View {
     let pool: PoolMembership
     let week: WeekBoardResponse?
     let season: SeasonBoardResponse?
+    /// The board request came back empty-handed, which must never read as "you are done".
+    let failed: Bool
 
     private var boot: BootstrapResponse? { model.boot.value }
     private var entries: [Identity] { model.people }
@@ -139,7 +146,11 @@ private struct ActivePoolCard: View {
             VStack(alignment: .leading, spacing: 8) {
                 Text("Week \(boot.currentWeek)\(lockText.map { " · \($0)" } ?? "")")
                     .sans(13, weight: .semibold).foregroundStyle(Color.ink2)
-                if week == nil {
+                if failed {
+                    // Silence is the only safe thing to say. "Your picks are in" off a request
+                    // that failed is the one sentence here that can cost someone their week.
+                    Text("Couldn't check your picks.").sans(14, weight: .semibold).foregroundStyle(Color.ink2)
+                } else if week == nil {
                     SkeletonLine(width: 180)
                 } else if owing.isEmpty {
                     Label(entries.count > 1 ? "All \(entries.count) sets of picks are in." : "Your picks are in.", systemImage: "checkmark.circle.fill")

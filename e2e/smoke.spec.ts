@@ -342,6 +342,21 @@ test("an entry removed by the commissioner doesn't strand the device that held i
   await expect(page.getByRole("heading", { name: /Pick 5 winners/ })).toBeVisible();
 });
 
+test("home never says your picks are in off a board it could not load", async ({ page }) => {
+  await page.goto(`/p/high-five/welcome?now=${BEFORE}`);
+  await page.getByPlaceholder("Your name").fill(`Offline ${Date.now().toString(36)}`);
+  await page.getByRole("button", { name: "Let's go" }).click();
+  await page.waitForURL(/\/week\/1$/);
+
+  // The week board is the only thing that knows whether the picks are in. With it refused, the
+  // absence of "owing" entries is ignorance, not success — and "Your picks are in" off a failed
+  // request is the one sentence on this screen that can cost someone their week.
+  await page.route("**/api/board/week/**", (route) => route.abort());
+  await page.goto(`/p/high-five/?now=${BEFORE}`);
+  await expect(page.getByText("Couldn't check your picks.")).toBeVisible();
+  await expect(page.getByText("Your picks are in.")).toHaveCount(0);
+});
+
 test("dark mode follows the device, and a choice overrides it", async ({ page }) => {
   // The tokens are the theme: nothing re-renders, the custom properties are redefined on <html>.
   await page.emulateMedia({ colorScheme: "dark" });

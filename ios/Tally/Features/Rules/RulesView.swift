@@ -16,9 +16,12 @@ struct RulesView: View {
             HowToPlay(pool: pool, inApp: true)
             HStack(spacing: 8) {
                 Button(model.player == nil ? "Join the pool" : "Back to my picks") {
+                    // Rules is a sheet now, so "back to my picks" has to close it — otherwise it
+                    // changes the tab behind the modal and looks like it did nothing.
+                    model.showRules = false
                     if model.player == nil { model.showWelcome = true } else { model.tab = .picks }
                 }.buttonStyle(.tally(.primary))
-                Button("View the board") { model.tab = .board }.buttonStyle(.tally(.plain))
+                Button("View the board") { model.showRules = false; model.tab = .board }.buttonStyle(.tally(.plain))
             }
         }
     }

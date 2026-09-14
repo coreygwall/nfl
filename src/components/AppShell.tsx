@@ -241,13 +241,20 @@ export function AppShell() {
               myCode={boot.data?.myCode ?? null}
               hasPasskey={(boot.data?.myPasskeys ?? 0) > 0}
               // Switching entries leaves you on the same screen — you are usually comparing two
-              // cards on the same week, and being thrown elsewhere loses your place. The query
-              // string does not come with you: the pick flow keeps its step there, and "you just
-              // locked in" is emphatically not true of the entry you just switched to.
+              // cards on the same week, and being thrown elsewhere loses your place. Only one piece
+              // of route state goes stale: the pick flow keeps its step in the query, and "you just
+              // locked in" is emphatically not true of the entry you switched to. Everything else
+              // in the query describes the *screen* rather than the player — the board's sort, for
+              // one — so it stays.
               onSwitch={(id) => {
                 switchTo(id);
                 setSwitching(false);
-                if (loc.search) nav(loc.pathname, { replace: true });
+                if (new URLSearchParams(loc.search).has("step")) {
+                  const next = new URLSearchParams(loc.search);
+                  next.delete("step");
+                  const query = next.toString();
+                  nav(`${loc.pathname}${query ? `?${query}` : ""}`, { replace: true });
+                }
               }}
               // Adding one does move you — the button says "and make picks".
               onAdded={(p) => {
