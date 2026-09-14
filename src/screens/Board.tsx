@@ -7,7 +7,8 @@ import { useHeaderWeek } from "../components/Chrome.tsx";
 import { TEAMS } from "../../shared/teams.ts";
 import type { ScoredPick, SeasonRow, WeekRow } from "../../shared/scoring.ts";
 import { SEASON_START_WEEK, WEEKS } from "../../shared/week.ts";
-import { EmptyState, ErrorState, RankBadge, Segmented, Spinner } from "../components/Common.tsx";
+import { CountUp, EmptyState, ErrorState, RankBadge, Segmented } from "../components/Common.tsx";
+import { BoardSkeleton } from "../components/TallyLoader.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
 import { Lock } from "../components/Icons.tsx";
 
@@ -184,7 +185,7 @@ function WeekBoardView({ week, sort, onWeek }: { week: number; sort: BoardSort; 
   return (
     <div>
       {board.isPending ? (
-        <Spinner />
+        <BoardSkeleton />
       ) : board.error ? (
         <ErrorState message={board.error.message} onRetry={() => board.refetch()} />
       ) : (
@@ -242,7 +243,7 @@ function WeekRowItem({ row, index, open, onToggle, isMe, week, started }: { row:
       transition={{ type: "spring", stiffness: 400, damping: 30, delay: Math.min(index * 0.03, 0.3) }}
       className={`card-flat overflow-hidden ${isMe ? "bg-flag-soft shadow-hard" : "bg-white"}`}
     >
-      <button className="flex w-full items-center gap-3 p-3 text-left" onClick={onToggle} aria-expanded={open}>
+      <button className="row-hover flex w-full items-center gap-3 p-3 text-left" onClick={onToggle} aria-expanded={open}>
         <PlaceBadge place={row.place} muted={!started} />
         <div className="min-w-0 flex-1">
           <div className="font-display flex items-center gap-2 truncate text-[17px] font-extrabold">
@@ -264,9 +265,7 @@ function WeekRowItem({ row, index, open, onToggle, isMe, week, started }: { row:
           </div>
         </div>
         <div className="text-right">
-          <motion.div key={row.points} initial={{ scale: 1.3 }} animate={{ scale: 1 }} className="font-display text-3xl font-extrabold leading-none tabular">
-            {row.points}
-          </motion.div>
+          <CountUp value={row.points} className="font-display block text-3xl font-extrabold leading-none tabular" />
           <div className="text-[10px] font-bold uppercase tracking-wider text-ink-3">pts</div>
         </div>
       </button>
@@ -397,7 +396,7 @@ function SeasonBoardView({ sort }: { sort: BoardSort }) {
   const board = useSeasonBoard();
   const { player } = usePlayer();
   const [open, setOpen] = useState<string | null>(null);
-  if (board.isPending) return <Spinner />;
+  if (board.isPending) return <BoardSkeleton />;
   if (board.error) return <ErrorState message={board.error.message} onRetry={() => board.refetch()} />;
   const rows = sortRows(board.data.rows, sort);
   return (
@@ -440,7 +439,7 @@ function SeasonRowItem({ row, index, isMe, open, onToggle, throughWeek }: { row:
       transition={{ type: "spring", stiffness: 400, damping: 30, delay: Math.min(index * 0.03, 0.3) }}
       className={`card-flat overflow-hidden ${isMe ? "bg-flag-soft shadow-hard" : "bg-white"}`}
     >
-      <button className="flex w-full items-center gap-3 p-3 text-left" onClick={onToggle} aria-expanded={open}>
+      <button className="row-hover flex w-full items-center gap-3 p-3 text-left" onClick={onToggle} aria-expanded={open}>
         <PlaceBadge place={row.place} muted={throughWeek === 0} />
         <div className="min-w-0 flex-1">
           <div className="font-display flex items-center gap-2 truncate text-[17px] font-extrabold">
@@ -456,7 +455,7 @@ function SeasonRowItem({ row, index, isMe, open, onToggle, throughWeek }: { row:
           </div>
         </div>
         <div className="text-right">
-          <div className="font-display text-3xl font-extrabold leading-none tabular">{row.points}</div>
+          <CountUp value={row.points} className="font-display block text-3xl font-extrabold leading-none tabular" />
           <div className="text-[10px] font-bold uppercase tracking-wider text-ink-3">pts</div>
         </div>
       </button>

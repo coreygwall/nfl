@@ -33,6 +33,16 @@ export function AppShell() {
     document.title = `${poolName} · Tally`;
   }, [poolName]);
 
+  // The header wears its rule only once there is something above it to separate from. Passive and
+  // coarse on purpose: this reads one boolean, so it never runs layout on a scroll frame.
+  const [scrolled, setScrolled] = useState(false);
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 4);
+    onScroll();
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
+  }, []);
+
   // The cookie is the other half of staying signed in: if storage was cleared but the cookie
   // survived, the server still knows us, so adopt whoever it says we are.
   useEffect(() => {
@@ -105,7 +115,7 @@ export function AppShell() {
 
   return (
     <div className="relative mx-auto flex min-h-dvh w-full max-w-[1180px] flex-col">
-      <header className="sticky top-0 z-30 border-b-2 border-ink bg-paper/90 backdrop-blur">
+      <header data-scrolled={scrolled} className="app-header sticky top-0 z-30 bg-paper/90 backdrop-blur">
         <div className="flex items-center gap-3 px-4 py-3 sm:px-6 sm:py-3.5 lg:px-8">
           <Link
             to="/"

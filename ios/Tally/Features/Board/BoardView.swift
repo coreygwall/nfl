@@ -50,7 +50,8 @@ struct WeekBoardView: View {
     var body: some View {
         Group {
             switch board {
-            case .idle, .loading: Spinner()
+            // The shape of the board, not a spinner in the middle of nothing.
+            case .idle, .loading: BoardSkeleton()
             case .failed(let err): ErrorState(message: err.message) { Task { await load() } }
             case .loaded(let data): content(data)
             }
@@ -153,7 +154,7 @@ struct WeekBoardView: View {
             // "OK" to acknowledge their own good week, and this can be scrolled straight past.
             if celebrating, let mine = top.first(where: { $0.playerId == model.player?.id }) {
                 WeekWinnerCard(week: week, points: mine.points, shared: top.count > 1) {
-                    withAnimation(.easeOut(duration: 0.2)) { celebrating = false }
+                    withAnimation(Motion.fade) { celebrating = false }
                 }
                 .transition(.scale(scale: 0.9).combined(with: .opacity))
             }
@@ -177,14 +178,14 @@ struct WeekBoardView: View {
                     Button("Make your picks") { model.pickWeek = week; model.tab = .picks }.buttonStyle(.tally(.primary, size: .small))
                 }
             } else {
-                ForEach(rowsSorted(data.rows, by: sort)) { row in
+                ForEach(Array(rowsSorted(data.rows, by: sort).enumerated()), id: \.element.id) { index, row in
                     let won = !top.isEmpty && row.place == 1 && row.picksMade > 0
                     BoardRowCard(place: row.place, name: row.name, isMe: row.playerId == model.player?.id, points: row.points, muted: !started,
                                  crowned: won,
                                  subtitle: row.picksMade == 0 ? "No picks"
                                     : !started ? "\(Format.plural(row.picksMade, "pick")) in · up to \(row.possible)"
                                     : "\(row.correct) of \(row.picksMade) right · up to \(row.possible)",
-                                 open: open == row.playerId, onToggle: { withAnimation(.easeOut(duration: 0.2)) { open = open == row.playerId ? nil : row.playerId } }) {
+                                 open: open == row.playerId, onToggle: { withAnimation(Motion.fade) { open = open == row.playerId ? nil : row.playerId } }) {
                         if row.picksMade == 0 {
                             PickSlotRow(slots: row.pickSlots)
                             if row.playerId == model.player?.id {
@@ -204,8 +205,10 @@ struct WeekBoardView: View {
                             }
                         }
                     }
+                    .dealt(index)
+                    .scrollSettle()
                 }
-                .animation(.spring(response: 0.35, dampingFraction: 0.85), value: sort)
+                .animation(Motion.settle, value: sort)
             }
         }
     }
@@ -220,7 +223,8 @@ struct SeasonBoardView: View {
     var body: some View {
         Group {
             switch board {
-            case .idle, .loading: Spinner()
+            // The shape of the board, not a spinner in the middle of nothing.
+            case .idle, .loading: BoardSkeleton()
             case .failed(let err): ErrorState(message: err.message) { Task { await load() } }
             case .loaded(let data): content(data)
             }
@@ -272,7 +276,7 @@ struct SeasonBoardView: View {
             if data.rows.isEmpty {
                 EmptyState(title: "Nobody's on the board yet.", body: "Standings show up once people start picking.")
             } else {
-                ForEach(rowsSorted(data.rows, by: sort)) { row in
+                ForEach(Array(rowsSorted(data.rows, by: sort).enumerated()), id: \.element.id) { index, row in
                     let subtitle: String = {
                         if row.weeksPlayed == 0 { return "No picks yet" }
                         var s = "\(row.correct) right · \(row.weeksPlayed) wk\(row.weeksPlayed == 1 ? "" : "s")"
@@ -282,14 +286,16 @@ struct SeasonBoardView: View {
                     }()
                     BoardRowCard(place: row.place, name: row.name, isMe: row.playerId == model.player?.id, points: row.points, muted: data.throughWeek == 0,
                                  subtitle: subtitle, open: open == row.playerId,
-                                 onToggle: { withAnimation(.easeOut(duration: 0.2)) { open = open == row.playerId ? nil : row.playerId } }) {
+                                 onToggle: { withAnimation(Motion.fade) { open = open == row.playerId ? nil : row.playerId } }) {
                         WeekBars(row: row, throughWeek: data.throughWeek) { w in
                             model.boardScope = .week
                             model.boardWeek = w
                         }
                     }
+                    .dealt(index)
+                    .scrollSettle()
                 }
-                .animation(.spring(response: 0.35, dampingFraction: 0.85), value: sort)
+                .animation(Motion.settle, value: sort)
             }
         }
     }
@@ -325,14 +331,18 @@ struct BoardRowCard<Detail: View>: View {
                     }
                     Spacer()
                     VStack(alignment: .trailing, spacing: 0) {
-                        Text("\(points)").font(TallyFont.display(30)).monospacedDigit().contentTransition(.numericText())
+                        // `.numericText` rolls the digits, but only if the change is inside an
+                        // animation — without this it snaps like any other value.
+                        Text("\(points)").font(TallyFont.display(30)).monospacedDigit()
+                            .contentTransition(.numericText())
+                            .animation(Motion.settle, value: points)
                         Text("PTS").font(TallyFont.sans(10, weight: .bold)).tracking(1).foregroundStyle(Color.ink3)
                     }
                 }
                 .padding(12)
                 .contentShape(Rectangle())
             }
-            .buttonStyle(.plain)
+            .buttonStyle(.cardPress)
             .accessibilityAddTraits(open ? [.isButton, .isSelected] : .isButton)
             if open {
                 VStack(alignment: .leading, spacing: 8) {

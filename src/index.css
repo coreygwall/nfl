@@ -197,6 +197,139 @@ button {
 @layer utilities {
   /* Team logos drifting past on the welcome page. The track holds two copies of the
      list, so translating by half its width loops without a seam. */
+  /* ---- The loading mark ------------------------------------------------------------------
+     Four strokes and the diagonal, drawn and then rubbed out in the order they were written.
+     Every line carries pathLength="1", so one set of keyframes works for the short uprights and
+     the long slash alike; the negative offset at the end pulls the dash off the far side, which
+     erases in the same direction the hand drew. */
+  .tally-stroke {
+    stroke-dasharray: 1;
+    stroke-dashoffset: 1;
+    animation:
+      tally-draw 2.1s ease-in-out infinite,
+      tally-hold 2.1s linear infinite;
+    /* Only the draw is staggered. The fade is shared, so the mark leaves as one thing. */
+    animation-delay: calc(var(--i) * 0.05s), 0s;
+  }
+  @keyframes tally-draw {
+    0%,
+    10% {
+      stroke-dashoffset: 1;
+    }
+    32%,
+    100% {
+      stroke-dashoffset: 0;
+    }
+  }
+  @keyframes tally-hold {
+    0%,
+    8% {
+      opacity: 0;
+    }
+    16%,
+    80% {
+      opacity: 1;
+    }
+    94%,
+    100% {
+      opacity: 0;
+    }
+  }
+
+  /* A placeholder breathing, slowly enough not to be a distraction in itself. */
+  .shimmer {
+    animation: shimmer 1.8s ease-in-out infinite;
+  }
+  @keyframes shimmer {
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+
+  /* A small deck of stickers fanning past, for waits too short to deserve a whole screen. */
+  .sticker-shuffle img {
+    opacity: 0;
+    animation: sticker-shuffle calc(var(--n) * 0.42s) ease-in-out infinite;
+    animation-delay: calc(var(--i) * 0.42s);
+  }
+  @keyframes sticker-shuffle {
+    0% {
+      opacity: 0;
+      transform: translateY(6px) rotate(-8deg) scale(0.9);
+    }
+    12%,
+    22% {
+      opacity: 1;
+      transform: translateY(0) rotate(0deg) scale(1);
+    }
+    34%,
+    100% {
+      opacity: 0;
+      transform: translateY(-6px) rotate(8deg) scale(0.9);
+    }
+  }
+
+  /* ---- Hover ------------------------------------------------------------------------------
+     Scoped to real pointers. On a touchscreen `:hover` sticks to whatever was tapped last, which
+     leaves a button looking pressed long after the thumb has gone.
+
+     The direction matters: a button already sinks *into* its shadow when pressed, so on hover it
+     lifts *out* of it. Hover and active then read as two ends of one gesture rather than two
+     unrelated effects. */
+  @media (hover: hover) and (pointer: fine) {
+    .btn:hover:not(:disabled) {
+      transform: translate(-1px, -1px);
+      box-shadow: 3px 3px 0 0 var(--color-ink);
+    }
+    .btn-ghost:hover:not(:disabled) {
+      transform: none;
+      box-shadow: none;
+      background: var(--color-paper-2);
+    }
+    .card-lift {
+      transition:
+        transform 140ms ease,
+        box-shadow 140ms ease;
+    }
+    .card-lift:hover {
+      transform: translate(-1px, -2px);
+      box-shadow: var(--shadow-hard-lg);
+    }
+    .card-lift:active {
+      transform: translate(1px, 1px);
+      box-shadow: var(--shadow-hard-sm);
+    }
+    .chip-pop {
+      transition: transform 140ms ease;
+    }
+    .chip-pop:hover {
+      transform: scale(1.06) rotate(-1.5deg);
+    }
+    /* A row is a wide, quiet target; a tint reads better on one than a lift does. */
+    .row-hover {
+      transition: background-color 140ms ease;
+    }
+    .row-hover:hover {
+      background: color-mix(in oklab, var(--color-flag) 12%, #fff);
+    }
+  }
+
+  /* The header earns its line only once there is something above it to separate from. */
+  .app-header {
+    transition:
+      box-shadow 160ms ease,
+      border-color 160ms ease;
+    border-bottom: 2px solid transparent;
+  }
+  .app-header[data-scrolled="true"] {
+    border-bottom-color: var(--color-ink);
+    box-shadow: 0 4px 0 -2px rgb(20 18 15 / 0.08);
+  }
+
   .marquee-track {
     animation: marquee 42s linear infinite;
   }
@@ -218,6 +351,29 @@ button {
     }
     .marquee {
       overflow-x: auto;
+    }
+    /* Not simply `animation: none` — that would freeze the mark mid-stroke and the skeletons
+       half-faded. Each one is pinned to its finished state instead. */
+    .tally-stroke {
+      animation: none;
+      stroke-dashoffset: 0;
+      opacity: 1;
+    }
+    .shimmer {
+      animation: none;
+      opacity: 1;
+    }
+    .sticker-shuffle img {
+      animation: none;
+    }
+    .sticker-shuffle img:first-child {
+      opacity: 1;
+    }
+    .card-lift,
+    .chip-pop,
+    .row-hover,
+    .app-header {
+      transition: none;
     }
   }
 }
