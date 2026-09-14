@@ -173,9 +173,26 @@ test.describe.serial("pool flow", () => {
     await page.getByRole("button", { name: /^More for Corey/ }).click();
     await expect(page.getByRole("menuitem", { name: "Rename" })).toBeVisible();
     await expect(page.getByRole("menuitem", { name: "Remove from pool" })).toBeVisible();
+
+    // A `menu` role is a promise about the keyboard: opening hands focus to the first item, and
+    // the arrows walk the list rather than scrolling the page behind it.
+    await expect(page.getByRole("menuitem", { name: "Rename" })).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByRole("menuitem", { name: "Reset access" })).toBeFocused();
+    await page.keyboard.press("End");
+    await expect(page.getByRole("menuitem", { name: "Remove from pool" })).toBeFocused();
+    await page.keyboard.press("ArrowDown");
+    await expect(page.getByRole("menuitem", { name: "Rename" })).toBeFocused();
+
     // Escape closes it and puts focus back where it was, rather than at the top of the page.
     await page.keyboard.press("Escape");
     await expect(page.getByRole("menuitem", { name: "Rename" })).toHaveCount(0);
+    await expect(page.getByRole("button", { name: /^More for Corey/ })).toBeFocused();
+
+    // The bare numbers in a row are only legible next to a column header, which a screen reader
+    // cannot see — so each cell says what it is.
+    await expect(page.getByText(/^\d+ picks$/).first()).toBeAttached();
+    await expect(page.getByText(/^\d+ devices$/).first()).toBeAttached();
 
     // Cards are the other way to look at the same roster, and the choice is remembered.
     await page.getByRole("radio", { name: "Cards" }).click();

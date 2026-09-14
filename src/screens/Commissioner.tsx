@@ -427,9 +427,11 @@ function Players() {
     <Menu
       label={`More for ${p.name}`}
       items={[
-        { label: "Rename", onSelect: () => rename(p) },
-        { label: "Reset access", onSelect: () => void resetAccess(p.id, p.name) },
-        { label: "Remove from pool", onSelect: () => remove(p), danger: true },
+        { label: "Rename", onSelect: () => rename(p), disabled: mut.isPending },
+        // Each reset mints a new code and revokes the devices, so a second one in flight means two
+        // "here is the new code" toasts and only the last of them still opens anything.
+        { label: "Reset access", onSelect: () => void resetAccess(p.id, p.name), disabled: reset.isPending },
+        { label: "Remove from pool", onSelect: () => remove(p), danger: true, disabled: mut.isPending },
       ]}
     />
   );
@@ -514,15 +516,23 @@ function Players() {
           {/* A header makes it a table: the cells can be bare numbers instead of repeating
               "picks · wks · device" on thirteen consecutive rows. Widths are shared with the
               rows below, and each column leaves at the width where it stops being worth its
-              space — the code is the last to go, because it is the one people come here for. */}
-          <div className="hidden items-center gap-3 border-b-2 border-dashed border-line px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-ink-3 sm:flex">
-            <span className="w-8 shrink-0" aria-hidden="true" />
+              space — the code is the last to go, because it is the one people come here for.
+
+              A bare "5" is only legible next to the column it sits under, which is a thing a
+              screen reader cannot see. So the header is decoration (aria-hidden) and each cell
+              carries its own label instead: the row is heard as "5 picks", not as a stray line
+              of column names followed by thirteen rows of unattached digits. */}
+          <div
+            aria-hidden="true"
+            className="hidden items-center gap-3 border-b-2 border-dashed border-line px-3 py-2 text-[11px] font-bold uppercase tracking-wider text-ink-3 sm:flex"
+          >
+            <span className="w-8 shrink-0" />
             <span className="min-w-0 flex-1">Player</span>
             <span className="hidden w-14 shrink-0 text-right lg:block">Picks</span>
             <span className="hidden w-14 shrink-0 text-right lg:block">Weeks</span>
             <span className="hidden w-16 shrink-0 text-right md:block">Devices</span>
             <span className="w-28 shrink-0 text-right">Code</span>
-            <span className="w-28 shrink-0" aria-hidden="true" />
+            <span className="w-28 shrink-0" />
           </div>
           <ul className="divide-y-2 divide-dashed divide-line">
             {shown.map((p) => (
@@ -534,9 +544,11 @@ function Players() {
                 </div>
                 <div className="font-display hidden w-14 shrink-0 text-right text-sm font-extrabold tabular lg:block">
                   {p.picksCount}
+                  <span className="sr-only"> picks</span>
                 </div>
                 <div className="font-display hidden w-14 shrink-0 text-right text-sm font-extrabold tabular lg:block">
                   {p.weeksPlayed}
+                  <span className="sr-only"> weeks played</span>
                 </div>
                 <div
                   className={`font-display hidden w-16 shrink-0 text-right text-sm font-extrabold tabular md:block ${
@@ -544,8 +556,10 @@ function Players() {
                   }`}
                 >
                   {p.devices}
+                  <span className="sr-only"> devices</span>
                 </div>
                 <div className="font-display hidden w-28 shrink-0 text-right text-xs tracking-[0.08em] text-ink-2 sm:block">
+                  <span className="sr-only">code </span>
                   {p.code ? formatCode(p.code) : <span className="text-ink-3">none</span>}
                 </div>
                 <div className="flex w-28 shrink-0 justify-end gap-2">
