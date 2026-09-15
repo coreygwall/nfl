@@ -34,6 +34,7 @@
   /* The four that let the light theme be re-lit rather than inverted. See the dark block below. */
   --color-surface: #ffffff;
   --color-shadow: #14120f;
+  --color-card-border: #14120f;
   --color-on-accent: #14120f;
   --color-on-turf: #ffffff;
   --color-dot: rgb(20 18 15 / 0.06);
@@ -54,23 +55,25 @@
  * turns white, which reads as a glow rather than as a card lying on a page. So the shadow gets its
  * own token and stays black: cards sit *above* a warm dark ground, lit from the same corner.
  *
- * The ground is warm (#1A1713, brown-black) rather than neutral, because the paper it replaces is
- * warm. Cards are a step lighter than the ground instead of white. The accents keep their hue and
- * gain lightness so they still clear 4.5:1, and anything *filled* with an accent keeps dark text
- * in both themes — a yellow chip wants black on it whatever the rest of the screen is doing.
+ * The ground is warm (#191611, brown-black) rather than neutral, because the paper it replaces is
+ * warm. Cards are visibly lighter than the ground without becoming a stack of nearly black slabs,
+ * while their outlines are warm off-white rather than the same bright white used for text. The
+ * accents keep their hue and gain lightness so they still clear 4.5:1, and anything *filled* with
+ * yellow keeps dark text in both themes — a yellow chip wants black on it whatever the rest of
+ * the screen is doing.
  *
  * Every pair here was checked: the worst is ink-3 on paper-2 at 4.76:1.
  */
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
     color-scheme: dark;
-    --color-paper: #1a1713;
-    --color-paper-2: #2e2921;
-    --color-paper-3: #3a342a;
+    --color-paper: #191611;
+    --color-paper-2: #2c261f;
+    --color-paper-3: #3a3229;
     --color-ink: #f4efe6;
     --color-ink-2: #b8af9e;
     --color-ink-3: #9c9384;
-    --color-line: #443c30;
+    --color-line: #51483a;
     --color-turf: #3fbf74;
     --color-turf-2: #5ad48c;
     --color-turf-soft: #16301f;
@@ -81,8 +84,10 @@
     --color-sky: #6fa8ff;
     --color-sky-soft: #16233a;
     --color-bronze: #846444;
-    --color-surface: #24201a;
+    --color-surface: #27221b;
     --color-shadow: #000000;
+    --color-card-border: #d8cfc0;
+    --color-on-accent: #14120f;
     --color-on-turf: #14120f;
     --color-dot: rgb(244 239 230 / 0.05);
   }
@@ -90,13 +95,13 @@
 
 :root[data-theme="dark"] {
   color-scheme: dark;
-  --color-paper: #1a1713;
-  --color-paper-2: #2e2921;
-  --color-paper-3: #3a342a;
+  --color-paper: #191611;
+  --color-paper-2: #2c261f;
+  --color-paper-3: #3a3229;
   --color-ink: #f4efe6;
   --color-ink-2: #b8af9e;
   --color-ink-3: #9c9384;
-  --color-line: #443c30;
+  --color-line: #51483a;
   --color-turf: #3fbf74;
   --color-turf-2: #5ad48c;
   --color-turf-soft: #16301f;
@@ -107,8 +112,10 @@
   --color-sky: #6fa8ff;
   --color-sky-soft: #16233a;
   --color-bronze: #846444;
-  --color-surface: #24201a;
+  --color-surface: #27221b;
   --color-shadow: #000000;
+  --color-card-border: #d8cfc0;
+  --color-on-accent: #14120f;
   --color-on-turf: #14120f;
   --color-dot: rgb(244 239 230 / 0.05);
 }
@@ -139,13 +146,13 @@ body {
   }
   .card {
     background: var(--color-surface);
-    border: 2px solid var(--color-ink);
+    border: 2px solid var(--color-card-border);
     border-radius: var(--radius-card);
     box-shadow: var(--shadow-hard);
   }
   .card-flat {
     background: var(--color-surface);
-    border: 2px solid var(--color-ink);
+    border: 2px solid var(--color-card-border);
     border-radius: var(--radius-card);
   }
   .btn {
@@ -189,6 +196,11 @@ body {
   }
   .btn-flag {
     background: var(--color-flag);
+    color: var(--color-on-accent);
+  }
+  /* A hard yellow surface must never inherit light text in dark mode. This covers badges,
+     rank markers, and one-off yellow callouts as well as the dedicated flag button. */
+  :where(.bg-flag, .hover\:bg-flag:hover) {
     color: var(--color-on-accent);
   }
   .btn-ghost {
