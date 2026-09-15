@@ -7,7 +7,7 @@ import { useChrome } from "./Chrome.tsx";
 import { ChevronDown, ChevronLeft, ChevronRight, Football, House, Megaphone, Swap, Trophy, X } from "./Icons.tsx";
 import { useToast } from "./Toast.tsx";
 import { useOnline } from "../lib/online.ts";
-import { CompactThemeSelect, ThemePicker } from "./ThemeControl.tsx";
+import { ThemePicker, ThemeToggle } from "./ThemeControl.tsx";
 import { api, ApiClientError } from "../api/client.ts";
 import type { Identity } from "../lib/identity.ts";
 import { formatCode } from "../../shared/codes.ts";
@@ -199,7 +199,7 @@ export function AppShell() {
               <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
                 {headerWeek && <HeaderWeekNav week={headerWeek.week} max={headerWeek.max} onChange={changeWeek} />}
                 {announcementButton}
-                <CompactThemeSelect />
+                <ThemeToggle className="hidden md:flex" />
                 <button className="chip min-w-0 max-w-[12ch] sm:max-w-[22ch]" onClick={() => setSwitching(true)} aria-label="Switch player">
                   <span className="truncate">{player.name}</span>
                   <Swap className="shrink-0 text-ink-2" />
@@ -207,7 +207,7 @@ export function AppShell() {
               </div>
             </>
           )}
-          {(!player || onWelcome) && <div className="ml-auto flex items-center gap-2">{announcementButton}<CompactThemeSelect /></div>}
+          {(!player || onWelcome) && <div className="ml-auto flex items-center gap-2">{announcementButton}<ThemeToggle className="hidden md:flex" /></div>}
         </div>
         {!online && (
           <div className="bg-ink px-4 py-1.5 text-center text-xs font-bold text-paper">
