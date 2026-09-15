@@ -229,7 +229,7 @@ function WeekBoardView({ week, sort, onWeek }: { week: number; sort: BoardSort; 
   );
 }
 
-function WeekRowItem({ row, index, open, onToggle, isMe, week, started }: { row: WeekRow; index: number; open: boolean; onToggle: () => void; isMe: boolean; week: number; started: boolean }) {
+export function WeekRowItem({ row, index, open, onToggle, isMe, week, started }: { row: WeekRow; index: number; open: boolean; onToggle: () => void; isMe: boolean; week: number; started: boolean }) {
   const hidden = row.picksMade - row.picks.length;
   return (
     <motion.li
@@ -423,7 +423,7 @@ function SeasonBoardView({ sort }: { sort: BoardSort }) {
   );
 }
 
-function SeasonRowItem({ row, index, isMe, open, onToggle, throughWeek }: { row: SeasonRow; index: number; isMe: boolean; open: boolean; onToggle: () => void; throughWeek: number }) {
+export function SeasonRowItem({ row, index, isMe, open, onToggle, throughWeek }: { row: SeasonRow; index: number; isMe: boolean; open: boolean; onToggle: () => void; throughWeek: number }) {
   const first = SEASON_START_WEEK;
   const weeks = Array.from({ length: Math.max(throughWeek - first + 1, 1) }, (_, i) => i + first);
   const max = Math.max(15, ...Object.values(row.byWeek));

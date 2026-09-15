@@ -5,9 +5,14 @@ import { usePlayer } from "../lib/player.tsx";
 import { POOL_TYPES } from "../../shared/pools.ts";
 import { formatKickoff } from "../lib/time.ts";
 import { MAX_PICKS } from "../../shared/picks.ts";
-import { WEEKS } from "../../shared/week.ts";
+import { SEASON_START_WEEK } from "../../shared/week.ts";
 import { Announcements } from "../components/Announcements.tsx";
 import { fallbackPoolWeeks } from "../lib/poolFallback.ts";
+import { joinPromptOpen, latestCompletedWeek } from "../lib/poolHome.ts";
+import { SeasonRowItem, WeekRowItem } from "./Board.tsx";
+import { Share } from "../components/Icons.tsx";
+import { poolUrl } from "../lib/basename.ts";
+import { useToast } from "../components/Toast.tsx";
 
 /**
  * Home: which pool you are in, and what it wants from you.
@@ -29,6 +34,7 @@ export function Home() {
   return (
     <div className="mx-auto w-full max-w-[860px]">
       <PoolCard />
+      <PoolOpenCard now={boot.data.now} />
       <Announcements preview />
       <BrowsePool />
       <MorePools />
@@ -60,7 +66,7 @@ function PoolDoorway({ error, retry }: { error?: string; retry: () => void }) {
             Week {boardWeek} winner & results
           </Link>
           <Link className="btn w-full" to="/board/season">
-            Season standings
+            Season standings · starts Week {SEASON_START_WEEK}
           </Link>
         </div>
         {error && (
@@ -74,6 +80,53 @@ function PoolDoorway({ error, retry }: { error?: string; retry: () => void }) {
         Picks and standings are separate—you can browse the pool without submitting anything.
       </p>
     </div>
+  );
+}
+
+/** This is intentionally time-boxed campaign copy, not a permanent rule about joining. */
+function PoolOpenCard({ now }: { now: string }) {
+  const toast = useToast();
+  if (!joinPromptOpen(now)) return null;
+
+  const share = async () => {
+    const url = poolUrl();
+    if (navigator.share) {
+      try {
+        await navigator.share({ url });
+        return;
+      } catch (error) {
+        if (error instanceof DOMException && error.name === "AbortError") return;
+        // A desktop browser can expose Web Share and still decline this payload. Copy is the
+        // dependable second path, rather than making the button silently do nothing.
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(url);
+      toast("Pool link copied — send it to anyone who still wants in.", "success");
+    } catch {
+      toast("Couldn't open sharing. Copy the address from your browser instead.", "error");
+    }
+  };
+
+  return (
+    <section className="card mt-4 overflow-hidden bg-flag-soft p-5" aria-labelledby="pool-open-heading">
+      <div className="flex items-start gap-3">
+        <div className="min-w-0 flex-1">
+          <p className="text-xs font-bold uppercase tracking-wider text-ink-3">Invite your people</p>
+          <h2 id="pool-open-heading" className="font-display mt-0.5 text-xl font-extrabold">The pool is still open</h2>
+          <p className="mt-1 text-sm leading-relaxed text-ink-2">
+            There’s still time to join for Week 2. Games lock one by one, so anyone you invite can pick from what’s left.
+          </p>
+        </div>
+        <span className="font-display shrink-0 rounded-full border-2 border-ink bg-flag px-3 py-1 text-xs font-extrabold">
+          Until Sun 1 ET
+        </span>
+      </div>
+      <button className="btn btn-primary mt-4 w-full sm:w-auto" onClick={() => void share()}>
+        <Share /> Share the pool
+      </button>
+      <p className="mt-2 text-xs text-ink-3">Opens your phone’s share menu; on desktop, the link is copied.</p>
+    </section>
   );
 }
 
@@ -200,10 +253,17 @@ function PoolCard() {
  * Home rather than behind the pick flow, so a member can treat Tally like a season scoreboard. */
 function BrowsePool() {
   const boot = useBootstrap();
+  const { player } = usePlayer();
   const currentWeek = boot.data?.currentWeek ?? 1;
   const boardWeek = boot.data?.boardWeek ?? currentWeek;
-  const lastWeek = Math.min(WEEKS, Math.max(1, currentWeek, boardWeek));
-  const weeks = Array.from({ length: lastWeek }, (_, i) => i + 1);
+  const completedWeek = latestCompletedWeek(boot.data?.weeks ?? []);
+  const weekBoard = useWeekBoard(completedWeek);
+  const seasonBoard = useSeasonBoard();
+  const [openWeekPlayer, setOpenWeekPlayer] = useState<string | null>(null);
+  const [openSeasonPlayer, setOpenSeasonPlayer] = useState<string | null>(null);
+  const pastWeeks = (boot.data?.weeks ?? [])
+    .filter((week) => week.gameCount > 0 && week.finalCount === week.gameCount && week.week !== completedWeek)
+    .map((week) => week.week);
 
   return (
     <section className="mt-5" aria-labelledby="explore-pool-heading">
@@ -211,28 +271,102 @@ function BrowsePool() {
         <h2 id="explore-pool-heading" className="font-display text-lg font-extrabold">Explore the pool</h2>
         <span className="text-xs text-ink-3">No picks required</span>
       </div>
-      <div className="grid gap-2 sm:grid-cols-2">
-        <Link to="/board/season" className="card-flat block bg-surface p-4 transition-colors hover:bg-paper-2">
-          <span className="font-display block font-extrabold">Season standings <span aria-hidden="true">›</span></span>
-          <span className="mt-1 block text-sm text-ink-2">See the full-season leaderboard.</span>
-        </Link>
-        <Link to={`/board/week/${boardWeek}`} className="card-flat block bg-surface p-4 transition-colors hover:bg-paper-2">
-          <span className="font-display block font-extrabold">Weekly standings <span aria-hidden="true">›</span></span>
-          <span className="mt-1 block text-sm text-ink-2">Open Week {boardWeek}'s board and results.</span>
-        </Link>
-      </div>
-      <div className="card-flat mt-2 bg-surface p-4">
-        <h3 className="font-display font-extrabold">Past weeks</h3>
-        <p className="mt-1 text-sm text-ink-2">Jump to any week to revisit its picks and results.</p>
-        <div className="mt-3 flex flex-wrap gap-2" aria-label="Browse weeks">
-          {weeks.map((week) => (
-            <Link key={week} className="chip bg-paper-2 hover:bg-flag" to={`/board/week/${week}`}>
-              Week {week}
-            </Link>
-          ))}
-        </div>
+      <div className="grid items-start gap-3 lg:grid-cols-2">
+        <section className="card p-4" aria-labelledby="latest-week-heading">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-xs font-bold uppercase tracking-wider text-ink-3">Latest weekly winner</p>
+              <h3 id="latest-week-heading" className="font-display mt-0.5 text-xl font-extrabold">
+                {completedWeek ? `Week ${completedWeek} results` : "Weekly standings"}
+              </h3>
+            </div>
+            {completedWeek && <span className="chip bg-turf-soft text-xs">Final</span>}
+          </div>
+
+          {completedWeek === null ? (
+            <>
+              <p className="mt-3 text-sm text-ink-2">The first top three will appear here when Week 1 is final.</p>
+              <Link className="btn btn-sm mt-3" to={`/board/week/${boardWeek}`}>Week {boardWeek}</Link>
+            </>
+          ) : weekBoard.isPending ? (
+            <PreviewSkeleton />
+          ) : !weekBoard.data ? (
+            <p className="mt-3 text-sm text-ink-2">Couldn’t load the latest results.</p>
+          ) : (
+            <>
+              <ul className="mt-3 space-y-2" aria-label={`Week ${completedWeek} top three`}>
+                {weekBoard.data.rows.slice(0, 3).map((row, index) => (
+                  <WeekRowItem
+                    key={row.playerId}
+                    row={row}
+                    index={index}
+                    open={openWeekPlayer === row.playerId}
+                    onToggle={() => setOpenWeekPlayer(openWeekPlayer === row.playerId ? null : row.playerId)}
+                    isMe={row.playerId === player?.id}
+                    week={completedWeek}
+                    started
+                  />
+                ))}
+              </ul>
+              <Link className="btn btn-sm mt-3 w-full" to={`/board/week/${completedWeek}`}>
+                See the full Week {completedWeek} leaderboard
+              </Link>
+            </>
+          )}
+
+          {pastWeeks.length > 0 && (
+            <div className="mt-4 border-t-2 border-dashed border-line pt-3">
+              <h4 className="font-display text-sm font-extrabold">Past weeks</h4>
+              <div className="mt-2 flex flex-wrap gap-2" aria-label="Browse past weeks">
+                {pastWeeks.map((week) => (
+                  <Link key={week} className="chip bg-paper-2 hover:bg-flag" to={`/board/week/${week}`}>Week {week}</Link>
+                ))}
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section className="card p-4" aria-labelledby="season-preview-heading">
+          <p className="text-xs font-bold uppercase tracking-wider text-ink-3">Season race</p>
+          <h3 id="season-preview-heading" className="font-display mt-0.5 text-xl font-extrabold">Season standings</h3>
+          {seasonBoard.isPending ? (
+            <PreviewSkeleton />
+          ) : !seasonBoard.data ? (
+            <p className="mt-3 text-sm text-ink-2">Couldn’t load the season standings.</p>
+          ) : seasonBoard.data.throughWeek === 0 ? (
+            <div className="card-flat mt-3 bg-flag-soft p-4">
+              <p className="font-display font-extrabold">Starts Week {seasonBoard.data.fromWeek}</p>
+              <p className="mt-1 text-sm text-ink-2">Week 1 crowns its own winner. Season points begin next week.</p>
+            </div>
+          ) : (
+            <ul className="mt-3 space-y-2" aria-label="Season top three">
+              {seasonBoard.data.rows.slice(0, 3).map((row, index) => (
+                <SeasonRowItem
+                  key={row.playerId}
+                  row={row}
+                  index={index}
+                  isMe={row.playerId === player?.id}
+                  open={openSeasonPlayer === row.playerId}
+                  onToggle={() => setOpenSeasonPlayer(openSeasonPlayer === row.playerId ? null : row.playerId)}
+                  throughWeek={seasonBoard.data.throughWeek}
+                />
+              ))}
+            </ul>
+          )}
+          <Link className="btn btn-sm mt-3 w-full" to="/board/season">
+            Season standings · starts Week {SEASON_START_WEEK}
+          </Link>
+        </section>
       </div>
     </section>
+  );
+}
+
+function PreviewSkeleton() {
+  return (
+    <div className="mt-3 space-y-2" aria-label="Loading standings">
+      {[0, 1, 2].map((row) => <div key={row} className="shimmer h-[66px] rounded-card bg-paper-2" aria-hidden="true" />)}
+    </div>
   );
 }
 

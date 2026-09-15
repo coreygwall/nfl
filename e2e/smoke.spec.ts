@@ -273,12 +273,65 @@ test.describe.serial("pool flow", () => {
 });
 
 test("the pool home is useful even before someone joins", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: async ({ url }: ShareData) => sessionStorage.setItem("shared-pool-url", url ?? ""),
+    });
+  });
   await page.goto(`/p/high-five/?now=${BEFORE}`);
   await expect(page).toHaveURL(/\/p\/high-five\/?/);
   await expect(page.getByRole("heading", { name: "Explore the pool" })).toBeVisible();
   await expect(page.getByText("Follow the pool without making picks.")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "The pool is still open" })).toBeVisible();
+  await page.getByRole("button", { name: "Share the pool" }).click();
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem("shared-pool-url"))).toMatch(/\/p\/high-five\/?$/);
+  await expect(page.getByRole("link", { name: /Season standings · starts Week 2/ })).toBeVisible();
   await page.getByRole("link", { name: /Season standings/ }).click();
   await expect(page).toHaveURL(/\/board\/season$/);
+});
+
+test("desktop copies the invite and the prompt ends at the Sunday Week 2 kickoff", async ({ page }) => {
+  await page.addInitScript(() => {
+    Object.defineProperty(navigator, "share", { configurable: true, value: undefined });
+    Object.defineProperty(navigator, "clipboard", {
+      configurable: true,
+      value: { writeText: async (value: string) => sessionStorage.setItem("copied-pool-url", value) },
+    });
+  });
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.goto(`/p/high-five/?now=2026-09-20T16:59:59.999Z`);
+  await page.getByRole("button", { name: "Share the pool" }).click();
+  await expect.poll(() => page.evaluate(() => sessionStorage.getItem("copied-pool-url"))).toMatch(/\/p\/high-five\/?$/);
+  await expect(page.getByText("Pool link copied")).toBeVisible();
+
+  await page.goto(`/p/high-five/?now=2026-09-20T17:00:00.000Z`);
+  await expect(page.getByRole("heading", { name: "The pool is still open" })).toHaveCount(0);
+});
+
+test("home previews the latest completed week with expandable picks", async ({ page, request }) => {
+  // This suite has two established entries at this point; add a third so the compact preview's
+  // three-row cap is exercised rather than assuming every pool already has three people.
+  await request.post("/api/players", { data: { name: "Preview Player" } });
+  const week = await request.get(`/api/league/weeks/1?now=2026-09-15T12:00:00Z`, {
+    headers: { "x-admin-pin": "1234" },
+  });
+  const { games } = await week.json() as { games: Array<{ id: string; home: string }> };
+  for (const game of games) {
+    await request.put(`/api/league/games/${game.id}/result?now=2026-09-15T12:00:00Z`, {
+      headers: { "x-admin-pin": "1234" },
+      data: { winner: game.home },
+    });
+  }
+
+  await page.goto(`/p/high-five/?now=2026-09-15T12:00:00Z`);
+  await expect(page.getByRole("heading", { name: "Week 1 results" })).toBeVisible();
+  const topThree = page.getByRole("list", { name: "Week 1 top three" });
+  await expect(topThree.getByRole("button")).toHaveCount(3);
+  await topThree.getByRole("button").first().click();
+  await expect(topThree.getByRole("list", { name: "Picks, most confident first" })).toBeVisible();
+  await expect(page.getByRole("link", { name: "See the full Week 1 leaderboard" })).toBeVisible();
+  await expect(page.getByText("Starts Week 2", { exact: true })).toBeVisible();
 });
 
 test("a sign-in link claims the name in one tap, with no code to type", async ({ page, request }) => {
