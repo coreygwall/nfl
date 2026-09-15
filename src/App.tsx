@@ -1,7 +1,6 @@
 import { Navigate, Route, Routes, useLocation } from "react-router";
 import type { ReactNode } from "react";
 import { useBootstrap } from "./api/queries.ts";
-import { usePlayer } from "./lib/player.tsx";
 import { AppShell } from "./components/AppShell.tsx";
 import { ChromeProvider } from "./components/Chrome.tsx";
 import { ErrorState, Spinner } from "./components/Common.tsx";
@@ -21,8 +20,6 @@ import { POOL_SLUG } from "./lib/basename.ts";
  * more than one, and it was never able to say "your picks are in, here's where you stand".
  */
 function PoolHome() {
-  const { player } = usePlayer();
-  if (!player) return <Navigate to="/welcome" replace />;
   return <Home />;
 }
 
