@@ -17,7 +17,7 @@ import { ErrorState, RankBadge, Spinner } from "../components/Common.tsx";
 import { GamesSkeleton } from "../components/TallyLoader.tsx";
 import { useHeaderWeek, useHideNav } from "../components/Chrome.tsx";
 import { poolUrl } from "../lib/basename.ts";
-import { ChevronDown, ChevronLeft, ChevronUp, Grip, Lock, Share } from "../components/Icons.tsx";
+import { ChevronDown, ChevronLeft, ChevronUp, Grip, House, Lock, Share } from "../components/Icons.tsx";
 import { SlideToLock } from "../components/SlideToLock.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
 import { useToast } from "../components/Toast.tsx";
@@ -219,6 +219,15 @@ function PickFlowInner({ week }: { week: number }) {
 
   return (
     <div>
+      {(step === "select" || step === "rank") && (
+        <Link
+          to="/"
+          className="btn btn-sm mb-1 inline-flex md:hidden"
+          aria-label="Go to pool home"
+        >
+          <House size={16} /> Pool home
+        </Link>
+      )}
       <AnimatePresence mode="wait" initial={false}>
         {step === "review" ? (
           <StepWrap key="review" wide={reviewWide}>
