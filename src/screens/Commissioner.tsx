@@ -21,6 +21,7 @@ import { poolUrl } from "../lib/basename.ts";
 import { ErrorState, Menu, Segmented, Spinner } from "../components/Common.tsx";
 import { Cards, Check, LinkIcon, Rows } from "../components/Icons.tsx";
 import { useToast } from "../components/Toast.tsx";
+import { Announcements } from "../components/Announcements.tsx";
 
 /**
  * The commissioner's office — everything about *this pool*, and nothing about who won on Sunday.
@@ -51,6 +52,7 @@ export function Commissioner() {
         onChange={setTab}
       />
       <div className="mt-4">{tab === "pool" ? <PoolSettings /> : <Players />}</div>
+      {tab === "pool" && <Announcements settings />}
       {roles.platformAdmin && (
         <div className="card-flat mt-4 flex flex-wrap items-center gap-3 bg-paper-2 p-4">
           <div className="min-w-0 flex-1">

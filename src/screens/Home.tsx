@@ -7,6 +7,7 @@ import { POOL_TYPES } from "../../shared/pools.ts";
 import { formatKickoff } from "../lib/time.ts";
 import { MAX_PICKS } from "../../shared/picks.ts";
 import { WEEKS } from "../../shared/week.ts";
+import { Announcements } from "../components/Announcements.tsx";
 
 /**
  * Home: which pool you are in, and what it wants from you.
@@ -27,6 +28,7 @@ export function Home() {
   return (
     <div className="mx-auto w-full max-w-[860px]">
       <PoolCard />
+      <Announcements preview />
       <BrowsePool />
       <MorePools />
       <p className="mt-6 text-center text-sm">

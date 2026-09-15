@@ -14,6 +14,7 @@ import { leagueRoutes } from "./routes/league.ts";
 import { roleRoutes } from "./routes/roles.ts";
 import { passkeyRoutes } from "./routes/passkeys.ts";
 import { pushRoutes } from "./routes/push.ts";
+import { messageRoutes } from "./routes/messages.ts";
 import { configFrom } from "./apns.ts";
 import { dispatchNotifications } from "./notify.ts";
 
@@ -69,6 +70,7 @@ app.route("/api/roles", roleRoutes);
 app.route("/api/commissioner", commissionerRoutes);
 app.route("/api/league", leagueRoutes);
 app.route("/api/push", pushRoutes);
+app.route("/api/messages", messageRoutes);
 
 /**
  * A pool installs to a home screen as itself — its name, scoped to its own path — while the bare
