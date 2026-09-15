@@ -483,7 +483,7 @@ test("appearance follows the device and stays in sync across the desktop shortcu
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/");
   const ground = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
-  expect(await ground()).toBe("rgb(26, 23, 19)");
+  expect(await ground()).toBe("rgb(25, 22, 17)");
 
   await page.emulateMedia({ colorScheme: "light" });
   expect(await ground()).toBe("rgb(246, 241, 232)");
@@ -493,11 +493,11 @@ test("appearance follows the device and stays in sync across the desktop shortcu
   await page.setViewportSize({ width: 1280, height: 844 });
   await page.getByRole("button", { name: "Switch to dark mode" }).click();
   expect(await page.getAttribute("html", "data-theme")).toBe("dark");
-  expect(await ground()).toBe("rgb(26, 23, 19)");
+  expect(await ground()).toBe("rgb(25, 22, 17)");
   expect(await page.locator('meta[name="theme-color"]').evaluateAll((tags) => tags.map((tag) => tag.getAttribute("content")))).toEqual(["#1A1713", "#1A1713"]);
   await page.reload();
   expect(await page.getAttribute("html", "data-theme")).toBe("dark");
-  expect(await ground()).toBe("rgb(26, 23, 19)");
+  expect(await ground()).toBe("rgb(25, 22, 17)");
 
   // Auto restores the independent light/dark metadata, so a later system change requires no
   // mounted settings sheet or JavaScript listener to keep the browser chrome current.
