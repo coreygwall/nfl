@@ -47,7 +47,7 @@ test.describe.serial("pool flow", () => {
     await expect(page).toHaveURL(/\/p\/high-five\/?$/);
     await expect(page.getByRole("heading", { name: "Explore the pool" })).toBeVisible();
     await expect(page.getByRole("link", { name: /Season standings/ })).toBeVisible();
-    await expect(page.getByRole("link", { name: "Week 1" })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Week 1", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "High Five. Switch pool" }).click();
     const pools = page.getByRole("dialog", { name: "Pools" });
     await expect(pools.getByRole("link", { name: /Pool home/ })).toBeVisible();
