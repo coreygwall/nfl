@@ -120,7 +120,7 @@ function PoolOpenCard({ now }: { now: string }) {
         </span>
       </div>
       <p className="mt-3 w-full text-sm leading-relaxed text-ink-2">
-        There’s still time to join for Week 2. Games lock one by one, so anyone you invite can pick from what’s left.
+        Join for Week 2. Games lock one by one, so new players can pick from what’s left.
       </p>
       <button className="btn btn-primary mt-4 w-full sm:w-auto" onClick={() => void share()}>
         <Share /> Share the pool
