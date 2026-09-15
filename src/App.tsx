@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes, useLocation } from "react-router";
 import type { ReactNode } from "react";
 import { useBootstrap } from "./api/queries.ts";
+import { usePlayer } from "./lib/player.tsx";
 import { AppShell } from "./components/AppShell.tsx";
 import { ChromeProvider } from "./components/Chrome.tsx";
 import { ErrorState, Spinner } from "./components/Common.tsx";
