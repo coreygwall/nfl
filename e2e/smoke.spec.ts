@@ -310,6 +310,9 @@ test("desktop copies the invite and the prompt ends at the Sunday Week 2 kickoff
 });
 
 test("home previews the latest completed week with expandable picks", async ({ page, request }) => {
+  // This suite has two established entries at this point; add a third so the compact preview's
+  // three-row cap is exercised rather than assuming every pool already has three people.
+  await request.post("/api/players", { data: { name: "Preview Player" } });
   const week = await request.get(`/api/league/weeks/1?now=2026-09-15T12:00:00Z`, {
     headers: { "x-admin-pin": "1234" },
   });
