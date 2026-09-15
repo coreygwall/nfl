@@ -4,7 +4,6 @@ import { useBootstrap } from "./api/queries.ts";
 import { usePlayer } from "./lib/player.tsx";
 import { AppShell } from "./components/AppShell.tsx";
 import { ChromeProvider } from "./components/Chrome.tsx";
-import { ErrorState, Spinner } from "./components/Common.tsx";
 import { Welcome } from "./screens/Welcome.tsx";
 import { PickFlow } from "./screens/PickFlow.tsx";
 import { Board } from "./screens/Board.tsx";
@@ -15,6 +14,7 @@ import { Rules } from "./screens/Rules.tsx";
 import { Landing } from "./screens/Landing.tsx";
 import { POOL_SLUG } from "./lib/basename.ts";
 import { Announcements } from "./components/Announcements.tsx";
+import { fallbackPoolWeeks } from "./lib/poolFallback.ts";
 
 /**
  * The root of a pool is Home now rather than a redirect into this week's picks. Landing straight on
@@ -28,10 +28,9 @@ function PoolHome() {
 function BoardIndex() {
   const boot = useBootstrap();
   const { search } = useLocation();
-  if (boot.isPending) return <Spinner />;
-  if (boot.error) return <ErrorState message={boot.error.message} onRetry={() => boot.refetch()} />;
+  const fallback = fallbackPoolWeeks();
   // Carry ?sort= through the redirect, so a shared board link keeps its view.
-  return <Navigate to={`/board/week/${boot.data.boardWeek}${search}`} replace />;
+  return <Navigate to={`/board/week/${boot.data?.boardWeek ?? fallback.boardWeek}${search}`} replace />;
 }
 
 /**

@@ -16,6 +16,7 @@ import { isVulgar, VULGAR_MESSAGE } from "../../shared/profanity.ts";
 import { addPasskey, passkeysSupported, wasCancelled } from "../lib/passkey.ts";
 import { useQueryClient } from "@tanstack/react-query";
 import { Check } from "./Icons.tsx";
+import { fallbackPoolWeeks } from "../lib/poolFallback.ts";
 
 export function AppShell() {
   const { player, people, setPlayer, syncEntries, switchTo, forget } = usePlayer();
@@ -107,7 +108,7 @@ export function AppShell() {
   }, [player, boot.data, boot.dataUpdatedAt, forget, toast, nav]);
 
   const onWelcome = loc.pathname.startsWith("/welcome");
-  const currentWeek = boot.data?.currentWeek ?? 1;
+  const currentWeek = boot.data?.currentWeek ?? fallbackPoolWeeks().pickWeek;
   // Home is first and is the only screen that can say *which* pool and *what needs doing* before
   // you have picked a tab. Rules left the bar: a document you read once was holding a third of it.
   const tabs = [

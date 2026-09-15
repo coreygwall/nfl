@@ -2,12 +2,12 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useBootstrap, useSeasonBoard, useWeekBoard } from "../api/queries.ts";
 import { usePlayer } from "../lib/player.tsx";
-import { ErrorState, Spinner } from "../components/Common.tsx";
 import { POOL_TYPES } from "../../shared/pools.ts";
 import { formatKickoff } from "../lib/time.ts";
 import { MAX_PICKS } from "../../shared/picks.ts";
 import { WEEKS } from "../../shared/week.ts";
 import { Announcements } from "../components/Announcements.tsx";
+import { fallbackPoolWeeks } from "../lib/poolFallback.ts";
 
 /**
  * Home: which pool you are in, and what it wants from you.
@@ -23,8 +23,9 @@ import { Announcements } from "../components/Announcements.tsx";
  */
 export function Home() {
   const boot = useBootstrap();
-  if (boot.isPending) return <Spinner />;
-  if (boot.error) return <ErrorState message={boot.error.message} onRetry={() => boot.refetch()} />;
+  if (!boot.data) {
+    return <PoolDoorway error={boot.error?.message} retry={() => void boot.refetch()} />;
+  }
   return (
     <div className="mx-auto w-full max-w-[860px]">
       <PoolCard />
@@ -35,6 +36,42 @@ export function Home() {
         <Link className="text-ink-3 underline" to="/rules">
           How scoring works
         </Link>
+      </p>
+    </div>
+  );
+}
+
+/** Useful before the first request finishes, and still useful if it never does. */
+function PoolDoorway({ error, retry }: { error?: string; retry: () => void }) {
+  const { pickWeek, boardWeek } = fallbackPoolWeeks();
+  return (
+    <div className="mx-auto w-full max-w-[860px]">
+      <div className="card p-5">
+        <p className="text-xs font-bold uppercase tracking-wider text-ink-3">Your pool</p>
+        <h1 className="font-display mt-1 text-3xl font-extrabold">High Five</h1>
+        <p className="mt-2 text-sm text-ink-2">
+          {error ? "We couldn't refresh the live pool yet. You can still go where you need to." : "Refreshing the latest pool details…"}
+        </p>
+        <div className="mt-5 grid gap-2 sm:grid-cols-3">
+          <Link className="btn btn-primary w-full" to={`/week/${pickWeek}`}>
+            Make Week {pickWeek} picks
+          </Link>
+          <Link className="btn w-full" to={`/board/week/${boardWeek}`}>
+            Week {boardWeek} winner & results
+          </Link>
+          <Link className="btn w-full" to="/board/season">
+            Season standings
+          </Link>
+        </div>
+        {error && (
+          <div className="mt-4 border-t-2 border-dashed border-line pt-4">
+            <p role="alert" className="text-xs text-ink-3">{error}</p>
+            <button className="btn btn-sm mt-2" onClick={retry}>Try refreshing the pool</button>
+          </div>
+        )}
+      </div>
+      <p className="mt-4 text-center text-xs text-ink-3">
+        Picks and standings are separate—you can browse the pool without submitting anything.
       </p>
     </div>
   );

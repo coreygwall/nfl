@@ -2,7 +2,9 @@ import { noteServerNow, nowOverride } from "../lib/clock.ts";
 import { loadPlayer } from "../lib/identity.ts";
 
 /** A request the server has not answered in this long is not going to be answered. */
-const REQUEST_TIMEOUT_MS = 20_000;
+// A pool doorway that fails clearly after twelve seconds is recoverable. Forty seconds of loader
+// (the old 20-second deadline plus a retry) looks indistinguishable from a broken shared link.
+const REQUEST_TIMEOUT_MS = 12_000;
 
 export class ApiClientError extends Error {
   constructor(

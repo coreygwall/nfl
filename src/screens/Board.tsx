@@ -11,6 +11,7 @@ import { CountUp, EmptyState, ErrorState, RankBadge, Segmented } from "../compon
 import { BoardSkeleton } from "../components/TallyLoader.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
 import { Lock } from "../components/Icons.tsx";
+import { fallbackPoolWeeks } from "../lib/poolFallback.ts";
 
 export type BoardSort = "points" | "possible";
 
@@ -21,7 +22,7 @@ export function Board({ tab }: { tab: "week" | "season" }) {
   const [params, setParams] = useSearchParams();
   const week = tab === "week" ? Number(weekParam) : null;
   if (tab === "week" && (!Number.isInteger(week) || week! < 1 || week! > WEEKS)) return <Navigate to="/board" replace />;
-  const boardWeek = boot.data?.boardWeek ?? 1;
+  const boardWeek = boot.data?.boardWeek ?? fallbackPoolWeeks().boardWeek;
   const sort: BoardSort = params.get("sort") === "possible" ? "possible" : "points";
   const setSort = (v: BoardSort) => setParams(v === "possible" ? { sort: v } : {}, { replace: true });
   const keepSort = sort === "possible" ? "?sort=possible" : "";
