@@ -18,6 +18,12 @@ test('commissioner broadcasts appear on home, can be liked, edited, hidden and d
   await page.goto('/p/high-five/');
   const homeFeed = page.getByRole('region', { name: 'Announcements' });
   await expect(homeFeed.getByText('Welcome! Good luck this week.')).toBeVisible();
+  const homeOrder = await page.locator('main').evaluate(() => {
+    const season = document.getElementById('season-preview-heading');
+    const announcements = document.getElementById('announcements');
+    return Boolean(season && announcements && (season.compareDocumentPosition(announcements) & Node.DOCUMENT_POSITION_FOLLOWING));
+  });
+  expect(homeOrder).toBe(true);
   await homeFeed.getByRole('link', { name: 'View all' }).click();
   await expect(page).toHaveURL(/\/announcements$/);
   await page.getByRole('button', { name: /^Like announcement/ }).click();
@@ -30,7 +36,14 @@ test('commissioner broadcasts appear on home, can be liked, edited, hidden and d
   const guestContext = await browser.newContext();
   const guest = await guestContext.newPage();
   try {
-    await guest.goto(new URL('/p/high-five/announcements', page.url()).href);
+    await guest.goto(new URL('/p/high-five/', page.url()).href);
+    const announcementShortcut = guest.getByRole('button', { name: 'Announcements, 1 new' });
+    await expect(announcementShortcut).toBeVisible();
+    await announcementShortcut.click();
+    await expect(guest).toHaveURL(/#announcements$/);
+    await expect(guest.getByRole('region', { name: 'Announcements' })).toBeInViewport();
+    await expect(guest.getByRole('button', { name: 'Announcements', exact: true })).toBeVisible();
+    await guest.getByRole('region', { name: 'Announcements' }).getByRole('link', { name: 'View all' }).click();
     await expect(guest.getByText('Updated: Good luck everyone!')).toBeVisible();
     await expect(guest.getByRole('button', { name: /^Like announcement/ })).toBeDisabled();
     await expect(guest.getByLabel('Message to the pool')).toHaveCount(0);

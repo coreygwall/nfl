@@ -155,3 +155,9 @@ export const Share = ({ size = 16, ...p }: P) => (
     <path d="M5 13v5a2 2 0 002 2h10a2 2 0 002-2v-5" />
   </svg>
 );
+export const Megaphone = ({ size = 18, ...p }: P) => (
+  <svg {...base(size, p)}>
+    <path d="M4 13V9l12-5v14L4 13z" />
+    <path d="M16 8a4 4 0 010 6M7 14l1 6h4l-2-5" />
+  </svg>
+);
