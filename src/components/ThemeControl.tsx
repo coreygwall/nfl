@@ -1,4 +1,5 @@
-import type { ComponentType, SVGProps } from "react";
+import { AnimatePresence, motion } from "motion/react";
+import { useSyncExternalStore, type ComponentType, type SVGProps } from "react";
 import { ChevronDown, Device, Moon, Sun } from "./Icons.tsx";
 import { useTheme, type Theme } from "../lib/theme.ts";
 
@@ -65,5 +66,58 @@ export function CompactThemeSelect({ showLabel = false }: { showLabel?: boolean 
         {OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
       </select>
     </label>
+  );
+}
+
+function subscribeToSystemColorScheme(listener: () => void): () => void {
+  const media = window.matchMedia("(prefers-color-scheme: dark)");
+  media.addEventListener("change", listener);
+  return () => media.removeEventListener("change", listener);
+}
+
+function useSystemDark(): boolean {
+  return useSyncExternalStore(
+    subscribeToSystemColorScheme,
+    () => window.matchMedia("(prefers-color-scheme: dark)").matches,
+    () => false,
+  );
+}
+
+/** A one-click, desktop-header shortcut. Auto remains available in the account menu. */
+export function ThemeToggle({ className = "" }: { className?: string }) {
+  const [theme, setTheme] = useTheme();
+  const systemDark = useSystemDark();
+  const dark = theme === "dark" || (theme === "system" && systemDark);
+  const next = dark ? "light" : "dark";
+
+  return (
+    <button
+      type="button"
+      className={`relative inline-flex h-10 w-[76px] items-center rounded-full border-2 border-ink bg-surface p-1 transition-colors hover:bg-paper-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ink ${className}`}
+      aria-label={`Switch to ${next} mode`}
+      aria-pressed={dark}
+      onClick={() => setTheme(next)}
+    >
+      <span className="absolute left-2.5 text-ink-3" aria-hidden="true"><Sun size={16} /></span>
+      <span className="absolute right-2.5 text-ink-3" aria-hidden="true"><Moon size={16} /></span>
+      <motion.span
+        className="relative z-10 flex h-7 w-7 items-center justify-center rounded-full bg-ink text-paper shadow-sm"
+        animate={{ x: dark ? 36 : 0, rotate: dark ? 180 : 0 }}
+        transition={{ type: "spring", stiffness: 500, damping: 32 }}
+      >
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.span
+            key={dark ? "moon" : "sun"}
+            initial={{ opacity: 0, scale: 0.6, rotate: -45 }}
+            animate={{ opacity: 1, scale: 1, rotate: 0 }}
+            exit={{ opacity: 0, scale: 0.6, rotate: 45 }}
+            transition={{ duration: 0.14 }}
+            aria-hidden="true"
+          >
+            {dark ? <Moon size={15} /> : <Sun size={15} />}
+          </motion.span>
+        </AnimatePresence>
+      </motion.span>
+    </button>
   );
 }

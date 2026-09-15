@@ -478,7 +478,7 @@ test("home never says your picks are in off a board it could not load", async ({
   await expect(page.getByText("Your picks are in.")).toHaveCount(0);
 });
 
-test("appearance follows the device and stays in sync across the public site and account controls", async ({ page }) => {
+test("appearance follows the device and stays in sync across the desktop shortcut and account controls", async ({ page }) => {
   // The tokens are the theme: nothing re-renders, the custom properties are redefined on <html>.
   await page.emulateMedia({ colorScheme: "dark" });
   await page.goto("/");
@@ -488,9 +488,10 @@ test("appearance follows the device and stays in sync across the public site and
   await page.emulateMedia({ colorScheme: "light" });
   expect(await ground()).toBe("rgb(246, 241, 232)");
 
-  // The public site exposes the setting before anyone has an account. A saved choice wins over
-  // the device, updates both browser-chrome media branches, and survives a reload without a flash.
-  await page.getByLabel("Appearance quick setting").selectOption("dark");
+  // On desktop, one press sets a saved choice that wins over the device, updates both
+  // browser-chrome media branches, and survives a reload without a flash.
+  await page.setViewportSize({ width: 1280, height: 844 });
+  await page.getByRole("button", { name: "Switch to dark mode" }).click();
   expect(await page.getAttribute("html", "data-theme")).toBe("dark");
   expect(await ground()).toBe("rgb(26, 23, 19)");
   expect(await page.locator('meta[name="theme-color"]').evaluateAll((tags) => tags.map((tag) => tag.getAttribute("content")))).toEqual(["#1A1713", "#1A1713"]);
@@ -500,14 +501,15 @@ test("appearance follows the device and stays in sync across the public site and
 
   // Auto restores the independent light/dark metadata, so a later system change requires no
   // mounted settings sheet or JavaScript listener to keep the browser chrome current.
-  await page.getByLabel("Appearance quick setting").selectOption("system");
+  // Auto is still available in the account menu; return to it below once a player has joined.
+  await page.goto(`/p/high-five/welcome?now=${BEFORE}`);
+  await page.getByPlaceholder("Your name").fill(`Appearance ${Date.now().toString(36)}`);
+  await page.getByRole("button", { name: "Let's go" }).click();
+  await page.getByRole("button", { name: "Switch player" }).click();
+  await page.getByRole("radio", { name: "Auto" }).click();
   expect(await page.getAttribute("html", "data-theme")).toBeNull();
   expect(await page.locator('meta[name="theme-color"]').evaluateAll((tags) => tags.map((tag) => tag.getAttribute("content")))).toEqual(["#F6F1E8", "#1A1713"]);
 
-  // The same quick control is available before sign-up inside a pool.
-  await page.goto(`/p/high-five/welcome?now=${BEFORE}`);
-  await page.getByLabel("Appearance quick setting").selectOption("dark");
-  expect(await ground()).toBe("rgb(26, 23, 19)");
 });
 
 test("the landing page explains a pool without linking into one", async ({ page }) => {
