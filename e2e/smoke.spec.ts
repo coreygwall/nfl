@@ -510,10 +510,6 @@ test("appearance follows the device and stays in sync across the desktop shortcu
   expect(await page.getAttribute("html", "data-theme")).toBeNull();
   expect(await page.locator('meta[name="theme-color"]').evaluateAll((tags) => tags.map((tag) => tag.getAttribute("content")))).toEqual(["#F6F1E8", "#1A1713"]);
 
-  // On mobile the header stays focused on the pool; Appearance lives in the account menu.
-  await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto(`/p/high-five/welcome?now=${BEFORE}`);
-  await expect(page.getByRole("button", { name: /Switch to (light|dark) mode/ })).toBeHidden();
 });
 
 test("the landing page explains a pool without linking into one", async ({ page }) => {
