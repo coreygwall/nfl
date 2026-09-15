@@ -27,6 +27,18 @@ const split = (sql: string) =>
 const statements = split(schema);
 // Everything after the initial schema: additive, and safe to re-run.
 const alterStatements = [...split(devicesSchema), ...split(householdSchema), ...split(readySchema), ...split(passkeySchema), ...split(entriesSchema), ...split(rateLimitSchema), ...split(pickHistorySchema), ...split(pushSchema), ...split(rolesSchema), ...split(messagesSchema)];
+const SCHEMA_REVISION = "0011_messages";
+const SCHEMA_REVISION_KEY = "app_schema_revision";
+const RUNTIME_REVISION_KEY = "app_runtime_revision";
+
+function runtimeRevision(env: Env): string {
+  return [SCHEMA_REVISION, SCHEDULE_VERSION, SEASON, env.POOL_SLUG || "high-five", env.POOL_TYPE || "High Five"].join(":");
+}
+
+function isMissingMetaTable(err: unknown): boolean {
+  const message = err instanceof Error ? err.message : String(err);
+  return /no such table(?::|\s).*meta/i.test(message);
+}
 
 async function applySchema(db: D1Database): Promise<void> {
   await db.batch(statements.map((s) => db.prepare(s)));
@@ -38,6 +50,65 @@ async function applySchema(db: D1Database): Promise<void> {
       if (!/duplicate column name/i.test(err instanceof Error ? err.message : String(err))) throw err;
     }
   }
+}
+
+/**
+ * Existing production databases predate the revision marker. Confirm the final migration's three
+ * tables once, then adopt the marker without replaying eleven migrations in the request path.
+ */
+async function hasCurrentLegacySchema(db: D1Database): Promise<boolean> {
+  const row = await db.prepare(
+    "SELECT count(*) AS n FROM sqlite_master WHERE type = 'table' AND name IN (?, ?, ?)",
+  ).bind("pool_communication_settings", "pool_messages", "pool_message_reactions").first<{ n: number }>();
+  return row?.n === 3;
+}
+
+async function prepareRuntime(env: Env): Promise<void> {
+  const expectedRuntime = runtimeRevision(env);
+  let metadataAvailable = true;
+  let schemaRevision: string | null = null;
+  let appliedSchema = false;
+
+  try {
+    const metadata = await env.DB.prepare(
+      "SELECT key, value FROM meta WHERE key IN (?, ?)",
+    ).bind(SCHEMA_REVISION_KEY, RUNTIME_REVISION_KEY).all<{ key: string; value: string }>();
+    const values = new Map(metadata.results.map((row) => [row.key, row.value]));
+    if (values.get(RUNTIME_REVISION_KEY) === expectedRuntime) return;
+    schemaRevision = values.get(SCHEMA_REVISION_KEY) ?? null;
+  } catch (err) {
+    // A connection or D1 service error must remain an error. Treating it as a new database could
+    // replay migrations against a live pool at exactly the wrong time.
+    if (!isMissingMetaTable(err)) throw err;
+    // A genuinely empty database has no meta table. Applying the idempotent schema is the one
+    // correct slow path; normal production requests never return here once initialization lands.
+    metadataAvailable = false;
+  }
+
+  if (!metadataAvailable) {
+    await applySchema(env.DB);
+    appliedSchema = true;
+  } else if (schemaRevision !== SCHEMA_REVISION) {
+    const canAdoptLegacySchema = schemaRevision === null && await hasCurrentLegacySchema(env.DB);
+    if (!canAdoptLegacySchema) {
+      await applySchema(env.DB);
+      appliedSchema = true;
+    }
+  }
+
+  if (appliedSchema || schemaRevision !== SCHEMA_REVISION) {
+    await setMeta(env.DB, SCHEMA_REVISION_KEY, SCHEMA_REVISION);
+  }
+  await syncSchedule(env.DB);
+  await ensurePool(env.DB, {
+    slug: env.POOL_SLUG || "high-five",
+    name: env.POOL_NAME || env.POOL_TYPE || "High Five",
+    type: env.POOL_TYPE || "High Five",
+    season: SEASON,
+    now: new Date().toISOString(),
+  });
+  // Written last: a cold isolate may skip all setup only after every prerequisite succeeded.
+  await setMeta(env.DB, RUNTIME_REVISION_KEY, expectedRuntime);
 }
 
 /** Seeds/refreshes games from the schedule bundled at build time. */
@@ -205,20 +276,14 @@ export async function syncResultsFromSource(
 
 let ready: Promise<void> | null = null;
 
-/** Applies the schema and seeds/refreshes the schedule. Memoised per isolate in production. */
+/**
+ * Makes a deployment ready once, then reduces later cold starts to one indexed metadata read.
+ * The previous implementation replayed every migration on the first request handled by every new
+ * isolate, which could exhaust the browser's request deadline in the middle of a live pick week.
+ */
 export function ensureReady(env: Env): Promise<void> {
   if (ready && !isDev(env)) return ready;
-  const run = (async () => {
-    await applySchema(env.DB);
-    await syncSchedule(env.DB);
-    await ensurePool(env.DB, {
-      slug: env.POOL_SLUG || "high-five",
-      name: env.POOL_NAME || env.POOL_TYPE || "High Five",
-      type: env.POOL_TYPE || "High Five",
-      season: SEASON,
-      now: new Date().toISOString(),
-    });
-  })();
+  const run = prepareRuntime(env);
   ready = run.catch((err) => {
     ready = null;
     throw err;

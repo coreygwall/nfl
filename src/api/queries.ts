@@ -26,11 +26,15 @@ export function useBootstrap() {
   return useQuery({
     queryKey: ["bootstrap", player?.id ?? null],
     queryFn: () => api<BootstrapResponse>("/bootstrap"),
-    // Home has a useful schedule-backed fallback and an explicit retry. Retrying a timed-out
-    // bootstrap invisibly doubles the time before the user can understand what happened.
+    // Home has a useful schedule-backed fallback, so a failed first attempt becomes actionable
+    // immediately. Retry quietly behind that fallback: a transient cold start should heal without
+    // making someone press another button before they can see the live pool.
     retry: false,
     staleTime: 60_000,
-    refetchInterval: 5 * 60_000,
+    refetchInterval: (query) => {
+      if (query.state.status !== "error") return 5 * 60_000;
+      return query.state.fetchFailureCount <= 3 ? 4_000 : 30_000;
+    },
   });
 }
 

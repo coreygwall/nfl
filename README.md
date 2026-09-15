@@ -262,7 +262,7 @@ Time travel in dev: add `?now=2026-09-13T20:00:00Z` to any URL. The client forwa
 
 ```
 shared/     pure rules shared by client and Worker: validatePicks (locks, frozen ranks), scoring, week windows, teams
-worker/     Hono API on Cloudflare Workers + D1; self-bootstraps schema + schedule; /commissioner and /league behind account roles
+worker/     Hono API on Cloudflare Workers + D1; version-gates schema + schedule setup; /commissioner and /league behind account roles
 src/        React 19 + Vite + Tailwind 4 + motion; TanStack Query for data; react-router
 migrations/ D1 schema (players, games, picks, meta)
 scripts/    schedule builder, logo extractor, iOS asset + font builders
@@ -276,6 +276,8 @@ settings, backfill, pick history, `export.csv`) and `/league/*` (results, schedu
 Identity is the `x-player-token` header the client holds; `/roles` reports what that identity may open.
 
 Resilience notes: the client reloads itself if a redeploy invalidates a cached chunk and shows an "update ready"
-bar when the server's build id changes; drafts live in localStorage so a killed tab loses nothing; the Worker
-maps database constraint races to a 409 the client recovers from; and a broken logo image degrades to a
-team-colour monogram rather than a broken-image icon.
+bar when the server's build id changes; bootstrap failures leave the schedule-backed pool doorway usable and
+retry quietly in the background; drafts live in localStorage so a killed tab loses nothing; the Worker checks a
+single readiness marker on a cold isolate instead of replaying migrations; database constraint races map to a
+409 the client recovers from; and a broken logo image degrades to a team-colour monogram rather than a
+broken-image icon.
