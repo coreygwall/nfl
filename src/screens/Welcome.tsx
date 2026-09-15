@@ -12,10 +12,11 @@ import { SEASON_START_WEEK } from "../../shared/week.ts";
 import type { Player } from "../../shared/types.ts";
 import type { RosterPlayer } from "../../shared/api.ts";
 import type { Abbr } from "../../shared/teams.ts";
-import { ErrorState, Spinner } from "../components/Common.tsx";
+import { Spinner } from "../components/Common.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
 import { useToast } from "../components/Toast.tsx";
 import { addPasskey, autofillSupported, cancelAutofill, dismissOffer, offerDismissed, passkeysSupported, platformBiometricsSupported, signInWithAutofill, signInWithPasskey, wasCancelled } from "../lib/passkey.ts";
+import { fallbackPoolWeeks } from "../lib/poolFallback.ts";
 
 /** Every team, in a fixed shuffle so the strip reads as a jumble rather than a division list. */
 const MARQUEE_TEAMS: Abbr[] = [
@@ -33,7 +34,7 @@ export function Welcome() {
   // Signing in ends where you came to be: on this week's picks. Home is the landing for every
   // *later* visit — it answers "which pool, and what needs doing" — but the button that gets you
   // here says "start picking", so it had better.
-  const next = params.get("next") || `/week/${boot.data?.currentWeek ?? 1}`;
+  const next = params.get("next") || `/week/${boot.data?.currentWeek ?? fallbackPoolWeeks().pickWeek}`;
   const claimId = params.get("claim");
   const toast = useToast();
   const create = useCreatePlayer();
@@ -184,12 +185,13 @@ export function Welcome() {
       <div className="lg:grid lg:min-h-[calc(100dvh-420px)] lg:grid-cols-[minmax(0,1fr)_400px] lg:items-center lg:gap-12">
         <Hero />
         <div>
-          {boot.isPending ? (
-            <div className="card p-5">
-              <Spinner label="Getting the roster…" />
-            </div>
-          ) : boot.error ? (
-            <ErrorState message={boot.error.message} onRetry={() => boot.refetch()} />
+          {!boot.data ? (
+            <WelcomeDoorway
+              player={player}
+              error={boot.error?.message}
+              onContinue={() => nav(next, { replace: true })}
+              onRetry={() => void boot.refetch()}
+            />
           ) : (
             <div className="card p-5">
               {player?.token && (
@@ -417,6 +419,58 @@ export function Welcome() {
       )}
     </AnimatePresence>
     </>
+  );
+}
+
+/** Keep a slow roster request from turning an invitation into a dead end. */
+function WelcomeDoorway({
+  player,
+  error,
+  onContinue,
+  onRetry,
+}: {
+  player: Identity | null;
+  error?: string;
+  onContinue: () => void;
+  onRetry: () => void;
+}) {
+  const { boardWeek } = fallbackPoolWeeks();
+  return (
+    <div className="card p-5">
+      <h2 className="font-display text-xl font-extrabold">
+        {player ? `Welcome back, ${player.name}` : "High Five is still open"}
+      </h2>
+      <p className="mt-1 text-sm leading-relaxed text-ink-2">
+        {error
+          ? "The player list didn't refresh, but you can still browse the pool and try again."
+          : "We're refreshing the player list. You don't have to wait here to look around."}
+      </p>
+      {player && (
+        <button className="btn btn-turf mt-4 w-full" onClick={onContinue}>
+          Continue to my picks
+        </button>
+      )}
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        <Link className="btn w-full" to="/">Pool home</Link>
+        <Link className="btn w-full" to={`/board/week/${boardWeek}`}>Week {boardWeek} results</Link>
+        <Link className="btn w-full sm:col-span-2" to="/board/season">Season standings</Link>
+      </div>
+      <div className="mt-4 border-t-2 border-dashed border-line pt-4">
+        {error ? (
+          <>
+            <p role="alert" className="text-xs text-ink-3">{error}</p>
+            <button className="btn btn-sm mt-2" onClick={onRetry}>Try loading players again</button>
+          </>
+        ) : (
+          <p className="text-center text-xs font-semibold text-ink-3" aria-live="polite">Loading players…</p>
+        )}
+      </div>
+      {!player && (
+        <p className="mt-3 text-xs text-ink-3">
+          Joining or signing in will appear here as soon as the player list is ready.
+        </p>
+      )}
+    </div>
   );
 }
 

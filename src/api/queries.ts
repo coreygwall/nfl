@@ -26,6 +26,9 @@ export function useBootstrap() {
   return useQuery({
     queryKey: ["bootstrap", player?.id ?? null],
     queryFn: () => api<BootstrapResponse>("/bootstrap"),
+    // Home has a useful schedule-backed fallback and an explicit retry. Retrying a timed-out
+    // bootstrap invisibly doubles the time before the user can understand what happened.
+    retry: false,
     staleTime: 60_000,
     refetchInterval: 5 * 60_000,
   });

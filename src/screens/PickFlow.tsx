@@ -21,6 +21,7 @@ import { ChevronDown, ChevronLeft, ChevronUp, Grip, House, Lock, Share } from ".
 import { SlideToLock } from "../components/SlideToLock.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
 import { useToast } from "../components/Toast.tsx";
+import { fallbackPoolWeeks } from "../lib/poolFallback.ts";
 
 type Step = "select" | "rank" | "done";
 const ALL_RANKS = Array.from({ length: MAX_PICKS }, (_, i) => i + 1);
@@ -122,7 +123,7 @@ function PickFlowInner({ week }: { week: number }) {
   const allLocked = games.length > 0 && !anyUnlocked;
 
   const step: Step | "review" = stepParam ?? (hasSaved && !dirty ? "review" : "select");
-  useHideNav(step === "select" || step === "rank");
+  useHideNav((step === "select" || step === "rank") && !wk.error);
   useHeaderWeek(week, (w) => nav(`/week/${w}`));
 
   const setStep = (s: Step | null) => {
@@ -198,7 +199,7 @@ function PickFlowInner({ week }: { week: number }) {
     }
   };
 
-  if (wk.isPending || boot.isPending) return <GamesSkeleton />;
+  if (wk.isPending) return <GamesSkeleton />;
   if (wk.error) return <ErrorState message={wk.error.message} onRetry={() => wk.refetch()} />;
 
   const openGames = games.filter((g) => !lockedNow(g));
@@ -235,7 +236,7 @@ function PickFlowInner({ week }: { week: number }) {
           </StepWrap>
         ) : step === "select" ? (
           <StepWrap key="select" wide>
-            <SelectStep games={games} draft={draft} frozen={frozen} lockedNow={lockedNow} onPick={onPick} pickCounts={wk.data!.pickCounts} allLocked={allLocked} hasSaved={hasSaved} currentWeek={boot.data!.currentWeek} week={week} now={now} openCount={openGames.length} picked={merged.length} slotCount={slotCount} status={status} onNext={() => setStep("rank")} canRank={anyUnlocked && unlockedPicks.length > 0} />
+            <SelectStep games={games} draft={draft} frozen={frozen} lockedNow={lockedNow} onPick={onPick} pickCounts={wk.data!.pickCounts} allLocked={allLocked} hasSaved={hasSaved} currentWeek={boot.data?.currentWeek ?? fallbackPoolWeeks().pickWeek} week={week} now={now} openCount={openGames.length} picked={merged.length} slotCount={slotCount} status={status} onNext={() => setStep("rank")} canRank={anyUnlocked && unlockedPicks.length > 0} />
             <PickTray merged={merged} frozen={frozen} shake={shakeTray} slots={slotCount} onRemove={(gameId) => setDraft((d) => removeSelection(d, gameId))} onNext={() => setStep("rank")} disabled={!anyUnlocked} />
           </StepWrap>
         ) : step === "rank" ? (
