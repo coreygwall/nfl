@@ -458,7 +458,7 @@ function GameCard({
       className={`card-flat relative select-none overflow-hidden transition-opacity duration-200 ${
         locked ? "bg-paper-2/70" : "bg-surface"
       } ${muted ? "opacity-45 hover:opacity-100 focus-within:opacity-100" : ""}`}
-      animate={chosen && !locked ? { boxShadow: "4px 4px 0 0 #14120f", y: -1 } : { boxShadow: "0px 0px 0 0 #14120f", y: 0 }}
+      animate={chosen && !locked ? { boxShadow: "4px 4px 0 0 var(--color-shadow)", y: -1 } : { boxShadow: "0px 0px 0 0 var(--color-shadow)", y: 0 }}
       transition={{ type: "spring", stiffness: 500, damping: 30 }}
     >
       <div className="flex items-stretch">
@@ -670,7 +670,7 @@ function RankRow({
       dragListener={false}
       dragControls={controls}
       layout
-      whileDrag={{ scale: 1.03, boxShadow: "6px 6px 0 0 #14120f", zIndex: 10 }}
+      whileDrag={{ scale: 1.03, boxShadow: "6px 6px 0 0 var(--color-shadow)", zIndex: 10 }}
       className="card-flat relative flex touch-pan-y select-none items-center gap-3 bg-surface p-2.5"
     >
       <motion.div key={rank} initial={{ scale: 0.7 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 600, damping: 20 }}>

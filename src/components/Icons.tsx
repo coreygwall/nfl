@@ -75,6 +75,23 @@ export const House = ({ size = 20, ...p }: P) => (
     <path d="M10 19v-5h4v5" />
   </svg>
 );
+export const Sun = ({ size = 18, ...p }: P) => (
+  <svg {...base(size, p)}>
+    <circle cx="12" cy="12" r="3.5" />
+    <path d="M12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M18.7 5.3l-1.4 1.4M6.7 17.3l-1.4 1.4" />
+  </svg>
+);
+export const Moon = ({ size = 18, ...p }: P) => (
+  <svg {...base(size, p)}>
+    <path d="M20 15.2A8.5 8.5 0 018.8 4a8.5 8.5 0 1011.2 11.2z" />
+  </svg>
+);
+export const Device = ({ size = 18, ...p }: P) => (
+  <svg {...base(size, p)}>
+    <rect x="4" y="4" width="16" height="12" rx="2" />
+    <path d="M9 20h6M12 16v4" />
+  </svg>
+);
 export const CircleHelp = ({ size = 20, ...p }: P) => (
   <svg {...base(size, p)}>
     <circle cx="12" cy="12" r="9" />

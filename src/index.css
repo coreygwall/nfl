@@ -29,6 +29,7 @@
   --color-danger-soft: #fde2e6;
   --color-sky: #2f80ed;
   --color-sky-soft: #e1ecfc;
+  --color-bronze: #e9c9a6;
 
   /* The four that let the light theme be re-lit rather than inverted. See the dark block below. */
   --color-surface: #ffffff;
@@ -79,6 +80,7 @@
     --color-danger-soft: #3a1720;
     --color-sky: #6fa8ff;
     --color-sky-soft: #16233a;
+    --color-bronze: #846444;
     --color-surface: #24201a;
     --color-shadow: #000000;
     --color-on-turf: #14120f;
@@ -104,6 +106,7 @@
   --color-danger-soft: #3a1720;
   --color-sky: #6fa8ff;
   --color-sky-soft: #16233a;
+  --color-bronze: #846444;
   --color-surface: #24201a;
   --color-shadow: #000000;
   --color-on-turf: #14120f;

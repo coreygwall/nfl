@@ -37,7 +37,7 @@ extension Color {
     }
 
     /// A colour that resolves against whatever theme the view is rendered in. Resolution happens at
-    /// draw time, so `.preferredColorScheme` on the root — the app's own Light/Dark/System setting
+    /// draw time, so `.preferredColorScheme` on the root — the app's own Light/Dark/Auto setting
     /// — reaches every one of these without a single call site knowing about it.
     init(light: String, dark: String) {
         self.init(uiColor: UIColor { traits in
@@ -61,7 +61,7 @@ extension Color {
     static let dangerSoft = Color(light: "#FDE2E6", dark: "#3A1720")
     static let sky = Color(light: "#2F80ED", dark: "#6FA8FF")
     static let skySoft = Color(light: "#E1ECFC", dark: "#16233A")
-    static let bronze = Color(light: "#E9C9A6", dark: "#8A6A4A")
+    static let bronze = Color(light: "#E9C9A6", dark: "#846444")
 
     /// Where the light theme said `.white`: the fill of a card, a button, a chip. It is a step
     /// lighter than the ground in the dark theme rather than white, or the cards shout.
@@ -141,4 +141,3 @@ extension View {
         font(TallyFont.sans(size, weight: weight))
     }
 }
-

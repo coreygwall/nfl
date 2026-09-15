@@ -384,6 +384,7 @@ struct TallySegmented<T: Hashable>: View {
                         }
                 }
                 .buttonStyle(.plain)
+                .accessibilityAddTraits(active ? .isSelected : [])
             }
         }
         .padding(4)
