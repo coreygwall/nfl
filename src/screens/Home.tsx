@@ -6,6 +6,7 @@ import { ErrorState, Spinner } from "../components/Common.tsx";
 import { POOL_TYPES } from "../../shared/pools.ts";
 import { formatKickoff } from "../lib/time.ts";
 import { MAX_PICKS } from "../../shared/picks.ts";
+import { WEEKS } from "../../shared/week.ts";
 
 /**
  * Home: which pool you are in, and what it wants from you.
@@ -26,6 +27,7 @@ export function Home() {
   return (
     <div className="mx-auto w-full max-w-[860px]">
       <PoolCard />
+      <BrowsePool />
       <MorePools />
       <p className="mt-6 text-center text-sm">
         <Link className="text-ink-3 underline" to="/rules">
@@ -98,6 +100,12 @@ function PoolCard() {
               Try again
             </button>
           </p>
+        ) : !player ? (
+          <>
+            <p className="mt-2 font-display font-extrabold">Follow the pool without making picks.</p>
+            <p className="mt-1 text-sm text-ink-2">See every week's results and the season race whenever you want.</p>
+            <Link className="btn btn-sm mt-3" to="/welcome">Join to make picks</Link>
+          </>
         ) : owing.length === 0 ? (
           <p className="mt-2 font-display font-extrabold text-turf">
             {entries.length > 1 ? `All ${entries.length} sets of picks are in.` : "Your picks are in."}
@@ -146,6 +154,46 @@ function PoolCard() {
         </Link>
       )}
     </div>
+  );
+}
+
+/** The pool should be useful before someone ever commits a pick. These links deliberately live on
+ * Home rather than behind the pick flow, so a member can treat Tally like a season scoreboard. */
+function BrowsePool() {
+  const boot = useBootstrap();
+  const currentWeek = boot.data?.currentWeek ?? 1;
+  const boardWeek = boot.data?.boardWeek ?? currentWeek;
+  const lastWeek = Math.min(WEEKS, Math.max(1, currentWeek, boardWeek));
+  const weeks = Array.from({ length: lastWeek }, (_, i) => i + 1);
+
+  return (
+    <section className="mt-5" aria-labelledby="explore-pool-heading">
+      <div className="mb-2 flex items-baseline justify-between gap-3">
+        <h2 id="explore-pool-heading" className="font-display text-lg font-extrabold">Explore the pool</h2>
+        <span className="text-xs text-ink-3">No picks required</span>
+      </div>
+      <div className="grid gap-2 sm:grid-cols-2">
+        <Link to="/board/season" className="card-flat block bg-surface p-4 transition-colors hover:bg-paper-2">
+          <span className="font-display block font-extrabold">Season standings <span aria-hidden="true">›</span></span>
+          <span className="mt-1 block text-sm text-ink-2">See the full-season leaderboard.</span>
+        </Link>
+        <Link to={`/board/week/${boardWeek}`} className="card-flat block bg-surface p-4 transition-colors hover:bg-paper-2">
+          <span className="font-display block font-extrabold">Weekly standings <span aria-hidden="true">›</span></span>
+          <span className="mt-1 block text-sm text-ink-2">Open Week {boardWeek}'s board and results.</span>
+        </Link>
+      </div>
+      <div className="card-flat mt-2 bg-surface p-4">
+        <h3 className="font-display font-extrabold">Past weeks</h3>
+        <p className="mt-1 text-sm text-ink-2">Jump to any week to revisit its picks and results.</p>
+        <div className="mt-3 flex flex-wrap gap-2" aria-label="Browse weeks">
+          {weeks.map((week) => (
+            <Link key={week} className="chip bg-paper-2 hover:bg-flag" to={`/board/week/${week}`}>
+              Week {week}
+            </Link>
+          ))}
+        </div>
+      </div>
+    </section>
   );
 }
 

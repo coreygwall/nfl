@@ -21,8 +21,6 @@ import { POOL_SLUG } from "./lib/basename.ts";
  * more than one, and it was never able to say "your picks are in, here's where you stand".
  */
 function PoolHome() {
-  const { player } = usePlayer();
-  if (!player) return <Navigate to="/welcome" replace />;
   return <Home />;
 }
 
