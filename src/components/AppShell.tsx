@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useBootstrap, useClaimPlayer } from "../api/queries.ts";
 import { usePlayer } from "../lib/player.tsx";
 import { useChrome } from "./Chrome.tsx";
-import { ChevronDown, ChevronLeft, ChevronRight, Football, House, Swap, Trophy, X } from "./Icons.tsx";
+import { ChevronDown, ChevronLeft, ChevronRight, Football, House, Megaphone, Swap, Trophy, X } from "./Icons.tsx";
 import { useToast } from "./Toast.tsx";
 import { useOnline } from "../lib/online.ts";
 import { CompactThemeSelect, ThemePicker } from "./ThemeControl.tsx";
@@ -17,6 +17,8 @@ import { addPasskey, passkeysSupported, wasCancelled } from "../lib/passkey.ts";
 import { useQueryClient } from "@tanstack/react-query";
 import { Check } from "./Icons.tsx";
 import { fallbackPoolWeeks } from "../lib/poolFallback.ts";
+import { feedMessages, useMessagesFeed } from "../api/messages.ts";
+import { useAnnouncementRead } from "../lib/announcementRead.ts";
 
 export function AppShell() {
   const { player, people, setPlayer, syncEntries, switchTo, forget } = usePlayer();
@@ -30,6 +32,11 @@ export function AppShell() {
   const poolName = boot.data?.poolName ?? "High Five";
   const online = useOnline();
   const updateReady = !!boot.data && boot.data.build !== __BUILD_ID__ && __BUILD_ID__ !== "test";
+  const messageFeed = useMessagesFeed();
+  const messages = feedMessages(messageFeed.data);
+  const { unread: rawUnread } = useAnnouncementRead(messages);
+  const announcementsAvailable = !!messageFeed.data?.pages[0] && (messageFeed.data.pages[0].enabled || messageFeed.data.pages[0].canManage);
+  const unread = messageFeed.data?.pages[0]?.enabled ? rawUnread : 0;
 
   useEffect(() => {
     document.title = `${poolName} · Tally`;
@@ -119,6 +126,30 @@ export function AppShell() {
   const isActive = (t: { match: string; exact?: boolean }) =>
     t.exact ? loc.pathname === "/" : loc.pathname.startsWith(t.match);
 
+  const openAnnouncements = () => {
+    if (loc.pathname !== "/") {
+      nav("/#announcements");
+      return;
+    }
+    document.getElementById("announcements")?.scrollIntoView({ behavior: "smooth", block: "start" });
+  };
+
+  const announcementButton = announcementsAvailable && !onWelcome ? (
+    <button
+      type="button"
+      className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-ink bg-surface hover:bg-paper-2"
+      aria-label={`Announcements${unread ? `, ${unread} new` : ""}`}
+      onClick={openAnnouncements}
+    >
+      <Megaphone size={19} />
+      {unread > 0 ? (
+        <span className="font-display absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-ink bg-flag px-1 text-[10px] font-extrabold leading-none" aria-hidden="true">
+          {unread > 9 ? "9+" : unread}
+        </span>
+      ) : null}
+    </button>
+  ) : null;
+
   return (
     <div className="relative mx-auto flex min-h-dvh w-full max-w-[1180px] flex-col">
       <header data-scrolled={scrolled} className="app-header sticky top-0 z-30 bg-paper/90 backdrop-blur">
@@ -167,6 +198,7 @@ export function AppShell() {
               </nav>
               <div className="ml-auto flex min-w-0 items-center gap-1.5 sm:gap-2">
                 {headerWeek && <HeaderWeekNav week={headerWeek.week} max={headerWeek.max} onChange={changeWeek} />}
+                {announcementButton}
                 <CompactThemeSelect />
                 <button className="chip min-w-0 max-w-[12ch] sm:max-w-[22ch]" onClick={() => setSwitching(true)} aria-label="Switch player">
                   <span className="truncate">{player.name}</span>
@@ -175,7 +207,7 @@ export function AppShell() {
               </div>
             </>
           )}
-          {(!player || onWelcome) && <div className="ml-auto"><CompactThemeSelect /></div>}
+          {(!player || onWelcome) && <div className="ml-auto flex items-center gap-2">{announcementButton}<CompactThemeSelect /></div>}
         </div>
         {!online && (
           <div className="bg-ink px-4 py-1.5 text-center text-xs font-bold text-paper">

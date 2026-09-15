@@ -1,33 +1,44 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Link } from 'react-router';
-import { useInfiniteQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '../api/client.ts';
-import { usePlayer } from '../lib/player.tsx';
-import { MESSAGE_MAX_LENGTH, type MessagesResponse, type PoolMessage } from '../../shared/messages.ts';
+import { MESSAGE_MAX_LENGTH, type PoolMessage } from '../../shared/messages.ts';
+import { feedMessages, useMessagesFeed } from '../api/messages.ts';
+import { useAnnouncementRead } from '../lib/announcementRead.ts';
 
 export function Announcements({ preview = false, settings = false }: { preview?: boolean; settings?: boolean }) {
-  const { player } = usePlayer();
   const qc = useQueryClient();
   const [draft, setDraft] = useState('');
-  const feed = useInfiniteQuery({
-    queryKey: ['messages', player?.id ?? null],
-    initialPageParam: '',
-    queryFn: ({ pageParam }) => api<MessagesResponse>(`/messages${pageParam ? `?before=${encodeURIComponent(pageParam)}` : ''}`),
-    getNextPageParam: page => page.nextCursor ?? undefined,
-    refetchInterval: 60_000,
-  });
+  const feed = useMessagesFeed();
   const write = useMutation({
     mutationFn: ({ path = '', method = 'POST', body }: { path?: string; method?: string; body?: unknown }) => api(`/messages${path}`, { method, body }),
     onSuccess: () => qc.invalidateQueries({ queryKey: ['messages'] }),
   });
   const data = feed.data?.pages[0];
+  const messages = feedMessages(feed.data);
+  const shown = preview ? messages.slice(0, 2) : messages;
+  const section = useRef<HTMLElement>(null);
+  const { markRead } = useAnnouncementRead(messages);
+  useEffect(() => {
+    if (!messages.length || !section.current) return;
+    const element = section.current;
+    if (preview && window.location.hash === '#announcements') {
+      requestAnimationFrame(() => element.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    }
+    const observer = new IntersectionObserver(entries => {
+      if (entries.some(entry => entry.isIntersecting && entry.intersectionRatio >= 0.5)) {
+        markRead();
+        observer.disconnect();
+      }
+    }, { threshold: 0.5 });
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [preview, messages.length, markRead]);
   if (feed.isPending) return <p className="mt-5 text-sm text-ink-2" role="status">Loading announcements…</p>;
   if (!data) return <div className="mt-5 text-sm" role="alert">Couldn't load announcements. <button className="underline" onClick={() => void feed.refetch()}>Try again</button></div>;
   if (!data.enabled && !data.canManage && preview) return null;
-  const messages = [...new Map(feed.data!.pages.flatMap(page => page.messages).map(message => [message.id, message])).values()];
-  const shown = preview ? messages.slice(0, 2) : messages;
   return (
-    <section className="card-flat mt-5 bg-surface p-4" aria-label="Announcements">
+    <section ref={section} id={preview ? 'announcements' : undefined} className="card-flat mt-5 scroll-mt-24 bg-surface p-4" aria-label="Announcements">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h2 className="font-display text-lg font-extrabold">Announcements</h2>
         {preview && (data.enabled || data.canManage) && <Link className="btn btn-sm" to="/announcements">View all</Link>}

@@ -284,6 +284,12 @@ test("the pool home is useful even before someone joins", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Explore the pool" })).toBeVisible();
   await expect(page.getByText("Follow the pool without making picks.")).toBeVisible();
   await expect(page.getByRole("heading", { name: "The pool is still open" })).toBeVisible();
+  const inviteCopy = page.getByText(/Join for Week 2/);
+  const inviteLines = await inviteCopy.evaluate((element) => {
+    const style = getComputedStyle(element);
+    return Math.round(element.getBoundingClientRect().height / Number.parseFloat(style.lineHeight));
+  });
+  expect(inviteLines).toBeLessThanOrEqual(2);
   await page.getByRole("button", { name: "Share the pool" }).click();
   await expect.poll(() => page.evaluate(() => sessionStorage.getItem("shared-pool-url"))).toMatch(/\/p\/high-five\/?$/);
   await expect(page.getByRole("link", { name: /Season standings · starts Week 2/ })).toBeVisible();

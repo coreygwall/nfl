@@ -35,8 +35,8 @@ export function Home() {
     <div className="mx-auto w-full max-w-[860px]">
       <PoolCard />
       <PoolOpenCard now={boot.data.now} />
-      <Announcements preview />
       <BrowsePool />
+      <Announcements preview />
       <MorePools />
       <p className="mt-6 text-center text-sm">
         <Link className="text-ink-3 underline" to="/rules">
@@ -114,14 +114,14 @@ function PoolOpenCard({ now }: { now: string }) {
         <div className="min-w-0 flex-1">
           <p className="text-xs font-bold uppercase tracking-wider text-ink-3">Invite your people</p>
           <h2 id="pool-open-heading" className="font-display mt-0.5 text-xl font-extrabold">The pool is still open</h2>
-          <p className="mt-1 text-sm leading-relaxed text-ink-2">
-            There’s still time to join for Week 2. Games lock one by one, so anyone you invite can pick from what’s left.
-          </p>
         </div>
         <span className="font-display shrink-0 rounded-full border-2 border-ink bg-flag px-3 py-1 text-xs font-extrabold">
           Until Sun 1 ET
         </span>
       </div>
+      <p className="mt-3 w-full text-sm leading-relaxed text-ink-2">
+        Join for Week 2. Games lock one by one, so new players can pick from what’s left.
+      </p>
       <button className="btn btn-primary mt-4 w-full sm:w-auto" onClick={() => void share()}>
         <Share /> Share the pool
       </button>
