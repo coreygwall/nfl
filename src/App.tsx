@@ -14,6 +14,7 @@ import { League } from "./screens/League.tsx";
 import { Rules } from "./screens/Rules.tsx";
 import { Landing } from "./screens/Landing.tsx";
 import { POOL_SLUG } from "./lib/basename.ts";
+import { Announcements } from "./components/Announcements.tsx";
 
 /**
  * The root of a pool is Home now rather than a redirect into this week's picks. Landing straight on
@@ -68,6 +69,7 @@ export default function App() {
           <Route index element={<PoolHome />} />
           <Route path="welcome" element={<Welcome />} />
           <Route path="rules" element={<Rules />} />
+          <Route path="announcements" element={<Announcements />} />
           <Route
             path="week/:week"
             element={
