@@ -41,6 +41,21 @@ test.describe.serial("pool flow", () => {
     await expect(page.getByText("No weekly deadline")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Pick 5 winners" })).toBeVisible();
 
+    // Picks is deliberately focused on a phone, but never a cul-de-sac. The one-tap Pool home
+    // route is how someone checks standings or a past week without abandoning their draft.
+    await page.getByRole("link", { name: "Go to pool home" }).click();
+    await expect(page).toHaveURL(/\/p\/high-five\/?$/);
+    await expect(page.getByRole("heading", { name: "Explore the pool" })).toBeVisible();
+    await expect(page.getByRole("link", { name: /Season standings/ })).toBeVisible();
+    await expect(page.getByRole("link", { name: "Week 1" })).toBeVisible();
+    await page.getByRole("button", { name: "High Five. Switch pool" }).click();
+    const pools = page.getByRole("dialog", { name: "Pools" });
+    await expect(pools.getByRole("link", { name: /Pool home/ })).toBeVisible();
+    await pools.getByRole("link", { name: /Pool home/ }).click();
+    await expect(pools).toBeHidden();
+    await page.goto(`/week/1?now=${BEFORE}`);
+    await expect(page.getByRole("heading", { name: "Pick 5 winners" })).toBeVisible();
+
     for (const t of ["Seattle Seahawks", "San Francisco 49ers", "Buffalo Bills", "Cincinnati Bengals", "Detroit Lions"]) {
       await pick(page, t);
     }
@@ -255,6 +270,15 @@ test.describe.serial("pool flow", () => {
     await expect(page.getByText(/Most points from Week 2 on wins the season/)).toBeVisible();
     await expect(page.getByRole("button", { name: /Corey/ })).toContainText("No picks yet");
   });
+});
+
+test("the pool home is useful even before someone joins", async ({ page }) => {
+  await page.goto(`/p/high-five/?now=${BEFORE}`);
+  await expect(page).toHaveURL(/\/p\/high-five\/?/);
+  await expect(page.getByRole("heading", { name: "Explore the pool" })).toBeVisible();
+  await expect(page.getByText("Follow the pool without making picks.")).toBeVisible();
+  await page.getByRole("link", { name: /Season standings/ }).click();
+  await expect(page).toHaveURL(/\/board\/season$/);
 });
 
 test("a sign-in link claims the name in one tap, with no code to type", async ({ page, request }) => {
