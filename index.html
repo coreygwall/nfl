@@ -16,7 +16,11 @@
     <script>
       try {
         var t = localStorage.getItem("tally.theme");
-        if (t === "dark" || t === "light") document.documentElement.dataset.theme = t;
+        if (t === "dark" || t === "light") {
+          document.documentElement.dataset.theme = t;
+          var c = t === "dark" ? "#1A1713" : "#F6F1E8";
+          document.querySelectorAll('meta[name="theme-color"]').forEach(function (tag) { tag.content = c; });
+        }
       } catch (e) {}
     </script>
     <!--

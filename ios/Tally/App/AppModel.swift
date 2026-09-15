@@ -15,7 +15,7 @@ enum AppTab: Hashable {
 /**
  Light, dark, or whatever the phone is doing.
 
- "System" is the default and is stored as the absence of a choice, so a phone that turns dark at
+ "Auto" is the user-facing default and is stored as the absence of a choice, so a phone that turns dark at
  sunset takes the app with it without anyone having picked anything.
  */
 enum ThemeChoice: String, CaseIterable, Hashable {
@@ -23,7 +23,7 @@ enum ThemeChoice: String, CaseIterable, Hashable {
 
     var label: String {
         switch self {
-        case .system: return "System"
+        case .system: return "Auto"
         case .light: return "Light"
         case .dark: return "Dark"
         }

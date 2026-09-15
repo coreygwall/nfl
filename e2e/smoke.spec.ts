@@ -395,21 +395,35 @@ test("home never says your picks are in off a board it could not load", async ({
   await expect(page.getByText("Your picks are in.")).toHaveCount(0);
 });
 
-test("dark mode follows the device, and a choice overrides it", async ({ page }) => {
+test("appearance follows the device and stays in sync across the public site and account controls", async ({ page }) => {
   // The tokens are the theme: nothing re-renders, the custom properties are redefined on <html>.
   await page.emulateMedia({ colorScheme: "dark" });
-  await page.goto(`/p/high-five/welcome?now=${BEFORE}`);
+  await page.goto("/");
   const ground = () => page.evaluate(() => getComputedStyle(document.body).backgroundColor);
   expect(await ground()).toBe("rgb(26, 23, 19)");
 
   await page.emulateMedia({ colorScheme: "light" });
   expect(await ground()).toBe("rgb(246, 241, 232)");
 
-  // A saved choice wins over the device, and survives a reload without a flash — the inline
-  // script in index.html puts it on <html> before the stylesheet applies.
-  await page.evaluate(() => localStorage.setItem("tally.theme", "dark"));
+  // The public site exposes the setting before anyone has an account. A saved choice wins over
+  // the device, updates both browser-chrome media branches, and survives a reload without a flash.
+  await page.getByLabel("Appearance quick setting").selectOption("dark");
+  expect(await page.getAttribute("html", "data-theme")).toBe("dark");
+  expect(await ground()).toBe("rgb(26, 23, 19)");
+  expect(await page.locator('meta[name="theme-color"]').evaluateAll((tags) => tags.map((tag) => tag.getAttribute("content")))).toEqual(["#1A1713", "#1A1713"]);
   await page.reload();
   expect(await page.getAttribute("html", "data-theme")).toBe("dark");
+  expect(await ground()).toBe("rgb(26, 23, 19)");
+
+  // Auto restores the independent light/dark metadata, so a later system change requires no
+  // mounted settings sheet or JavaScript listener to keep the browser chrome current.
+  await page.getByLabel("Appearance quick setting").selectOption("system");
+  expect(await page.getAttribute("html", "data-theme")).toBeNull();
+  expect(await page.locator('meta[name="theme-color"]').evaluateAll((tags) => tags.map((tag) => tag.getAttribute("content")))).toEqual(["#F6F1E8", "#1A1713"]);
+
+  // The same quick control is available before sign-up inside a pool.
+  await page.goto(`/p/high-five/welcome?now=${BEFORE}`);
+  await page.getByLabel("Appearance quick setting").selectOption("dark");
   expect(await ground()).toBe("rgb(26, 23, 19)");
 });
 

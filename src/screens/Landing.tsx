@@ -3,6 +3,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { Sheet } from "../components/AppShell.tsx";
 import { HowToPlay } from "../components/HowToPlay.tsx";
 import { POOL_TYPES, type PoolTypeContent } from "../../shared/pools.ts";
+import { CompactThemeSelect } from "../components/ThemeControl.tsx";
 
 /**
  * playtally.app itself: what Tally is, how a pool works, and what is coming. Deliberately links
@@ -33,7 +34,8 @@ export function Landing() {
         <div className="mx-auto flex w-full max-w-[1080px] items-center gap-2.5 px-5 py-3 sm:px-8 sm:py-3.5">
           <img src="/icon.svg" alt="" className="h-10 w-10 shrink-0 sm:h-11 sm:w-11" />
           <span className="font-display text-[1.55rem] font-extrabold leading-none tracking-tight sm:text-[1.8rem]">Tally</span>
-          <span className="ml-auto text-[13px] font-bold text-ink-2">iOS app coming soon</span>
+          <span className="ml-auto hidden text-[13px] font-bold text-ink-2 sm:inline">iOS app coming soon</span>
+          <CompactThemeSelect showLabel />
         </div>
       </header>
 

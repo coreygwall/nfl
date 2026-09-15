@@ -90,7 +90,7 @@ struct AccountView: View {
                 value: Binding(get: { model.theme }, set: { model.theme = $0 }),
                 options: ThemeChoice.allCases.map { ($0, $0.label) }
             )
-            Text("System follows your phone, so the app turns dark when everything else does.")
+            Text("Auto matches your iPhone. Light or Dark stays selected until you change it.")
                 .sans(12).foregroundStyle(Color.ink2)
         }
     }
