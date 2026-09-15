@@ -631,13 +631,14 @@ function PoolSheet({ poolName, poolType, onClose }: { poolName: string; poolType
   return (
     <Sheet title="Pools" onClose={onClose}>
       <h3 className="font-display mb-2 text-sm font-extrabold uppercase tracking-wider text-ink-3">Your pool</h3>
-      <div className="card-flat flex items-center gap-3 bg-surface p-3">
+      <Link to="/" onClick={onClose} className="card-flat flex items-center gap-3 bg-surface p-3 transition-colors hover:bg-paper-2">
         <div className="min-w-0">
           <div className="font-display truncate font-extrabold">{poolName}</div>
           <div className="truncate text-xs text-ink-2">{poolType ?? "High Five"}</div>
         </div>
-        <span className="chip ml-auto shrink-0 bg-flag py-0.5 text-[11px]">open</span>
-      </div>
+        <span className="chip ml-auto shrink-0 bg-flag py-0.5 text-[11px]">Pool home <ChevronRight size={13} /></span>
+      </Link>
+      <p className="mt-2 text-xs text-ink-2">Open the pool to see standings, past weeks, and how it works.</p>
       <p className="mt-4 border-t-2 border-dashed border-line pt-4 text-sm text-ink-2">
         Every pool lives at its own address, so a commissioner's link is the way into another one.
         Opening it signs you in there; this one stays exactly as it is.
