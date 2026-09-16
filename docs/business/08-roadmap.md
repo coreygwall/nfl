@@ -159,8 +159,13 @@ Open questions that should be settled with a season of data rather than argued a
    it absolutely. Cards and Calls cannot (`09` § 7). Settling the resolution-authority model is the
    one architectural decision that gets more expensive with every feed-based pool type shipped
    before it.
-7. **What replaces the 20-player wall for a foursome?** `02` § 3 proposes the record book. It is
-   untested, and half the broadened product has no paywall until it is settled.
+7. **What replaces the 20-player wall for a foursome?** ~~`02` § 3 proposes the record book.~~
+   **Settled, and not the way this asked.** `02` § 3 now runs on *price what costs, never price what
+   counts*: the record book is free, the headcount cap is not being built, and there is one annual
+   tier carrying the things that cost per use. Nothing replaces the wall, because ~0.1% support
+   covers the bill at every scale in the model. What is open instead is whether **objects** — a
+   printed record book in December — is a real business or a hobby; that is answerable only by
+   making fifty of them.
 
 ---
 

@@ -14,6 +14,7 @@ ios/
     Design/            the design system ported from src/index.css: paper, ink, hard shadows, fonts
     Shell/             tabs, header, account sheet, toasts
     Features/          Welcome · Home · Picks · Board · Rules · Office · Pools — one folder per screen
+      Golf/            the second contest family: a scramble card's shell and its three screens
     Resources/Fonts/   Bricolage Grotesque + Inter as static TTFs (scripts/build-ios-fonts.py)
     Assets.xcassets/   32 team stickers, the mark and the icon (scripts/build-ios-assets.ts)
   TallyKit/            a Swift package with everything that is not a screen
@@ -118,6 +119,44 @@ association file is served at the path Apple reads.
 
 Account-owned entries (a parent picking for the family) ride on the account's token with the
 `x-entry-id` header, exactly as the site does; switching is one tap in the account sheet.
+
+## Two kinds of contest, and one way between them
+
+The app holds a **pool** (a season) and, behind a Labs switch, a **golf card** (an afternoon). They
+are different shapes, so they get different tabs: Home · Picks · Board · Account in a pool, Round ·
+Tally · Scorecard · Account in a card. What never changes is the way in — the chip top-left of every
+screen, which lists both and ticks where you are standing.
+
+`docs/navigation.md` is the reasoning and the rule (*the switcher is global, the tabs are the
+contest's, Account is always last*). In code it is four pieces: `AppModel.context` holds the one
+fact, `RootView` picks the shell from it, `PoolShellView` and `GolfShellView` are one per family and
+neither imports the other, and `PoolMenu` is the shared switcher. A third family is a new shell plus
+a case on `ContestContext`; if it needs an edit to `PoolShellView`, the seam has been crossed.
+
+### Golf cards (Labs, off by default)
+
+Account ▸ Settings ▸ Labs ▸ *Golf cards*. Off, nothing about the pool changes: the menu draws as it
+always did and the golf shell is unreachable. On, the menu grows a **Golf** section and *New golf
+card*.
+
+A scramble is four people playing one ball, and what the group argues about afterwards is whose shot
+got picked. So the card is a list of strokes with a name on each, and the score is the count:
+
+- **Tap a name** each time the team plays that person's ball. A par four is four taps.
+- **Holed it** — the last shot went in, and whoever hit it gets the mark.
+- **Tap-in** — one more stroke on the card, credited to nobody. A gimme is not an achievement; a
+  fifty-footer is just a shot with a name on it, like the drive.
+- **+1 penalty** — a stroke the rules added rather than a person hit. Counts, credits nobody.
+- **Undo** is one step back, whatever the step was. A finished hole ignores a stray tap until it is
+  reopened, so nothing can quietly turn a birdie into a par.
+
+`TallyKit/Golf/` holds all of it and none of it draws: `ScrambleCard` (the record and every
+mutation), `ScrambleTally` (the leaderboard, initials, the word for a score), `CardCatalog`
+(`UserDefaults`, plain JSON, ISO dates). `ScrambleTests.swift` pins every rule above.
+
+**One phone keeps the card, for now.** The shape is already right for sharing — every card has an
+id, every hole carries `updatedAt`, and the catalogue is JSON a Worker could take unchanged — so
+two people logging different holes is an endpoint and a per-hole merge rule, not a rewrite.
 
 ## Built to grow
 
@@ -293,7 +332,7 @@ nudge is the first message a week sends.
 ## Tests
 
 `cd ios/TallyKit && swift test` runs on a Mac without a simulator: the rules, URL parsing, the
-Keychain-free identity store, and decoding of the Worker's actual JSON shapes (the fixtures in
+Keychain-free identity store, the scramble card's rules, and decoding of the Worker's actual JSON shapes (the fixtures in
 `DecodingTests.swift` are copies of real responses — if a field changes shape on the server,
 this is what should go red first). `.github/workflows/ios.yml` runs the same and builds the app
 for the simulator on every push that touches `ios/`.

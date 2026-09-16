@@ -226,53 +226,51 @@ This is the part a taxonomy usually skips, and it is where the real damage is. T
 things in `02-monetization.md` are written in the shape of a fifteen-person NFL pool and do not
 survive the transfer intact.
 
-### The paywall has no trigger for a foursome
+### The paywall had no trigger for a foursome, and now it has no paywall
 
-The conversion mechanic is a headcount wall: free is one pool up to 20 players, Plus is up to 200,
-and *"the 21st person is the trigger. Hard paywall, unmissable, zero resentment."* A golf foursome
-is four people forever. A poker table is six to nine. **The wall never fires**, which means half the
-broadened product has a free tier and no way out of it.
+The conversion mechanic *was* a headcount wall: free up to 20 players, Plus up to 200, *"the 21st
+person is the trigger."* A golf foursome is four people forever and a poker table is six to nine, so
+the wall never fires for these families — which is what first exposed the problem.
 
-The second axis is already implied by the ladder's own stated principle:
+This document originally proposed a second axis: free keeps the current card and the last three,
+paid unlocks the record book. **That has since been rejected**, and the whole gate went with it.
+`02-monetization.md` § 3 now runs on *price what costs, never price what counts* — history costs a
+query and is the moat, so it is free at every tier, and the headcount cap fell to the same rule.
 
-> *"Nothing that makes a pool work is ever paid. What is paid is everything that makes a pool
-> persist, multiply, and be fun to run."*
+What that means for these families specifically:
 
-A card **works** for free — play the round, settle the skins, see the card. What costs money is that
-it **persists**: the running record across every round this year, the head-to-heads, the recap, the
-record book. So:
-
-| Family | Free stops at | Paid unlocks |
+| Family | Free | Paid (Tally Club, $29/yr) |
 |---|---|---|
-| **Pools** | The 21st player *(unchanged)* | 200 players, multiple pools |
-| **Cards** | The current card and the last three | The record book — every card, running standings, head-to-heads |
-| **Calls** | The open questions | The history of who was right |
+| **Pools** | The game, any number of players, every season ever played | The recaps, the paint |
+| **Cards** | Every card, the running standings, the head-to-heads, forever | The recaps, the paint |
+| **Calls** | The open questions *and* the history of who was right | The recaps, the paint |
 
-That is one number and one query, not a new pricing model, and it is a better trigger than a
-frequency cap — which would tax exactly the groups worth keeping.
+The honest consequence is that **Cards have no recurring revenue story of their own**, and pretending
+otherwise was the error. A foursome is not a subscription. What a foursome buys is an *object* — the
+season's record book, printed, in December — which is `02` § 3's second stream and a far better fit
+for four people who play twenty times a year and settle up in cash every time.
 
 ### "Per season" is undefined outside a sport
 
-`02-monetization.md` § 3 sells **$29/season** beside **$49/year**, and its § 6 notes the annual plan
-*"is the one that survives the off-season."* Golf side games and calls have no season, so the seasonal SKU
-is meaningless for them. **Cards and Calls sell on the annual plan only.** This does not weaken the
-pricing page; it pushes buyers toward the plan the plan already prefers.
+This one survives, and got easier. Golf side games and calls have no season, so a seasonal SKU is
+meaningless for them. `02` now sells **one annual tier and no seasonal one**, which removes the
+problem rather than routing around it.
 
-### The arithmetic that sells $29 is fifteen-person arithmetic
+### And the arithmetic is no longer per-head
 
-*"$29 across a 15-person pool is $1.93 per person per season… There is no price objection at two
-dollars."* Across a foursome, $49 a year is **$12.25 each**. Across a regular twelve-person golf
-group, **$4.08**. The first number needs a different sentence than the second, and split-the-ante
-(`02` § 2) matters more here rather than less, because these groups already settle money every
-single time they play.
+*"$29 across a 15-person pool is $1.93 per person per season"* was the pitch, and across a foursome
+the same logic gave $12.25 each — a different sentence for a different group. With nothing gated,
+there is no per-head arithmetic to do at all: the tier is one person choosing to fund the thing,
+not a bill the group divides. Split-the-ante (`02` § 2) stays useful for the *kitty*, which is the
+money these groups actually move.
 
 ### And the commissioner premise bends
 
 *"The commissioner is the one with the pain… The players have no pain; they have a link."* In a
 foursome everybody has the pain and nobody has only a link. The model survives, because somebody
 still sets the card up, holds the handicaps and settles it — the person with the app is the
-commissioner whether or not anyone calls them that. But the *pitch* changes, and the pricing page
-for Cards has to talk to a group rather than to an administrator.
+commissioner whether or not anyone calls them that. But the *pitch* changes, and anything sold to a
+group of Cards players has to talk to a group rather than to an administrator.
 
 ---
 
@@ -353,7 +351,7 @@ Stated now, so it is checked rather than rationalised:
 | **Brand dilution** | Medium | "Tally does everything" is how a wedge dies. The through-line is the group, and the filter in § 2 is the defence. Use it to say no in public. |
 | **Disputes become support** | Medium | New in kind. A feed has no arguments. Budget for it and design the resolution in-app. |
 | **App Store optics on Cards** | **High** | The 5.3 argument in `02` § 1 is about money flow only. A poker ledger is a 5.3 risk with zero dollars in the system, because App Review reads the screen. § 4 has the two rules; the poker screen is the one to get in front of a reviewer's eyes deliberately rather than hopefully. |
-| **A free tier with no exit** | Medium | The 20-player wall never fires for a foursome. § 6 proposes the record book as the second axis. Unresolved, this is half the broadened product on a permanent free plan. |
+| **A free tier with no exit** | Low, and accepted | The 20-player wall never fired for a foursome, and `02` § 3 has since removed both it and the record-book gate that was proposed here to replace it. Cards are a permanently free family on purpose. The bill is covered by ~0.1% support (`02` § 3) and the upside is objects and partnerships, not subscriptions. |
 | **Surface count vs. two part-time people** | High | `08` § 1. This document adds two families and zero people. The sequencing in § 8 is the entire mitigation. |
 
 ---
@@ -366,7 +364,7 @@ Edits made with this document:
 |---|---|
 | `README.md` | Ninth conclusion; this document in the index |
 | `01-strategy.md` | § 4 sequence names the three families; the seasonality risk cites Calls |
-| `02-monetization.md` | § 3 gains the second paywall axis for small, seasonless groups |
+| `02-monetization.md` | § 3 rewritten around *price what costs* — history and headcount both stop being paid; § 6 of this document follows it |
 | `04-brand.md` | § 4 adds *prediction market* to the words-not-used list; § 6 naming architecture gains the family layer |
 | `06-engagement.md` | § 3 ② notes that the Prop of the Week is the Calls engine |
 | `07-partnerships-investors.md` | Tier 3 distinguishes declining a Polymarket partnership from building Calls |

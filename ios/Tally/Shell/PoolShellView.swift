@@ -170,24 +170,68 @@ struct PoolChip: View {
     }
 }
 
-/// The pool menu itself, around whatever label opens it.
+/**
+ The menu itself, around whatever label opens it — the pool chip, or a golf card's.
+
+ One list of everywhere the app can stand, ticked where it is standing. Pools first; then, only
+ once the Labs switch is on, the golf cards under their own heading and a way to start one. From
+ inside a card no pool is ticked and the card is, which is the whole reason the pool picker's
+ selection is optional. Nothing else about the pool half changed.
+ */
 struct PoolMenu<Label: View>: View {
     @Environment(AppModel.self) private var model
+    @Environment(GolfModel.self) private var golf
     @ViewBuilder let label: Label
+
+    /// Ticked only while standing in the pool. Choosing one — even the pool already held — is a
+    /// way out of a card, which `switchPool` knows.
+    private var poolSelection: Binding<PoolRef?> {
+        Binding(get: { model.context == .pool ? model.pool : nil }, set: { ref in
+            guard let ref else { return }
+            Haptics.tap()
+            model.switchPool(ref)
+        })
+    }
+
+    private var cardSelection: Binding<String?> {
+        Binding(get: { model.context.cardId }, set: { id in
+            guard let id else { return }
+            Haptics.tap()
+            // Card to card keeps the tab, like pool to pool. Pool to card lands on the tee.
+            if model.context == .pool { golf.tab = .round }
+            model.switchToCard(id)
+        })
+    }
+
+    /// A picker inside a menu is how iOS draws "one of these, ticked" — the same shape as the
+    /// mailbox list in Mail or the folder list in Notes.
+    private var pools: some View {
+        Picker("Pool", selection: poolSelection) {
+            ForEach(model.catalog.pools) { pool in
+                Text(pool.name).tag(Optional(pool.ref))
+            }
+        }
+        .pickerStyle(.inline)
+    }
 
     var body: some View {
         Menu {
-            // A picker inside a menu is how iOS draws "one of these, ticked" — the same shape as
-            // the mailbox list in Mail or the folder list in Notes.
-            Picker("Pool", selection: Binding(get: { model.pool }, set: { ref in
-                Haptics.tap()
-                model.switchPool(ref)
-            })) {
-                ForEach(model.catalog.pools) { pool in
-                    Text(pool.name).tag(pool.ref)
+            if model.golfCards {
+                Section("Pools") { pools }
+                Section("Golf") {
+                    Picker("Card", selection: cardSelection) {
+                        ForEach(golf.cards) { card in
+                            Text(card.name).tag(Optional(card.id))
+                        }
+                    }
+                    .pickerStyle(.inline)
+                    Button { golf.showNewCard = true } label: {
+                        SwiftUI.Label("New golf card", systemImage: "plus.circle")
+                    }
                 }
+            } else {
+                pools
             }
-            .pickerStyle(.inline)
             Divider()
             Button { model.showPools = true } label: {
                 SwiftUI.Label("Join or start a pool", systemImage: "plus.circle")

@@ -23,6 +23,13 @@ struct AccountView: View {
     @Environment(\.openURL) private var openURL
     @State private var showCode = false
     @State private var adding = false
+    /// Drawn from the pool's shell, or from a golf card's. The account is the same person either
+    /// way; the entries and the offices are the pool's, so from a card they are not on the page.
+    let inPool: Bool
+
+    init(inPool: Bool = true) {
+        self.inPool = inPool
+    }
 
     private var boot: BootstrapResponse? { model.boot.value }
     private var accountName: String { boot?.account?.name ?? model.player?.name ?? "" }
@@ -31,8 +38,10 @@ struct AccountView: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
             header
-            entriesSection
-            if model.isCommissioner || model.isLeagueAdmin || model.legacyPin != nil { officeSection }
+            if inPool {
+                entriesSection
+                if model.isCommissioner || model.isLeagueAdmin || model.legacyPin != nil { officeSection }
+            }
             settingsSection
             deviceSection
             aboutSection
@@ -152,8 +161,35 @@ struct AccountView: View {
                         .sans(12).foregroundStyle(Color.ink2)
                 }
                 .padding(12)
+                SettingsDivider()
+                labsRow
             }
         }
+    }
+
+    /**
+     Labs: built, and not yet on for everyone. One switch today. Off by default, and off is not a
+     reset — the cards stay on the phone for when it comes back on.
+     */
+    private var labsRow: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                Image(systemName: "flask.fill").font(.system(size: 15, weight: .bold)).frame(width: 24)
+                Text("Golf cards").font(TallyFont.display(16))
+                Chip(text: "labs", size: 10)
+                Spacer()
+                Toggle("Golf cards", isOn: Binding(get: { model.golfCards }, set: { on in
+                    Haptics.tap()
+                    model.golfCards = on
+                }))
+                .labelsHidden()
+                .tint(.turf)
+            }
+            Text("A tally of whose shots your scramble team kept, hole by hole. Adds golf cards to the menu behind the pool's name. Early: one phone keeps the card.")
+                .sans(12).foregroundStyle(Color.ink2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(12)
     }
 
     /**
@@ -211,8 +247,10 @@ struct AccountView: View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "About Tally")
             SettingsGroup {
-                SettingsRow(title: "How scoring works", symbol: "book.fill") { model.showRules = true }
-                SettingsDivider()
+                if inPool {
+                    SettingsRow(title: "How scoring works", symbol: "book.fill") { model.showRules = true }
+                    SettingsDivider()
+                }
                 SettingsRow(title: "Join or start a pool", detail: "And what else Tally plays", symbol: "square.grid.2x2.fill") { model.showPools = true }
                 SettingsDivider()
                 HStack(spacing: 12) {

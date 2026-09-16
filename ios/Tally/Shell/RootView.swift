@@ -1,17 +1,36 @@
 import SwiftUI
 import TallyKit
 
-/// Welcome until this device has a name; the pool after that. Toasts float over both.
+/**
+ Welcome until this device has a name; after that, the shell of whatever the app is standing in.
+
+ Two shells, chosen here and nowhere else: the pool's four tabs, or a golf card's. The chip in the
+ navigation bar of either is the one control that moves between them (`docs/navigation.md`), and
+ `AppModel.context` is what it moves. The pool shell does not know the other exists — it is drawn
+ exactly as it was before there were cards — and the golf shell is only ever drawn behind the Labs
+ switch, for a card that is still on the phone. Toasts float over all of it.
+ */
 struct RootView: View {
     @Environment(AppModel.self) private var model
+    @Environment(GolfModel.self) private var golf
     @Environment(\.scenePhase) private var scenePhase
+
+    /// The card the app is standing in, if the switch is on and the card still exists.
+    private var activeCard: ScrambleCard? {
+        guard model.golfCards, let id = model.context.cardId else { return nil }
+        return golf.card(id)
+    }
 
     var body: some View {
         @Bindable var model = model
+        @Bindable var golf = golf
         ZStack(alignment: .top) {
             Color.paper.ignoresSafeArea()
             if model.player == nil || model.showWelcome {
                 WelcomeView()
+                    .transition(.opacity)
+            } else if let card = activeCard {
+                GolfShellView(cardId: card.id)
                     .transition(.opacity)
             } else {
                 PoolShellView()
@@ -21,6 +40,7 @@ struct RootView: View {
         }
         .noZoom()
         .animation(.easeInOut(duration: 0.2), value: model.player == nil || model.showWelcome)
+        .animation(.easeInOut(duration: 0.2), value: model.context)
         .onChange(of: scenePhase) { _, phase in
             // Back from the background: the week may have moved on, a game may have kicked off.
             if phase == .active {
@@ -45,6 +65,14 @@ struct RootView: View {
         }
         .sheet(isPresented: $model.showNotificationSettings) {
             NotificationSettingsSheet()
+        }
+        // The card sheets live here rather than in the golf shell because "New golf card" is on
+        // the chip's menu, which is in the pool's navigation bar too.
+        .sheet(isPresented: $golf.showNewCard) {
+            CardSetupSheet(editing: nil)
+        }
+        .sheet(item: $golf.editing) { card in
+            CardSetupSheet(editing: card)
         }
     }
 }

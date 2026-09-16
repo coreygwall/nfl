@@ -123,10 +123,33 @@ the group: a Keychain lookup is scoped by access group, so re-homing the existin
 from the app that wrote it and sign every install out on update. If it is missing the widget still
 draws from the snapshot and simply does not refresh.
 
-## Four tabs, and what is deliberately not one
+## Two families of contest, and one chip between them
+
+The app holds a **pool** (a season, Home · Picks · Board) and, behind a Labs switch, a **golf card**
+(an afternoon, Round · Tally · Scorecard). `docs/navigation.md` is the reasoning; the rule is three
+sentences: **the switcher is global, the tabs are the contest's, Account is always last.** So the
+chip top-left never moves and lists everywhere you can stand, while the tab bar under it belongs to
+the family you are in — no Board on a card, no Round in a pool.
+
+`AppModel.context` holds the one fact (pool, or card *X*), `RootView` is the only place that reads
+it to choose a shell, and `PoolShellView` / `GolfShellView` do not import each other. The shared
+surface is exactly three things: the design system, `PoolMenu`, and `AccountView(inPool:)`. **A
+third family is a new shell plus a case on `ContestContext`** — if it needs an edit to
+`PoolShellView`, the seam has been crossed and the blast radius is no longer zero.
+
+Golf is off by default (Account ▸ Settings ▸ Labs). Off means the menu draws exactly as it did and
+the golf shell is unreachable; off is not a reset, so the cards stay on the phone. `TallyKit/Golf/`
+holds the whole model and draws nothing: a scramble is a list of strokes with a name on each and the
+score is the count, a **tap-in** counts on the card and credits nobody, a **penalty** does the same,
+and a fifty-foot putt is just a shot with a name — which is the one distinction the whole feature
+exists for. One phone keeps the card today; every hole carries `updatedAt` so sharing is a merge
+rule rather than a rewrite.
+
+## Four tabs in a pool, and what is deliberately not one
 
 Home · Picks · Board · Account, on both surfaces. Home is the landing and is about the pool you are
-standing in: what week it is, whose picks are missing, where you stand.
+standing in: what week it is, whose picks are missing, where you stand. (A golf card has its own
+three; see above.)
 
 - **Switching pools is not a tab, and on iOS it is not a sheet either.** `AppModel` holds one pool,
   one session, one service; switching swaps the whole app and keeps the tab you were on. The
