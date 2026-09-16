@@ -609,9 +609,27 @@ function AnnouncementMenu({ messages, unread, onHome }: { messages: PoolMessage[
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLDivElement>(null);
   const trigger = useRef<HTMLButtonElement>(null);
+  // The megaphone isn't always the rightmost thing in the header — the theme toggle and, signed
+  // in, the player chip sit to its right. A popover pinned `right-0` to the button's own tiny
+  // wrapper inherits that: it hangs off the button's edge and, on a narrow phone, that's often
+  // enough to push its own left edge past the screen's. Pinning it to the viewport instead, offset
+  // from the button but clamped so it can never run past either margin, keeps it fully on screen
+  // regardless of where in the row the button lands.
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
 
   useEffect(() => {
     if (!open) return;
+    const place = () => {
+      const rect = trigger.current?.getBoundingClientRect();
+      if (!rect) return;
+      const margin = 16;
+      const width = Math.min(336, window.innerWidth - margin * 2);
+      const natural = window.innerWidth - rect.right;
+      const right = Math.min(Math.max(natural, margin), window.innerWidth - width - margin);
+      setPos({ top: rect.bottom + 8, right });
+    };
+    place();
+    window.addEventListener("resize", place);
     const onKey = (e: KeyboardEvent) => {
       if (e.key !== "Escape") return;
       setOpen(false);
@@ -623,12 +641,18 @@ function AnnouncementMenu({ messages, unread, onHome }: { messages: PoolMessage[
     window.addEventListener("keydown", onKey);
     window.addEventListener("mousedown", onDown);
     return () => {
+      window.removeEventListener("resize", place);
       window.removeEventListener("keydown", onKey);
       window.removeEventListener("mousedown", onDown);
     };
   }, [open]);
 
+  // A pool that goes quiet for a few weeks comes back to a stack of unread posts, not two or
+  // three — capped here, with the list itself scrollable too, so neither a long stack nor a short
+  // viewport can push "View all announcements" out of reach.
   const preview = messages.slice(0, unread);
+  const shown = preview.slice(0, 3);
+  const moreCount = preview.length - shown.length;
 
   return (
     <div ref={wrap} className="relative shrink-0">
@@ -653,7 +677,7 @@ function AnnouncementMenu({ messages, unread, onHome }: { messages: PoolMessage[
         ) : null}
       </button>
       <AnimatePresence>
-        {open && !onHome && (
+        {open && !onHome && pos && (
           <motion.div
             role="dialog"
             aria-label="Announcements"
@@ -661,14 +685,21 @@ function AnnouncementMenu({ messages, unread, onHome }: { messages: PoolMessage[
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: -4 }}
             transition={{ duration: 0.12 }}
-            className="card absolute right-0 top-[calc(100%+8px)] z-30 w-[min(21rem,calc(100vw-2rem))] overflow-hidden p-3"
+            style={{ top: pos.top, right: pos.right }}
+            // Fixed to the viewport, not the button's own tiny wrapper: the megaphone isn't always
+            // the rightmost thing in the row, and a popover pinned to its edge could hang its own
+            // left edge off a narrow screen. `pos` is pre-clamped so this never runs past either
+            // margin. Below md the tab bar is also fixed to the bottom of the viewport rather than
+            // scrolled away with the page, so the shorter cap on this side of that breakpoint
+            // leaves it clear; md: drops the cap once that bar is gone.
+            className="card fixed z-30 flex max-h-[min(22rem,calc(100dvh-13rem))] w-[min(21rem,calc(100vw-2rem))] flex-col overflow-hidden p-3 md:max-h-[min(28rem,calc(100dvh-6rem))]"
           >
-            <p className="font-display text-sm font-extrabold">
+            <p className="font-display shrink-0 text-sm font-extrabold">
               {preview.length ? `${preview.length} new announcement${preview.length === 1 ? "" : "s"}` : "You're all caught up"}
             </p>
-            {preview.length > 0 && (
-              <ul className="mt-2 space-y-2">
-                {preview.map((m) => (
+            {shown.length > 0 && (
+              <ul className="mt-2 min-h-0 space-y-2 overflow-y-auto">
+                {shown.map((m) => (
                   <li key={m.id}>
                     <Link
                       to={`/announcements#message-${m.id}`}
@@ -684,7 +715,8 @@ function AnnouncementMenu({ messages, unread, onHome }: { messages: PoolMessage[
                 ))}
               </ul>
             )}
-            <Link to="/announcements" className="btn btn-sm mt-3 w-full" onClick={() => setOpen(false)}>
+            {moreCount > 0 && <p className="mt-2 shrink-0 text-xs text-ink-2">+{moreCount} more unread</p>}
+            <Link to="/announcements" className="btn btn-sm mt-3 w-full shrink-0" onClick={() => setOpen(false)}>
               View all announcements
             </Link>
           </motion.div>
