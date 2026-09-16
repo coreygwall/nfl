@@ -27,6 +27,11 @@ export default defineConfig({
   reporter: [["list"]],
   use: {
     baseURL: `http://localhost:${PORT}`,
+    // Playwright's default action timeout is *infinite*, which turns one un-clickable button into
+    // a ninety-second test timeout naming whatever `finally` block the clock happened to land in
+    // rather than the control it was waiting on. A bound well under the test budget means a click
+    // on something disabled says that it was disabled.
+    actionTimeout: 15_000,
     viewport: { width: 390, height: 844 },
     locale: "en-US",
     timezoneId: "America/Los_Angeles",
