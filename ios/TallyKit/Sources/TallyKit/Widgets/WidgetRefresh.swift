@@ -73,7 +73,7 @@ public enum WidgetRefresh {
         return WidgetSnapshot(
             poolName: poolName,
             poolSlug: pool.slug,
-            host: pool.host,
+            origin: pool.origin,
             week: week,
             updatedAt: now,
             entries: entrySnapshots,

@@ -134,7 +134,7 @@ enum Sample {
     static let snapshot = WidgetSnapshot(
         poolName: "High Five",
         poolSlug: "high-five",
-        host: "playtally.app",
+        origin: URL(string: "https://playtally.app")!,
         week: 3,
         updatedAt: Date(),
         entries: [

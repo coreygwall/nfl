@@ -19,7 +19,8 @@ import Foundation
 public struct WidgetSnapshot: Codable, Hashable, Sendable {
     public let poolName: String
     public let poolSlug: String
-    public let host: String
+    /// The origin this pool lives on, kept whole so a widget can build a link back into it.
+    public let origin: URL
     public let week: Int
     /// When this was written. The widget shows it once it is old enough to be worth doubting.
     public let updatedAt: Date
@@ -30,7 +31,7 @@ public struct WidgetSnapshot: Codable, Hashable, Sendable {
     public init(
         poolName: String,
         poolSlug: String,
-        host: String,
+        origin: URL,
         week: Int,
         updatedAt: Date,
         entries: [WidgetEntry],
@@ -38,7 +39,7 @@ public struct WidgetSnapshot: Codable, Hashable, Sendable {
     ) {
         self.poolName = poolName
         self.poolSlug = poolSlug
-        self.host = host
+        self.origin = origin
         self.week = week
         self.updatedAt = updatedAt
         self.entries = entries
@@ -193,7 +194,7 @@ extension WidgetSnapshot {
     func sameContent(as other: WidgetSnapshot) -> Bool {
         poolName == other.poolName
             && poolSlug == other.poolSlug
-            && host == other.host
+            && origin == other.origin
             && week == other.week
             && seasonStartsAt == other.seasonStartsAt
             && entries == other.entries

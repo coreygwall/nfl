@@ -322,7 +322,7 @@ final class AppModel {
         guard let boot = boot.value, let me = player else { return }
         WidgetSessionStore.write(
             WidgetSession(
-                host: pool.host,
+                origin: pool.origin,
                 slug: pool.slug,
                 token: session.authHeaders.token ?? "",
                 entryId: session.authHeaders.entryId

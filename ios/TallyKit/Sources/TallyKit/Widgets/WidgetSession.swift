@@ -15,21 +15,23 @@ import Foundation
  does not refresh. The degradation is a slightly older number, never a blank widget.
  */
 public struct WidgetSession: Codable, Hashable, Sendable {
-    public let host: String
+    /// The whole origin rather than a bare host: a pool is keyed by origin, and a host string
+    /// alone drops the scheme and the port, which is exactly what a dev build runs on.
+    public let origin: URL
     public let slug: String
     /// The account's device token.
     public let token: String
     /// The managed entry to ask as, when the account is picking for somebody else.
     public let entryId: String?
 
-    public init(host: String, slug: String, token: String, entryId: String?) {
-        self.host = host
+    public init(origin: URL, slug: String, token: String, entryId: String?) {
+        self.origin = origin
         self.slug = slug
         self.token = token
         self.entryId = entryId
     }
 
-    public var pool: PoolRef { PoolRef(host: host, slug: slug) }
+    public var pool: PoolRef { PoolRef(origin: origin, slug: slug) }
     public var headers: AuthHeaders { AuthHeaders(token: token, entryId: entryId) }
 }
 
