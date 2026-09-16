@@ -26,8 +26,13 @@ final class GolfModel {
     /// The setup sheet over an existing card: names, pars, the card's name.
     var editing: ScrambleCard?
 
+    /// The lock screen for whichever round is going. Driven from here, because every change to a
+    /// card goes through `save` and there is no other source of truth to race with.
+    let activity = RoundActivityService()
+
     init() {
         catalog = CardCatalog.load()
+        activity.adoptExisting()
     }
 
     var cards: [ScrambleCard] { catalog.cards }
@@ -37,11 +42,13 @@ final class GolfModel {
     func save(_ card: ScrambleCard) {
         catalog.upsert(card)
         catalog.save()
+        Task { await activity.sync(card) }
     }
 
     func delete(_ id: String) {
         catalog.remove(id)
         catalog.save()
+        Task { await activity.discard(cardId: id) }
     }
 
     private func mutate(_ id: String, _ change: (inout ScrambleCard) -> Void) {

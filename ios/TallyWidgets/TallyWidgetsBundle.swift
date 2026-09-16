@@ -2,7 +2,7 @@ import SwiftUI
 import WidgetKit
 
 /**
- The widget extension: one Live Activity, three home-screen widgets, three lock-screen accessories.
+ The widget extension: two Live Activities, three home-screen widgets, three lock-screen accessories.
 
  It draws teams as their abbreviation on their own colour rather than as logos. That is not a
  compromise: at the size a lock screen gives five picks, each one is about thirty points across,
@@ -14,6 +14,7 @@ import WidgetKit
 struct TallyWidgetsBundle: WidgetBundle {
     var body: some Widget {
         WeekLiveActivity()
+        RoundLiveActivity()
         PicksWidget()
         WeekBoardWidget()
         SeasonBoardWidget()

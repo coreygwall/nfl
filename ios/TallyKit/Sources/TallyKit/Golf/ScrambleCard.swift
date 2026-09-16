@@ -31,6 +31,14 @@ public struct GolfPlayer: Codable, Hashable, Identifiable, Sendable {
     }
 }
 
+/**
+ What a stroke was.
+
+ Three of the four credit nobody, and they are separate kinds rather than one because the card
+ should say what actually happened. `penalty` used to be the only nameless stroke available, which
+ made it the thing people reached for when they had simply forgotten to log one — putting the word
+ *penalty* on the card for a stroke that was nothing of the sort. `unclaimed` is that stroke.
+ */
 public enum StrokeKind: String, Codable, Hashable, Sendable {
     /// Somebody's ball, chosen by the team. The only kind that earns a mark on the tally.
     case shot
@@ -38,6 +46,9 @@ public enum StrokeKind: String, Codable, Hashable, Sendable {
     case tapIn
     /// A stroke the rules added rather than a person hit. Counts, credits nobody, finishes nothing.
     case penalty
+    /// A stroke the team took that belongs to nobody in particular — a provisional, or one that
+    /// went unlogged until the hole was added up. Counts, credits nobody, finishes nothing.
+    case unclaimed
 }
 
 public struct Stroke: Codable, Hashable, Identifiable, Sendable {
@@ -55,6 +66,7 @@ public struct Stroke: Codable, Hashable, Identifiable, Sendable {
     public static func shot(by playerId: String) -> Stroke { Stroke(kind: .shot, playerId: playerId) }
     public static var tapIn: Stroke { Stroke(kind: .tapIn) }
     public static var penalty: Stroke { Stroke(kind: .penalty) }
+    public static var unclaimed: Stroke { Stroke(kind: .unclaimed) }
 }
 
 /// One hole's record: the strokes in the order they were taken, and whether the ball is in.

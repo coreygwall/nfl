@@ -98,6 +98,11 @@ struct CardMenu: View {
 
     var body: some View {
         Menu {
+            if let card = golf.card(cardId) {
+                ShareLink(item: ScrambleTally.summary(card)) {
+                    Label("Share the card", systemImage: "square.and.arrow.up")
+                }
+            }
             Button { golf.editing = golf.card(cardId) } label: {
                 Label("Names, pars and the card", systemImage: "pencil")
             }

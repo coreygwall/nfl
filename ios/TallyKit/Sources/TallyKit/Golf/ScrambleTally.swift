@@ -86,6 +86,44 @@ public enum ScrambleTally {
         return out
     }
 
+    /**
+     The card, as a message somebody can paste into the group chat.
+
+     The point of the whole feature is the argument on the drive home, and that argument happens in
+     a thread rather than in an app the other three have not installed. So the summary is plain
+     text, shaped for a phone keyboard: the score, then the tally with where each person's shots
+     were kept, and nothing else. No links, because there is nothing yet to link to.
+     */
+    public static func summary(_ card: ScrambleCard) -> String {
+        var lines: [String] = []
+        let title = card.course.isEmpty ? card.name : "\(card.name) · \(card.course)"
+        lines.append(title)
+
+        let progress = card.isComplete ? "final" : card.throughHole == 0 ? "not started" : "through \(card.throughHole)"
+        if card.throughHole > 0 {
+            lines.append("\(card.strokesTaken) strokes, \(toParText(card.toPar)) · \(progress)")
+        } else {
+            lines.append(progress)
+        }
+
+        let rows = rows(card)
+        if rows.contains(where: { $0.kept > 0 }) {
+            lines.append("")
+            lines.append("Shots kept")
+            for row in rows {
+                var detail: [String] = []
+                if row.drives > 0 { detail.append("\(row.drives) off the tee") }
+                if row.holed > 0 { detail.append("\(row.holed) holed") }
+                let tail = detail.isEmpty ? "" : " (\(detail.joined(separator: ", ")))"
+                lines.append("\(row.place). \(row.player.name) — \(row.kept)\(tail)")
+            }
+        }
+
+        lines.append("")
+        lines.append("Kept with Tally")
+        return lines.joined(separator: "\n")
+    }
+
     /// "E", "−2", "+3": the number a golfer reads, with a real minus sign.
     public static func toParText(_ n: Int) -> String {
         if n == 0 { return "E" }

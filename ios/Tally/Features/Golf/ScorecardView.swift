@@ -46,7 +46,7 @@ struct ScorecardView: View {
                 }
                 .padding(.vertical, 8)
                 .cardFlat()
-                Text("Initials are whose shots the team kept. A dash is a stroke nobody earned — a tap-in, or a penalty.")
+                Text("Initials are whose shots the team kept. A dash is a stroke nobody earned: a tap-in, a penalty, or nobody's ball.")
                     .sans(12).foregroundStyle(Color.ink3)
                     .fixedSize(horizontal: false, vertical: true)
             }
@@ -128,11 +128,15 @@ private struct ScorecardRow: View {
                     }
                 }
                 .frame(width: 46, alignment: .trailing)
+                // A par five with two-letter initials is fifteen characters, which a single
+                // truncating line ate silently. Two lines and a little shrink hold it; the row is
+                // still tappable through to the hole for the full story.
                 Text(keptBy(entry))
                     .font(TallyFont.sans(12, weight: .bold))
                     .foregroundStyle(Color.ink2)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.75)
+                    .multilineTextAlignment(.trailing)
                     .frame(maxWidth: .infinity, alignment: .trailing)
             }
             .padding(.horizontal, 12)

@@ -233,6 +233,7 @@ private struct StrokePill: View {
         case .shot: return card.player(stroke.playerId)?.name ?? "?"
         case .tapIn: return "Tap-in"
         case .penalty: return "Penalty"
+        case .unclaimed: return "Nobody's"
         }
     }
 
@@ -318,11 +319,30 @@ private struct HoleEntryControls: View {
                 .buttonStyle(.tally(.ghost, size: .small))
                 .disabled(entry.strokes.isEmpty)
                 Spacer()
-                Button("+1 penalty") {
-                    Haptics.tap()
-                    golf.record(.penalty, card: card.id)
+                // This used to be a single "+1 penalty", which made it the only way to log a
+                // stroke nobody was going to be credited with — so it got used for strokes that
+                // were simply forgotten, and put the word *penalty* on the card for them.
+                Menu {
+                    Button {
+                        Haptics.tap()
+                        golf.record(.penalty, card: card.id)
+                    } label: {
+                        Label("Penalty stroke", systemImage: "exclamationmark.triangle")
+                    }
+                    Button {
+                        Haptics.tap()
+                        golf.record(.unclaimed, card: card.id)
+                    } label: {
+                        Label("Nobody's ball", systemImage: "circle.dashed")
+                    }
+                } label: {
+                    Text("+1 stroke")
+                        .font(TallyFont.display(15, weight: .bold))
+                        .foregroundStyle(Color.ink)
+                        .padding(.horizontal, 14)
+                        .frame(minHeight: 38)
                 }
-                .buttonStyle(.tally(.ghost, size: .small))
+                .accessibilityLabel("Add a stroke nobody gets credit for")
             }
         }
     }
@@ -405,11 +425,19 @@ private struct RoundDoneCard: View {
                     .sans(14).foregroundStyle(Color.ink2)
                     .fixedSize(horizontal: false, vertical: true)
             }
-            Button("See the tally") {
-                Haptics.tap()
-                golf.tab = .tally
+            HStack(spacing: 10) {
+                Button("See the tally") {
+                    Haptics.tap()
+                    golf.tab = .tally
+                }
+                .buttonStyle(.tally(.primary, size: .small))
+                // The argument happens in a thread, not in an app the other three have not
+                // installed, so the card has to be able to leave the phone as plain text.
+                ShareLink(item: ScrambleTally.summary(card)) {
+                    Label("Share", systemImage: "square.and.arrow.up")
+                }
+                .buttonStyle(.tally(.plain, size: .small))
             }
-            .buttonStyle(.tally(.primary, size: .small))
         }
         .padding(14)
         .frame(maxWidth: .infinity, alignment: .leading)

@@ -146,13 +146,33 @@ got picked. So the card is a list of strokes with a name on each, and the score 
 - **Holed it** — the last shot went in, and whoever hit it gets the mark.
 - **Tap-in** — one more stroke on the card, credited to nobody. A gimme is not an achievement; a
   fifty-footer is just a shot with a name on it, like the drive.
-- **+1 penalty** — a stroke the rules added rather than a person hit. Counts, credits nobody.
+- **+1 stroke** — the two kinds nobody is credited with: a *penalty stroke* the rules added, and
+  *nobody's ball* for a provisional or one that went unlogged. They used to be one control called
+  "+1 penalty", which put that word on the card for strokes that were nothing of the sort.
 - **Undo** is one step back, whatever the step was. A finished hole ignores a stray tap until it is
   reopened, so nothing can quietly turn a birdie into a par.
+- **The par chip on the header is a control.** Setup guesses par 72 laid out the usual way, because
+  nobody fills in eighteen numbers on the first tee, so the truth arrives one tee at a time. Tap to
+  cycle 3, 4, 5.
+- **The hole you just finished keeps a line at the top of the next one.** Finishing advances, which
+  is right in a cart and wrong for the three seconds afterwards when somebody says that last one was
+  Dan's. Tapping it stands you back on that hole, where *Reopen* is waiting.
 
 `TallyKit/Golf/` holds all of it and none of it draws: `ScrambleCard` (the record and every
-mutation), `ScrambleTally` (the leaderboard, initials, the word for a score), `CardCatalog`
-(`UserDefaults`, plain JSON, ISO dates). `ScrambleTests.swift` pins every rule above.
+mutation), `ScrambleTally` (the leaderboard, initials, the word for a score, the shareable
+summary), `CardCatalog` (`UserDefaults`, plain JSON, ISO dates) and `RoundActivity` (what the lock
+screen shows). `ScrambleTests.swift` pins every rule above.
+
+**The round has a lock screen, and it needs no key.** `RoundLiveActivity` draws the hole, the team's
+score to par and the tally, and `RoundActivityService` starts it on the first stroke and ends it
+when the round does. Unlike the week's activity there is no feed behind a scramble, so nothing is
+pushed and `Activity.request` asks for no token — which means the golf lock screen works today, on
+a phone with no APNs key configured. See *Notifications and the lock screen* for the pool's, which
+does need one.
+
+**The card leaves the phone as text.** `ScrambleTally.summary` builds the message for the group
+chat, behind a share control on the round-done card and in the card menu. No link, because there is
+nothing yet to link to — the card is one phone's.
 
 **One phone keeps the card, for now.** The shape is already right for sharing — every card has an
 id, every hole carries `updatedAt`, and the catalogue is JSON a Worker could take unchanged — so

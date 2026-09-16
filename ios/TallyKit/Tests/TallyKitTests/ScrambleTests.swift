@@ -313,3 +313,141 @@ final class RoundCorrectionTests: XCTestCase {
         XCTAssertNil(c.lastFinished, "a hole in progress is not a hole that is in")
     }
 }
+
+/**
+ What leaves the phone, and what the lock screen says while the round is still on.
+
+ Both are readings of the same card, and both are the parts somebody else sees — the group chat at
+ the end, and a glance from four feet away in between.
+ */
+final class RoundSharingTests: XCTestCase {
+    private let corey = GolfPlayer(id: "c", name: "Corey")
+    private let dan = GolfPlayer(id: "d", name: "Dan")
+    private let pete = GolfPlayer(id: "p", name: "Pete")
+
+    private func played() -> ScrambleCard {
+        var c = ScrambleCard(name: "Saturday", course: "Blue Hill", players: [corey, dan, pete], pars: [4, 3, 5])
+        // Hole 1, par 4: Corey drove, Dan's approach, Dan holed it. A birdie.
+        c.record(.shot(by: "c"), on: 1); c.record(.shot(by: "d"), on: 1); c.record(.shot(by: "d"), on: 1)
+        c.finish(hole: 1, tapIn: false)
+        // Hole 2, par 3: Corey's tee shot, Corey's lag, tap-in. A par.
+        c.record(.shot(by: "c"), on: 2); c.record(.shot(by: "c"), on: 2)
+        c.finish(hole: 2, tapIn: true)
+        // Corey 3 kept (2 off the tee), Dan 2 (1 holed), Pete none. Six strokes, one under.
+        return c
+    }
+
+    // MARK: A stroke nobody is credited with, that is not a penalty
+
+    func testNobodysBallCountsOnTheCardAndOnNobodysTally() {
+        var c = played()
+        c.record(.shot(by: "p"), on: 3)
+        c.record(.unclaimed, on: 3)
+        c.record(.shot(by: "p"), on: 3)
+        c.finish(hole: 3, tapIn: true)
+
+        XCTAssertEqual(c.entry(3)?.score, 4, "all four strokes are on the card")
+        XCTAssertEqual(c.strokesTaken, 10, "six from the first two holes plus this one's four")
+        let pete = ScrambleTally.rows(c).first { $0.id == "p" }
+        XCTAssertEqual(pete?.kept, 2, "only the two that were somebody's")
+        XCTAssertEqual(c.entry(3)?.strokes.map(\.kind), [.shot, .unclaimed, .shot, .tapIn])
+    }
+
+    func testAnUnclaimedStrokeBeforeTheFirstShotDoesNotBecomeTheDrive() {
+        var c = ScrambleCard(name: "x", players: [corey, dan], pars: [4])
+        c.record(.unclaimed, on: 1)
+        c.record(.shot(by: "d"), on: 1)
+        c.finish(hole: 1, tapIn: true)
+        XCTAssertEqual(c.entry(1)?.drive?.playerId, "d")
+        XCTAssertEqual(ScrambleTally.rows(c).first { $0.id == "d" }?.drives, 1)
+    }
+
+    func testAnUnclaimedStrokeSurvivesTheRoundTrip() throws {
+        var c = ScrambleCard(name: "x", players: [corey], pars: [4])
+        c.record(.unclaimed, on: 1)
+        var catalog = CardCatalog.empty
+        catalog.upsert(c)
+        let back = try CardCatalog.decode(try catalog.encoded())
+        XCTAssertEqual(back.card(c.id)?.entry(1)?.strokes.map(\.kind), [.unclaimed])
+    }
+
+    // MARK: The message
+
+    func testTheSummaryReadsLikeSomethingYouWouldPaste() {
+        let text = ScrambleTally.summary(played())
+        let lines = text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+
+        XCTAssertEqual(lines[0], "Saturday · Blue Hill")
+        XCTAssertEqual(lines[1], "6 strokes, \(ScrambleTally.toParText(-1)) · through 2")
+        XCTAssertTrue(text.contains("Shots kept"))
+        // Corey kept three, two of them drives; Dan kept two and holed one; Pete has nothing to brag on.
+        XCTAssertTrue(text.contains("1. Corey — 3 (2 off the tee)"), text)
+        XCTAssertTrue(text.contains("2. Dan — 2 (1 holed)"), text)
+        XCTAssertTrue(text.contains("3. Pete — 0"), text)
+        XCTAssertTrue(text.hasSuffix("Kept with Tally"))
+    }
+
+    func testTheSummarySaysSoBeforeAnybodyHasHitAnything() {
+        let card = ScrambleCard(name: "Saturday", players: [corey, dan], pars: [4, 4])
+        let text = ScrambleTally.summary(card)
+        XCTAssertTrue(text.contains("not started"), text)
+        XCTAssertFalse(text.contains("Shots kept"), "nothing to rank yet")
+    }
+
+    func testACardWithNoCourseDoesNotTrailASeparator() {
+        let card = ScrambleCard(name: "Saturday", players: [corey], pars: [4])
+        XCTAssertEqual(ScrambleTally.summary(card).split(separator: "\n").first.map(String.init), "Saturday")
+    }
+
+    // MARK: The lock screen
+
+    func testTheLockScreenStateFollowsTheHoleBeingPlayed() {
+        var c = played()
+        c.go(to: 3)
+        c.record(.shot(by: "p"), on: 3)
+
+        let state = RoundActivityAttributes.state(from: c)
+        XCTAssertEqual(state.hole, 3)
+        XCTAssertEqual(state.par, 5)
+        XCTAssertEqual(state.strokesOnHole, 1)
+        XCTAssertEqual(state.through, 2)
+        XCTAssertEqual(state.strokes, 6)
+        XCTAssertEqual(state.toPar, -1)
+        XCTAssertFalse(state.done)
+        XCTAssertEqual(state.statusLine(), "Hole 3, par 5 · 1 shot in.")
+        XCTAssertEqual(state.leadLine(), "Corey leads with 3 kept.")
+    }
+
+    func testAFinishedHoleIsNotStrokesInProgress() {
+        var c = played()
+        c.go(to: 2)
+        let state = RoundActivityAttributes.state(from: c)
+        XCTAssertEqual(state.strokesOnHole, 0, "hole 2 is in; its strokes are not still being played")
+        XCTAssertEqual(state.statusLine(), "Hole 2, par 3 · through 2.")
+    }
+
+    func testTheLockScreenSaysNothingAboutALeadNobodyHas() {
+        let card = ScrambleCard(name: "x", players: [corey, dan], pars: [4])
+        let state = RoundActivityAttributes.state(from: card)
+        XCTAssertNil(state.leadLine())
+        XCTAssertEqual(state.statusLine(), "Hole 1, par 4 · on the tee.")
+    }
+
+    func testATiedLeadNamesBothAndAgreesWithItself() {
+        var c = ScrambleCard(name: "x", players: [corey, dan], pars: [4, 4])
+        c.record(.shot(by: "c"), on: 1); c.finish(hole: 1, tapIn: true)
+        c.record(.shot(by: "d"), on: 2); c.finish(hole: 2, tapIn: true)
+
+        let state = RoundActivityAttributes.state(from: c)
+        XCTAssertEqual(state.leaders, ["Corey", "Dan"])
+        XCTAssertEqual(state.leadLine(), "Corey and Dan lead with 1 kept.")
+        XCTAssertTrue(state.done)
+        XCTAssertEqual(state.statusLine(), "That's the round. 4 strokes, \(ScrambleTally.toParText(-4)).")
+    }
+
+    func testTheLockScreenTrimsABigGroupToWhatItCanDraw() {
+        let many = (1...8).map { GolfPlayer(id: "\($0)", name: "P\($0)") }
+        let card = ScrambleCard(name: "x", players: many, pars: [4])
+        XCTAssertEqual(RoundActivityAttributes.state(from: card).lines.count, 4)
+    }
+}

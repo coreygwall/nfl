@@ -140,10 +140,16 @@ third family is a new shell plus a case on `ContestContext`** — if it needs an
 Golf is off by default (Account ▸ Settings ▸ Labs). Off means the menu draws exactly as it did and
 the golf shell is unreachable; off is not a reset, so the cards stay on the phone. `TallyKit/Golf/`
 holds the whole model and draws nothing: a scramble is a list of strokes with a name on each and the
-score is the count, a **tap-in** counts on the card and credits nobody, a **penalty** does the same,
-and a fifty-foot putt is just a shot with a name — which is the one distinction the whole feature
-exists for. One phone keeps the card today; every hole carries `updatedAt` so sharing is a merge
-rule rather than a rewrite.
+score is the count, a **tap-in** counts on the card and credits nobody, a **penalty** and a
+**nobody's ball** do the same, and a fifty-foot putt is just a shot with a name — which is the one
+distinction the whole feature exists for. One phone keeps the card today; every hole carries
+`updatedAt` so sharing is a merge rule rather than a rewrite, and `ScrambleTally.summary` is how a
+card reaches the other three in the meantime.
+
+The round's Live Activity is the one lock screen in the app that **needs no APNs key**: a scramble
+has no feed, so every change is a tap in this app and `RoundActivityService` updates the activity
+itself with `pushType` left nil. Do not give it a token it would never use. It starts on the first
+stroke rather than when the card is made, because a card set up the night before is not a round.
 
 ## Four tabs in a pool, and what is deliberately not one
 
