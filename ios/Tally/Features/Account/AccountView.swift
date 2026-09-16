@@ -26,7 +26,7 @@ struct AccountView: View {
 
     private var boot: BootstrapResponse? { model.boot.value }
     private var accountName: String { boot?.account?.name ?? model.player?.name ?? "" }
-    private var entries: [Identity] { model.people }
+    private var entries: [Identity] { model.entries }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
@@ -55,6 +55,22 @@ struct AccountView: View {
     private var entriesSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Entries in \(model.poolName)")
+            // The entries belong to the account, so a device the server does not recognise can only
+            // show the name it happens to have saved. Saying so beats drawing one row where a
+            // family should be and leaving somebody to wonder where everybody went.
+            if model.deviceUnrecognised {
+                VStack(alignment: .leading, spacing: 8) {
+                    Text("This phone isn't signed in to your account.").display(16)
+                    Text("Your entries live on the account rather than on the phone, so only the name saved here is showing. Signing back in brings the rest across; nobody's picks are touched.")
+                        .sans(13).foregroundStyle(Color.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
+                    Button("Sign back in") { model.showWelcome = true }
+                        .buttonStyle(.tally(.primary, size: .small))
+                }
+                .padding(12)
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .cardFlat(fill: .flagSoft)
+            }
             ForEach(entries) { p in
                 let active = p.id == model.player?.id
                 Button {

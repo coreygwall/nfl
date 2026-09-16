@@ -170,6 +170,27 @@ standing in: what week it is, whose picks are missing, where you stand.
   place — so anything that has to be reachable mid-pick needs its own route out. That is what the
   flow's "Go to pool home" link is for, and why the e2e helpers reach Account by address.
 
+## The roster is the server's; the device only keeps the keys
+
+A phone that picks for a family holds two different things, and conflating them is what made
+Declan and Parker vanish from the iOS app while the web showed all three. `SessionStore` (one
+Keychain item per host) is a **cache of credentials**: the token, and which name is picking right
+now. **Who the account owns** is `myEntries` in every bootstrap, and `AppModel.entries` is the one
+property screens read — the picker, the account tab, Home's "who still owes picks", the widget
+snapshot. It falls back to the cache only before the first bootstrap lands.
+
+Drawing a roster from the cache looks fine until the cache falls behind, and it can: `reconcile`
+is a **silent no-op** whenever the bootstrap comes back without an account (an unrecognised token),
+the session is keyed to a host the install has since moved off, or an entry was added on another
+device between launches. None of those say anything on screen, which is why the app quietly showed
+one name where a family should be. `AppModel.deviceUnrecognised` now says it out loud on the
+account tab instead.
+
+Because the list can name an entry this device has never cached, **`switchTo` adopts**: tapping a
+name that is not in the store saves it there first, with the *account's* token, since a managed
+entry has none of its own. Without that the tap would move the highlight and change nothing else.
+`SessionStoreTests.swift` pins both halves.
+
 ## One Sunday, one set of words
 
 A week in progress is described in three places at once — the lock screen, the home-screen widgets

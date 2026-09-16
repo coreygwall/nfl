@@ -29,7 +29,7 @@ struct NotificationSettingsSheet: View {
                             ErrorState(message: error.message) { Task { await model.loadNotifyPrefs() } }
                         case .loaded(let prefs):
                             kinds(prefs)
-                            if model.people.count > 1 { entries(prefs) }
+                            if model.entries.count > 1 { entries(prefs) }
                             footnote
                         }
                     }
@@ -74,11 +74,11 @@ struct NotificationSettingsSheet: View {
     private func entries(_ prefs: NotifyPrefs) -> some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Who to tell you about")
-            Text("You pick for \(Format.plural(model.people.count, "entry", "entries")). Switch one off to stop hearing about it on this phone — their picks still count.")
+            Text("You pick for \(Format.plural(model.entries.count, "entry", "entries")). Switch one off to stop hearing about it on this phone — their picks still count.")
                 .sans(12).foregroundStyle(Color.ink2)
                 .fixedSize(horizontal: false, vertical: true)
             VStack(spacing: 0) {
-                ForEach(Array(model.people.enumerated()), id: \.element.id) { index, person in
+                ForEach(Array(model.entries.enumerated()), id: \.element.id) { index, person in
                     if index > 0 { DashedDivider().padding(.vertical, 10) }
                     SwitchRow(
                         title: person.name,
