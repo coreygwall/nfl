@@ -25,6 +25,9 @@ final class GolfModel {
     var showNewCard = false
     /// The setup sheet over an existing card: names, pars, the card's name.
     var editing: ScrambleCard?
+    /// The card being shared, snapshotted at the moment the button was tapped — a poster is a
+    /// picture of a round at a time, so it should not redraw under somebody mid-send.
+    var sharing: ScrambleCard?
 
     /// The lock screen for whichever round is going. Driven from here, because every change to a
     /// card goes through `save` and there is no other source of truth to race with.

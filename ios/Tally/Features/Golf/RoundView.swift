@@ -432,8 +432,11 @@ private struct RoundDoneCard: View {
                 }
                 .buttonStyle(.tally(.primary, size: .small))
                 // The argument happens in a thread, not in an app the other three have not
-                // installed, so the card has to be able to leave the phone as plain text.
-                ShareLink(item: ScrambleTally.summary(card)) {
+                // installed, so the round leaves as a drawn card rather than a paragraph.
+                Button {
+                    Haptics.tap()
+                    golf.sharing = card
+                } label: {
                     Label("Share", systemImage: "square.and.arrow.up")
                 }
                 .buttonStyle(.tally(.plain, size: .small))

@@ -451,3 +451,47 @@ final class RoundSharingTests: XCTestCase {
         XCTAssertEqual(RoundActivityAttributes.state(from: card).lines.count, 4)
     }
 }
+
+/// The two brags the share card puts under the leaderboard, and who they name.
+final class HighlightTests: XCTestCase {
+    private let corey = GolfPlayer(id: "c", name: "Corey")
+    private let dan = GolfPlayer(id: "d", name: "Dan")
+    private let pete = GolfPlayer(id: "p", name: "Pete")
+
+    func testEachBragNamesEverybodyTiedForIt() {
+        var c = ScrambleCard(name: "x", players: [corey, dan, pete], pars: [4, 4, 4])
+        // Corey drives and Dan holes it; then Dan drives and Corey holes it; then Pete does both.
+        c.record(.shot(by: "c"), on: 1); c.record(.shot(by: "d"), on: 1); c.finish(hole: 1, tapIn: false)
+        c.record(.shot(by: "d"), on: 2); c.record(.shot(by: "c"), on: 2); c.finish(hole: 2, tapIn: false)
+        c.record(.shot(by: "p"), on: 3); c.finish(hole: 3, tapIn: false)
+
+        let h = ScrambleTally.highlights(c)
+        XCTAssertEqual(h.mostKept?.count, 2)
+        XCTAssertEqual(h.mostKept?.names, ["Corey", "Dan"])
+        XCTAssertEqual(h.mostKept?.who, "Corey and Dan")
+        XCTAssertEqual(h.offTheTee?.count, 1)
+        XCTAssertEqual(Set(h.offTheTee?.names ?? []), ["Corey", "Dan", "Pete"])
+        XCTAssertEqual(h.holed?.count, 1)
+        XCTAssertEqual(Set(h.holed?.names ?? []), ["Corey", "Dan", "Pete"])
+    }
+
+    func testABragNobodyEarnedIsNotOnTheCard() {
+        var c = ScrambleCard(name: "x", players: [corey, dan], pars: [4])
+        // Every hole finished on a tap-in, so nothing was holed by anybody.
+        c.record(.shot(by: "c"), on: 1)
+        c.finish(hole: 1, tapIn: true)
+
+        let h = ScrambleTally.highlights(c)
+        XCTAssertEqual(h.mostKept?.names, ["Corey"])
+        XCTAssertEqual(h.offTheTee?.names, ["Corey"])
+        XCTAssertNil(h.holed, "nobody holed one, which is not a highlight")
+    }
+
+    func testACardNobodyHasHitOnHasNoHighlightsAtAll() {
+        let c = ScrambleCard(name: "x", players: [corey, dan], pars: [4])
+        let h = ScrambleTally.highlights(c)
+        XCTAssertNil(h.mostKept)
+        XCTAssertNil(h.offTheTee)
+        XCTAssertNil(h.holed)
+    }
+}

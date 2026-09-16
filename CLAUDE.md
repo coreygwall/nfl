@@ -143,8 +143,16 @@ holds the whole model and draws nothing: a scramble is a list of strokes with a 
 score is the count, a **tap-in** counts on the card and credits nobody, a **penalty** and a
 **nobody's ball** do the same, and a fifty-foot putt is just a shot with a name — which is the one
 distinction the whole feature exists for. One phone keeps the card today; every hole carries
-`updatedAt` so sharing is a merge rule rather than a rewrite, and `ScrambleTally.summary` is how a
-card reaches the other three in the meantime.
+`updatedAt` so sharing is a merge rule rather than a rewrite.
+
+A round reaches the other three as a **drawn card, not a paragraph** (`ShareCardView` rendered by
+`ImageRenderer` at 3x, previewed in `ShareCardSheet`): a result is text, a trophy is a picture, and
+a picture is what gets re-shared in a thread. It is also the only marketing this feature does, which
+is why the poster is in the app's own paper and ink and is always rendered in the **light** palette
+— a card that leaves the device should look the same to everybody. The share carries **no text
+body**; `ScrambleTally.summary` survives only as the fallback for a render that returns nil. The
+footer's `playtally.app` is the seam for the link that belongs there once there is a recap to point
+at or an App Store listing.
 
 The round's Live Activity is the one lock screen in the app that **needs no APNs key**: a scramble
 has no feed, so every change is a tap in this app and `RoundActivityService` updates the activity

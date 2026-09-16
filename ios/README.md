@@ -170,9 +170,23 @@ pushed and `Activity.request` asks for no token — which means the golf lock sc
 a phone with no APNs key configured. See *Notifications and the lock screen* for the pool's, which
 does need one.
 
-**The card leaves the phone as text.** `ScrambleTally.summary` builds the message for the group
-chat, behind a share control on the round-done card and in the card menu. No link, because there is
-nothing yet to link to — the card is one phone's.
+**The card leaves the phone as a poster.** `ShareCardView` draws the round at 4:5 in the app's own
+paper and ink — the score to par, the tally with the leader on the flag, and the two brags the group
+actually argues about (off the tee, and putts that went in). `ShareCardRenderer` renders it with
+`ImageRenderer` at 3x to a PNG in the temporary directory, and `ShareCardSheet` shows the card
+before it goes so nobody sends blind.
+
+Three things are pinned rather than left to the call site: the **light palette**, so the card looks
+the same to everybody whatever the sender's phone was doing; **scale 3**, which makes 1080 × 1350;
+and a **file URL**, which Messages and Mail handle better than an image value.
+
+**The message carries no text.** The picture is the message. `ScrambleTally.summary` still exists and
+is the fallback for the one case that would otherwise be a dead end — `ImageRenderer` may return nil,
+and a share button that does nothing is worse than one that sends the words.
+
+The footer says `playtally.app` and nothing more. That is the seam for the link that belongs there
+eventually: a recap for the people who played the round, or the App Store for everyone else once
+there is a listing. Neither exists yet, so neither is pretended at.
 
 **One phone keeps the card, for now.** The shape is already right for sharing — every card has an
 id, every hole carries `updatedAt`, and the catalogue is JSON a Worker could take unchanged — so

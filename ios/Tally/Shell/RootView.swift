@@ -74,6 +74,9 @@ struct RootView: View {
         .sheet(item: $golf.editing) { card in
             CardSetupSheet(editing: card)
         }
+        .sheet(item: $golf.sharing) { card in
+            ShareCardSheet(card: card)
+        }
     }
 }
 

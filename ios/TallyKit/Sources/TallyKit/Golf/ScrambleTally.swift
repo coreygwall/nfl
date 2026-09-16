@@ -87,12 +87,52 @@ public enum ScrambleTally {
     }
 
     /**
+     The three lines the group actually argues about, each with everyone tied for it.
+
+     Shots kept is the leaderboard, so it is already on the card; these two are the *brags* — off
+     the tee, and putts that went in — and they are separate from the leaderboard on purpose. A
+     person who kept four drives and nothing else had a good day at one thing, and the share card
+     should be able to say so without pretending it decided the round.
+
+     Nobody with a zero is ever named. "Nobody had a drive kept" is not a highlight, and a card
+     that says it reads like a bug.
+     */
+    public struct Highlights: Hashable, Sendable {
+        public struct Best: Hashable, Sendable {
+            public let names: [String]
+            public let count: Int
+
+            public init(names: [String], count: Int) {
+                self.names = names
+                self.count = count
+            }
+
+            /// "Corey" or "Corey and Dan", for a card that has room for one line.
+            public var who: String { Names.list(names) }
+        }
+
+        public let mostKept: Best?
+        public let offTheTee: Best?
+        public let holed: Best?
+    }
+
+    public static func highlights(_ card: ScrambleCard) -> Highlights {
+        let rows = rows(card)
+        func best(_ value: (TallyRow) -> Int) -> Highlights.Best? {
+            let top = rows.map(value).max() ?? 0
+            guard top > 0 else { return nil }
+            return Highlights.Best(names: rows.filter { value($0) == top }.map(\.player.name), count: top)
+        }
+        return Highlights(mostKept: best(\.kept), offTheTee: best(\.drives), holed: best(\.holed))
+    }
+
+    /**
      The card, as a message somebody can paste into the group chat.
 
-     The point of the whole feature is the argument on the drive home, and that argument happens in
-     a thread rather than in an app the other three have not installed. So the summary is plain
-     text, shaped for a phone keyboard: the score, then the tally with where each person's shots
-     were kept, and nothing else. No links, because there is nothing yet to link to.
+     **Not what normally gets shared.** A round goes out as the drawn card (`ShareCardView`), because
+     a picture is what gets re-shared in a thread and a paragraph is not. This is the fallback for
+     the one case that would otherwise be a dead end: `ImageRenderer` can return nil, and a share
+     button that does nothing is worse than one that sends the words.
      */
     public static func summary(_ card: ScrambleCard) -> String {
         var lines: [String] = []
