@@ -402,12 +402,9 @@ private struct PoolBadge: View {
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(systemName: "football.fill")
-                .font(.system(size: 15, weight: .bold))
-                .foregroundStyle(Color.ink)
-                .frame(width: 34, height: 34)
-                .background(Circle().fill(Color.flag))
-                .overlay(Circle().strokeBorder(Color.ink, lineWidth: 2))
+            FlagMark(size: 34) {
+                Image(systemName: "football.fill").font(.system(size: 15, weight: .bold))
+            }
             VStack(alignment: .leading, spacing: 1) {
                 Text("YOU'RE JOINING").font(TallyFont.sans(10, weight: .bold)).tracking(1.2).foregroundStyle(Color.ink3)
                 Text(poolName).font(TallyFont.display(18)).lineLimit(1)

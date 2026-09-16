@@ -37,7 +37,7 @@ struct PoolsView: View {
                                             Text("\(pool.poolType) · \(pool.ref.host)").sans(12).foregroundStyle(Color.ink2)
                                         }
                                         Spacer()
-                                        if current { Chip(text: "Open", fill: .flag) }
+                                        if current { Chip(text: "Open", fill: .flag, label: .onAccent) }
                                     }
                                     .padding(12)
                                     .frame(maxWidth: .infinity, alignment: .leading)

@@ -32,12 +32,9 @@ struct WeekWinnerBanner: View {
 
     var body: some View {
         HStack(spacing: 12) {
-            Image(systemName: "trophy.fill")
-                .font(.system(size: 22, weight: .bold))
-                .foregroundStyle(Color.ink)
-                .frame(width: 44, height: 44)
-                .background(Circle().fill(Color.flag))
-                .overlay(Circle().strokeBorder(Color.ink, lineWidth: 2))
+            FlagMark(size: 44) {
+                Image(systemName: "trophy.fill").font(.system(size: 22, weight: .bold))
+            }
             VStack(alignment: .leading, spacing: 2) {
                 Text(headline).display(20)
                 Text(detail).sans(13).foregroundStyle(Color.ink2)

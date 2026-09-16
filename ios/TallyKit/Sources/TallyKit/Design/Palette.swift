@@ -35,6 +35,31 @@ public enum TallyPalette {
     public static let turf = Color(light: "#0B7A3B", dark: "#3FBF74")
     public static let turf2 = Color(light: "#0F9A4C", dark: "#5AD48C")
     public static let turfSoft = Color(light: "#DFF2E6", dark: "#16301F")
+
+    /// How sure you are, as one hue in five steps. The five-pointer is the solid green and the
+    /// rest fade towards paper — in the dark theme the ramp runs the other way, because the most
+    /// prominent thing on a dark ground is the brightest. Gold is deliberately not in here: it is
+    /// reserved for *place*, the winner of a week or the leader of the season, so a rank and a
+    /// result never read as the same thing. Rank 5 takes `onFill`; 4 through 1 take `ink`.
+    public static let rank5 = Color(light: "#0B7A3B", dark: "#3FBF74")
+    public static let rank4 = Color(light: "#9AD3B0", dark: "#2A7A4C")
+    public static let rank3 = Color(light: "#B9E0C8", dark: "#21603C")
+    public static let rank2 = Color(light: "#D3ECDD", dark: "#1B4A2F")
+    public static let rank1 = Color(light: "#E9F5EE", dark: "#16301F")
+
+    /// The badge fill for a rank, 1 being the most confident pick and worth 5.
+    public static func rank(_ rank: Int) -> Color {
+        switch rank {
+        case 1: rank5
+        case 2: rank4
+        case 3: rank3
+        case 4: rank2
+        default: rank1
+        }
+    }
+
+    /// What is legible on `rank(_:)`. Only the solid five-pointer takes the filled-accent label.
+    public static func onRank(_ rank: Int) -> Color { rank == 1 ? onFill : ink }
     public static let flag = Color(light: "#FFD23F", dark: "#FFD23F")
     public static let flagSoft = Color(light: "#FFF3C4", dark: "#3A2F10")
     public static let danger = Color(light: "#D7263D", dark: "#FF6B7E")

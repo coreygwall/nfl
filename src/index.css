@@ -23,6 +23,12 @@
   --color-turf: #0b7a3b;
   --color-turf-2: #0f9a4c;
   --color-turf-soft: #dff2e6;
+  /* Confidence, one green in five steps: the five-pointer solid, the rest fading to paper. */
+  --color-rank-5: #0b7a3b;
+  --color-rank-4: #9ad3b0;
+  --color-rank-3: #b9e0c8;
+  --color-rank-2: #d3ecdd;
+  --color-rank-1: #e9f5ee;
   --color-flag: #ffd23f;
   --color-flag-soft: #fff3c4;
   --color-danger: #d7263d;
@@ -77,6 +83,11 @@
     --color-turf: #3fbf74;
     --color-turf-2: #5ad48c;
     --color-turf-soft: #16301f;
+    --color-rank-5: #3fbf74;
+    --color-rank-4: #2a7a4c;
+    --color-rank-3: #21603c;
+    --color-rank-2: #1b4a2f;
+    --color-rank-1: #16301f;
     --color-flag: #ffd23f;
     --color-flag-soft: #3a2f10;
     --color-danger: #ff6b7e;
@@ -105,6 +116,11 @@
   --color-turf: #3fbf74;
   --color-turf-2: #5ad48c;
   --color-turf-soft: #16301f;
+  --color-rank-5: #3fbf74;
+  --color-rank-4: #2a7a4c;
+  --color-rank-3: #21603c;
+  --color-rank-2: #1b4a2f;
+  --color-rank-1: #16301f;
   --color-flag: #ffd23f;
   --color-flag-soft: #3a2f10;
   --color-danger: #ff6b7e;

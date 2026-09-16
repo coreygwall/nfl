@@ -321,7 +321,7 @@ struct BoardRowCard<Detail: View>: View {
                         HStack(spacing: 6) {
                             Text(name).font(TallyFont.display(17)).lineLimit(1)
                             if isMe { Chip(text: "you", size: 10) }
-                            if crowned { Chip(text: "winner", fill: .flag, size: 10) }
+                            if crowned { Chip(text: "winner", fill: .flag, size: 10, label: .onAccent) }
                         }
                         Text(subtitle).sans(12).foregroundStyle(Color.ink2).lineLimit(1)
                     }

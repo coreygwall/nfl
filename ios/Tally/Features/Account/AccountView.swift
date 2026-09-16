@@ -48,7 +48,7 @@ struct AccountView: View {
                         Text(p.name).font(TallyFont.display(16))
                         if p.isManagedEntry { Chip(text: "you manage", size: 10) }
                         Spacer()
-                        if active { Chip(text: "picking", fill: .flag, size: 10) }
+                        if active { Chip(text: "picking", fill: .flag, size: 10, label: .onAccent) }
                     }
                     .padding(12)
                     .frame(maxWidth: .infinity, alignment: .leading)

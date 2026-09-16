@@ -36,18 +36,37 @@ export function EmptyState({ title, body, action }: { title: string; body?: stri
   );
 }
 
+/**
+ * How sure you are, as one green in five steps: the five-pointer solid, the rest fading towards
+ * paper. Gold used to mark rank 1 and is deliberately gone from here — it is reserved for *place*,
+ * the winner of a week or the leader of the season, so a confident pick and a result never read
+ * as the same thing.
+ *
+ * Written out as full class names rather than built from the rank, because Tailwind finds classes
+ * by scanning source text and would never emit `bg-rank-${n}`. The "pts" label takes the same
+ * colour as the number: a second, dimmer colour is a second contrast pair to keep legal on every
+ * step of the ramp, and size and weight already carry the hierarchy.
+ */
+const RANK_FILL: Record<number, string> = {
+  1: "bg-rank-5 text-on-turf",
+  2: "bg-rank-4 text-ink",
+  3: "bg-rank-3 text-ink",
+  4: "bg-rank-2 text-ink",
+  5: "bg-rank-1 text-ink",
+};
+
 export function RankBadge({ rank, size = "md", muted = false }: { rank: number; size?: "sm" | "md" | "lg"; muted?: boolean }) {
   const points = 6 - rank;
   const dims = size === "lg" ? "h-14 w-14 text-2xl" : size === "sm" ? "h-7 w-7 text-xs" : "h-10 w-10 text-base";
   return (
     <div
       className={`flex shrink-0 flex-col items-center justify-center rounded-xl border-2 border-ink font-display font-extrabold leading-none tabular ${dims} ${
-        muted ? "bg-paper-2 text-ink-3" : rank === 1 ? "bg-flag" : "bg-surface"
+        muted ? "bg-paper-2 text-ink-3" : (RANK_FILL[rank] ?? "bg-surface text-ink")
       }`}
       aria-label={`Rank ${rank}, ${points} points`}
     >
       <span>{points}</span>
-      {size !== "sm" && <span className="mt-0.5 text-[9px] font-bold uppercase tracking-wider text-ink-2">pts</span>}
+      {size !== "sm" && <span className="mt-0.5 text-[9px] font-bold uppercase tracking-wider">pts</span>}
     </div>
   );
 }
