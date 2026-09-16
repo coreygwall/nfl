@@ -163,6 +163,41 @@ public struct PoolService: Sendable {
         let appVersion: String?
     }
 
+    /**
+     Hands the Worker the token for a running Live Activity, so it can keep that lock screen
+     current while the app is shut.
+
+     Called every time ActivityKit issues one rather than once: it reissues without warning, the
+     same way APNs does, and a stale activity token is a lock screen frozen on the one o'clock
+     score. The entry travels in the body because one install runs several of these — one per
+     entry — and the server has to know which week's board each belongs to.
+     */
+    @discardableResult
+    public func registerActivityToken(
+        _ token: String,
+        entryId: String,
+        week: Int,
+        environment: PushEnvironment
+    ) async throws -> OkResponse {
+        try await client.post(
+            "/push/activity",
+            body: RegisterActivityBody(token: token, environment: environment.rawValue, entryId: entryId, week: week)
+        )
+    }
+
+    /// The lock screen is gone — dismissed, or the week ended while the app was open.
+    @discardableResult
+    public func unregisterActivityToken(_ token: String) async throws -> OkResponse {
+        try await client.delete("/push/activity/\(token)")
+    }
+
+    private struct RegisterActivityBody: Encodable {
+        let token: String
+        let environment: String
+        let entryId: String
+        let week: Int
+    }
+
     // MARK: Announcements
 
     private struct MessageBody: Encodable { let body: String }

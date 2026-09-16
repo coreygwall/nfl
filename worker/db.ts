@@ -867,3 +867,67 @@ export async function listPlatformAdmins(db: D1Database): Promise<{ id: string; 
     .all<{ id: string; name: string; granted_at: string }>();
   return results.map((r) => ({ id: r.id, name: r.name, grantedAt: r.granted_at }));
 }
+
+// MARK: Live activities
+
+/**
+ * A lock screen this Worker can reach.
+ *
+ * One row per (entry, week) — the token is the primary key because ActivityKit reissues them, the
+ * same way APNs does with device tokens. `ended_at` is set rather than the row deleted so a push
+ * that arrives after the week closed is a no-op rather than a resurrection.
+ */
+export interface LiveActivityRecord {
+  token: string;
+  environment: "sandbox" | "production";
+  playerId: string;
+  week: number;
+}
+
+interface LiveActivityRow {
+  token: string;
+  environment: string;
+  player_id: string;
+  week: number;
+}
+
+export async function saveLiveActivity(
+  db: D1Database,
+  input: LiveActivityRecord,
+  now: string,
+): Promise<void> {
+  await db
+    .prepare(
+      `INSERT INTO live_activities (token, environment, player_id, week, started_at, updated_at, ended_at)
+       VALUES (?, ?, ?, ?, ?, ?, NULL)
+       ON CONFLICT(token) DO UPDATE SET
+         environment = excluded.environment,
+         player_id = excluded.player_id,
+         week = excluded.week,
+         updated_at = excluded.updated_at,
+         ended_at = NULL`,
+    )
+    .bind(input.token, input.environment, input.playerId, input.week, now, now)
+    .run();
+}
+
+/** Every activity still believed to be on a lock screen, for the cron to update. */
+export async function listLiveActivities(db: D1Database): Promise<LiveActivityRecord[]> {
+  const { results } = await db
+    .prepare("SELECT token, environment, player_id, week FROM live_activities WHERE ended_at IS NULL")
+    .all<LiveActivityRow>();
+  return results.map((r) => ({
+    token: r.token,
+    environment: r.environment === "sandbox" ? ("sandbox" as const) : ("production" as const),
+    playerId: r.player_id,
+    week: r.week,
+  }));
+}
+
+export async function endLiveActivity(db: D1Database, token: string, now: string): Promise<void> {
+  await db.prepare("UPDATE live_activities SET ended_at = ?, updated_at = ? WHERE token = ?").bind(now, now, token).run();
+}
+
+export async function touchLiveActivity(db: D1Database, token: string, now: string): Promise<void> {
+  await db.prepare("UPDATE live_activities SET updated_at = ? WHERE token = ?").bind(now, token).run();
+}

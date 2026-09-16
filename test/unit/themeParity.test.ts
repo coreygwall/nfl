@@ -2,20 +2,36 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 
 /**
- * The two design systems are one design system, written twice.
+ * The design system is one design system, written twice.
  *
- * `src/index.css` and `ios/Tally/Design/Theme.swift` hold the same palette in two languages, and
- * nothing but diligence kept them together — which is exactly how the dark theme drifted: web
- * refined five values and added `--color-card-border`, iOS kept the old ones for weeks, and the
- * apps quietly stopped looking alike in dark mode. Nobody noticed, because noticing requires
- * holding a phone next to a laptop in the dark.
+ * `src/index.css` and `ios/TallyKit/Sources/TallyKit/Design/Palette.swift` hold the same palette in
+ * two languages, and nothing but diligence kept them together — which is exactly how the dark theme
+ * drifted: web refined five values and added `--color-card-border`, iOS kept the old ones for
+ * weeks, and the apps quietly stopped looking alike in dark mode. Nobody noticed, because noticing
+ * requires holding a phone next to a laptop in the dark.
  *
  * So the diligence is a test now. Change a colour on one surface and this fails until the other
  * one follows.
+ *
+ * It also guards the *shape* of the thing. The widget extension cannot see the app target, so when
+ * the Live Activity needed these colours it grew its own private copy of seven of them as flat
+ * light-theme hexes — which is why that surface shipped with no dark mode at all. The palette lives
+ * in TallyKit now, where both targets link it, and the last two tests here fail if either target
+ * starts keeping hexes of its own again.
  */
 
 const css = readFileSync(new URL("../../src/index.css", import.meta.url), "utf8");
-const swift = readFileSync(new URL("../../ios/Tally/Design/Theme.swift", import.meta.url), "utf8");
+const swift = readFileSync(new URL("../../ios/TallyKit/Sources/TallyKit/Design/Palette.swift", import.meta.url), "utf8");
+const appTheme = readFileSync(new URL("../../ios/Tally/Design/Theme.swift", import.meta.url), "utf8");
+const widgets = ["WeekLiveActivity.swift", "TallyWidgetsBundle.swift"]
+  .map((f) => {
+    try {
+      return readFileSync(new URL(`../../ios/TallyWidgets/${f}`, import.meta.url), "utf8");
+    } catch {
+      return "";
+    }
+  })
+  .join("\n");
 
 /** Web token → the `Color` constant that mirrors it on iOS. */
 const MIRRORED: Record<string, string> = {
@@ -104,5 +120,20 @@ describe("the palette is the same on both surfaces", () => {
   it("the two dark blocks on the web agree with each other", () => {
     const preference = tokens(block('@media (prefers-color-scheme: dark) {\n  :root:not([data-theme="light"]) {'));
     expect(preference).toEqual(dark);
+  });
+
+  /**
+   * Both iOS targets read the shared palette rather than keeping values of their own. A literal
+   * hex in either of them is how the drift starts, so it is a failure here — team colours are the
+   * one exception, and those come from the sport's data rather than being written down.
+   */
+  it("the app target defines no colours of its own", () => {
+    const hexes = appTheme.match(/"#[0-9A-Fa-f]{6}"/g) ?? [];
+    expect(hexes, "Theme.swift should alias TallyPalette, not hold hexes").toEqual([]);
+  });
+
+  it("the widget extension defines no colours of its own", () => {
+    const hexes = widgets.match(/"#[0-9A-Fa-f]{6}"/g) ?? [];
+    expect(hexes, "the widgets should draw from TallyPalette, not a private copy").toEqual([]);
   });
 });

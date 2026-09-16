@@ -17,6 +17,7 @@ import { pushRoutes } from "./routes/push.ts";
 import { messageRoutes } from "./routes/messages.ts";
 import { configFrom } from "./apns.ts";
 import { dispatchNotifications } from "./notify.ts";
+import { dispatchActivities } from "./activities.ts";
 
 /** Injected by Vite at build time (git sha); "dev" when running under the test runner. */
 export const BUILD_ID: string = typeof __BUILD_ID__ === "string" ? __BUILD_ID__ : "dev";
@@ -204,8 +205,15 @@ const handler: ExportedHandler<Env> = {
         // Straight after, so a result that has just landed is already in the database when we work
         // out whether a slate is over. Every message is claimed before it is sent, so a firing that
         // finds nothing new says nothing.
-        const pushed = await dispatchNotifications(env, SEASON, now, configFrom(env));
+        const config = configFrom(env);
+        const pushed = await dispatchNotifications(env, SEASON, now, config);
         if (pushed.sent || pushed.retired || pushed.skipped) console.log("notifications", JSON.stringify(pushed));
+        // And the lock screens, which are a rewrite rather than an interruption: there is nothing
+        // to claim and nothing to say twice, so this can run every firing without anyone noticing.
+        const activities = await dispatchActivities(env, SEASON, now, config);
+        if (activities.updated || activities.ended || activities.gone) {
+          console.log("live activities", JSON.stringify(activities));
+        }
       })(),
     );
   },

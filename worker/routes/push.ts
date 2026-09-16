@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../env.ts";
 import { badRequest } from "../errors.ts";
-import { deletePushToken, savePushToken } from "../db.ts";
+import { deletePushToken, endLiveActivity, saveLiveActivity, savePushToken } from "../db.ts";
 
 /**
  * Where the app says "you can reach me here".
@@ -73,3 +73,76 @@ pushRoutes.delete("/:token", async (c) => {
   await deletePushToken(c.env.DB, token);
   return c.json({ ok: true });
 });
+
+/**
+ * Where the app says "there is a lock screen here, keep it current".
+ *
+ * ActivityKit hands the app a token some moments after the activity starts, and reissues it
+ * without warning, so this is called whenever one arrives rather than once. The entry is taken
+ * from the request body rather than from whoever is signed in: one install runs several entries,
+ * and each of them has its own lock screen.
+ */
+pushRoutes.post("/activity", async (c) => {
+  const player = c.get("player");
+  const account = c.get("account");
+  if (!player && !account) throw badRequest("NO_PLAYER", "Sign in first.");
+
+  const body = (await c.req.json().catch(() => ({}))) as {
+    token?: unknown;
+    environment?: unknown;
+    entryId?: unknown;
+    week?: unknown;
+  };
+  const token = typeof body.token === "string" ? body.token.trim() : "";
+  if (!TOKEN.test(token)) throw badRequest("BAD_TOKEN", "That is not an activity token.");
+  const week = typeof body.week === "number" && Number.isInteger(body.week) ? body.week : 0;
+  if (week < 1) throw badRequest("BAD_WEEK", "An activity belongs to a week.");
+
+  // The entry has to be one this caller may speak for. Without the check, a token plus any signed
+  // in device could point somebody else's lock screen at this one's week.
+  const entryId = typeof body.entryId === "string" ? body.entryId : "";
+  const allowed = await entriesFor(c.env.DB, player?.id ?? null, account?.id ?? null);
+  if (!entryId || !allowed.has(entryId)) throw badRequest("BAD_ENTRY", "That is not one of your entries.");
+
+  await saveLiveActivity(
+    c.env.DB,
+    {
+      token,
+      environment: body.environment === "sandbox" ? "sandbox" : "production",
+      playerId: entryId,
+      week,
+    },
+    c.get("now"),
+  );
+  return c.json({ ok: true });
+});
+
+/** The lock screen is gone — dismissed, or the week ended while the app was open. */
+pushRoutes.delete("/activity/:token", async (c) => {
+  const player = c.get("player");
+  const account = c.get("account");
+  if (!player && !account) throw badRequest("NO_PLAYER", "Sign in first.");
+  const token = c.req.param("token").trim();
+  if (!TOKEN.test(token)) throw badRequest("BAD_TOKEN", "That is not an activity token.");
+  await endLiveActivity(c.env.DB, token, c.get("now"));
+  return c.json({ ok: true });
+});
+
+/** The entries this caller may act for: their own row, plus anything their account manages. */
+async function entriesFor(
+  db: D1Database,
+  playerId: string | null,
+  accountId: string | null,
+): Promise<Set<string>> {
+  const ids = new Set<string>();
+  if (playerId) ids.add(playerId);
+  if (accountId) {
+    ids.add(accountId);
+    const { results } = await db
+      .prepare("SELECT player_id FROM entry_owners WHERE owner_id = ?")
+      .bind(accountId)
+      .all<{ player_id: string }>();
+    for (const r of results) ids.add(r.player_id);
+  }
+  return ids;
+}

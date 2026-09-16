@@ -237,6 +237,20 @@ final class AppModel {
                 try? await self?.service.unregisterPushToken(token)
             }
         )
+        // Whenever ActivityKit issues a token for a running lock screen, the Worker hears about it.
+        // Without this the activity only ever updates while the app is open, which is the one time
+        // nobody needs a lock screen.
+        live.onToken = { [weak self] entryId, week, token in
+            guard let self else { return }
+            Task {
+                try? await self.service.registerActivityToken(
+                    token,
+                    entryId: entryId,
+                    week: week,
+                    environment: PushEnvironment.current
+                )
+            }
+        }
         Task {
             await push.refreshPermission()
             live.adoptExisting()
@@ -268,15 +282,27 @@ final class AppModel {
      Activities are switched off.
      */
     func syncLiveActivity(week: Int, response: WeekResponse) {
-        guard let name = player?.name else { return }
+        guard let entry = player else { return }
         let state = WeekActivityAttributes.ContentState.from(
             picks: response.myPicks,
             games: response.games,
-            now: ServerClock.shared.now
+            now: ServerClock.shared.now,
+            place: response.standing?.place,
+            field: response.standing?.field
         )
         let firstKickoff = response.games.map(\.kickoffAt).min()
+        // The name only earns its place on the lock screen when there is more than one of them to
+        // tell apart; on a single entry it is the reader's own name, which they know.
+        let label = people.count > 1 ? entry.name : ""
         Task {
-            await live.sync(week: week, entryName: name, poolName: poolName, state: state, firstKickoff: firstKickoff)
+            await live.sync(
+                week: week,
+                entryId: entry.id,
+                entryName: label,
+                poolName: poolName,
+                state: state,
+                firstKickoff: firstKickoff
+            )
         }
     }
 
