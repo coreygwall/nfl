@@ -193,8 +193,102 @@ five picks, three bold letters read from arm's length where a squashed logo does
 the extension free of the app's asset catalog. The app keeps the activity current while it is open
 and hands the Worker a push token to update it while it is not.
 
-None of it sends until the APNs key is installed. See **Push notifications** in `CLAUDE.md` for the
-one command — it is the only part of this that cannot be done from the repository.
+None of it sends until the APNs key is installed. That, and one click in Xcode, are the only parts
+of this that cannot be done from the repository — the runbook below is all of it.
+
+## Switching it on: the four things only you can do
+
+Everything in the repository is done. The code, the entitlements, the Info.plist keys, the widget
+extension's embedding into the app — all of it is committed and builds green on CI. What is left
+needs your Apple developer account and your Cloudflare login, which a repository cannot have.
+
+It is four steps and takes about ten minutes. Widgets work after step 1; notifications and Live
+Activities need all four.
+
+### 1. Let Xcode register the App Group
+
+Open `ios/Tally.xcodeproj` → select the **Tally** target → **Signing & Capabilities** → make sure
+your team is selected. Do the same for the **TallyWidgetsExtension** target.
+
+Both already carry `group.app.playtally.ios` in their entitlements, so this is usually silent —
+Xcode creates and registers the group as part of provisioning. If instead you see a red error
+saying the provisioning profile *doesn't include the `com.apple.security.application-groups`
+entitlement*, click **Try Again** / the **Fix Issue** button beside it. That is Xcode asking
+permission to register the identifier, and it only ever has to be granted once.
+
+The Keychain group (`$(AppIdentifierPrefix)app.playtally.shared`) needs nothing at all — a keychain
+access group is just a name under your team, not a registered identifier.
+
+**After this step the widgets work.** They read a snapshot the app leaves in the shared container
+and need no server key. Long-press the home screen → **+** → search *Tally*.
+
+### 2. Mint the APNs key
+
+At [developer.apple.com/account](https://developer.apple.com/account) → **Certificates, Identifiers
+& Profiles** → **Keys** → the **+** button.
+
+- Give it a name — *Tally push* is fine, it is only a label.
+- Tick **Apple Push Notifications service (APNs)**.
+- **Continue** → **Register** → **Download**.
+
+Two things to know before you click Download:
+
+- **The `.p8` file downloads once and can never be downloaded again.** Put it somewhere you keep
+  things, not in Downloads. If you lose it you revoke the key and make a new one — no disaster,
+  but it is ten minutes you would rather not repeat.
+- **Never commit it.** It is the credential that lets anything send a push as this app. It belongs
+  in the Cloudflare secret store, which is what step 3 is.
+
+On the same page, note the key's **Key ID** — ten characters, like `A1B2C3D4E5`. You need it in
+step 4.
+
+### 3. Put the key into Cloudflare
+
+```sh
+npx wrangler secret put APNS_KEY
+```
+
+It prompts for a value. Paste the **entire contents** of the `.p8` file, including the
+`-----BEGIN PRIVATE KEY-----` and `-----END PRIVATE KEY-----` lines, then press enter.
+
+### 4. Add the Key ID and deploy
+
+In `wrangler.jsonc`, set the Key ID you noted in step 2:
+
+```jsonc
+"APNS_KEY_ID": "A1B2C3D4E5"
+```
+
+Unlike the key itself this is **not a secret** — it travels in the header of every push — so it
+belongs in config, committed. Then push to the deploy branch (`claude/nfl-pool-app-9tv2om`), which
+is what releases it.
+
+`APPLE_TEAM_ID` and `APPLE_BUNDLE_ID` are already filled in.
+
+### Checking it worked
+
+The cron sweep logs its own state. In the Cloudflare dashboard → your Worker → **Logs**, a firing
+with push switched off says exactly what is still missing:
+
+```
+notifications {"sent":0,...,"skipped":"push is not configured yet — missing APNS_KEY_ID (wrangler.jsonc, the key's 10-character id)"}
+```
+
+Once it is configured that line disappears and you get counts instead. The quickest end-to-end
+test is to have somebody not finish their picks a couple of hours before a Thursday kickoff — the
+nudge is the first message a week sends.
+
+### If a notification still does not arrive
+
+- **Nothing at all, on a device build.** A build signed by Xcode is reachable only on Apple's
+  *sandbox* host; a TestFlight or App Store build only on *production*. The app tells the Worker
+  which it is (`PushEnvironment.current`) so this is usually right automatically — but a token
+  registered by one kind of build and then used by the other is silently dropped by Apple.
+  Reinstalling re-registers it.
+- **Some people, not others.** Check the switches: Account → Notifications → *Choose what to hear*.
+  A muted entry or a switched-off kind is honoured per device.
+- **The lock screen never updates while the app is closed.** That is the Live Activity push path,
+  which needs the same key — and also needs Live Activities left on in iOS Settings → Tally.
 
 ## Tests
 

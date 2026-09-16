@@ -37,6 +37,11 @@ targets:
         CFBundleDisplayName: Tally
         LSApplicationCategoryType: public.app-category.sports
         UILaunchScreen: {}
+        NSSupportsLiveActivities: true
+        # A Live Activity's push updates are budgeted by the system. This asks for the higher
+        # allowance, which a scoreboard genuinely needs: the Worker rewrites the lock screen every
+        # time a slate settles, across a Sunday, and without it the later ones are the ones dropped.
+        NSSupportsLiveActivitiesFrequentUpdates: true
         UIApplicationSceneManifest:
           UIApplicationSupportsMultipleScenes: false
         UISupportedInterfaceOrientations: [UIInterfaceOrientationPortrait]

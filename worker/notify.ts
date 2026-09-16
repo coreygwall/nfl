@@ -2,7 +2,7 @@ import type { Notification } from "../shared/notify.ts";
 import { planNotifications, WINDOW_MS } from "../shared/notify-plan.ts";
 import { allows } from "../shared/notify-prefs.ts";
 import { ms } from "../shared/week.ts";
-import { send, type ApnsConfig, type PushResult } from "./apns.ts";
+import { missingApnsConfig, send, type ApnsConfig, type ApnsEnv, type PushResult } from "./apns.ts";
 import {
   claimNotification,
   entriesByOwner,
@@ -26,7 +26,7 @@ import {
  * buzzing twice for the same slate.
  */
 
-export interface NotifyEnv {
+export interface NotifyEnv extends ApnsEnv {
   DB: D1Database;
   POOL_SLUG?: string;
 }
@@ -83,7 +83,7 @@ export async function dispatchNotifications(
   config: ApnsConfig | null,
   sender: typeof send = send,
 ): Promise<DispatchReport> {
-  if (!config) return { ...EMPTY, skipped: "no APNs key configured" };
+  if (!config) return { ...EMPTY, skipped: `push is not configured yet — missing ${missingApnsConfig(env).join(", ")}` };
 
   const [games, players, picks, tokens, owned] = await Promise.all([
     listGames(env.DB, season),

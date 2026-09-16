@@ -40,9 +40,15 @@ The same key is what lights up **Live Activities**, which are pushed rather than
 `<bundle>.push-type.liveactivity` sub-topic. Until the key exists it reports `skipped` and the lock
 screen only moves while the app is open — which is the one time nobody is looking at a lock screen.
 
-Nothing else needs doing in the developer portal. The Push Notifications capability is in
+Nothing else needs doing in the developer portal for push. The Push Notifications capability is in
 `ios/Tally/Tally.entitlements`, and Xcode enables it on the App ID itself when it provisions with
-automatic signing — the same way it already handles associated domains.
+automatic signing — the same way it already handles associated domains. The **App Group** the
+widgets read is the one identifier Xcode may ask permission to register; `ios/README.md` has the
+click-by-click version of all of this under *Switching it on*.
+
+A half-finished setup used to report `no APNs key configured` even when the key was the part that
+*was* done — `missingApnsConfig` names the actual gap now, because the ten-character Key ID in
+`wrangler.jsonc` is the piece that gets forgotten and the `.p8` is the piece that takes effort.
 
 ## Notifications: what is built, and the one switch that was decoration
 

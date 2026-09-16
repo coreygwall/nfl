@@ -1,6 +1,6 @@
 import { activityPayload, buildActivityState, picksSettled, staleEpochFor } from "../shared/live-activity.ts";
 import { buildWeekBoard } from "../shared/scoring.ts";
-import { send, type ApnsConfig, type PushResult } from "./apns.ts";
+import { missingApnsConfig, send, type ApnsConfig, type ApnsEnv, type PushResult } from "./apns.ts";
 import {
   endLiveActivity,
   listAllPicks,
@@ -24,7 +24,7 @@ import {
  * as often as the cron fires.
  */
 
-export interface ActivityEnv {
+export interface ActivityEnv extends ApnsEnv {
   DB: D1Database;
 }
 
@@ -53,7 +53,7 @@ export async function dispatchActivities(
   config: ApnsConfig | null,
   sender: typeof send = send,
 ): Promise<ActivityReport> {
-  if (!config) return { ...EMPTY, skipped: "no APNs key configured" };
+  if (!config) return { ...EMPTY, skipped: `push is not configured yet — missing ${missingApnsConfig(env).join(", ")}` };
 
   const activities = await listLiveActivities(env.DB);
   if (activities.length === 0) return { ...EMPTY };
