@@ -100,7 +100,7 @@ struct PickFlowView: View {
         switch step {
         case .review:
             ReviewStep(week: week, games: games, myPicks: myPicks, pickCounts: data.pickCounts, lockedNow: lockedNow, anyUnlocked: anyUnlocked,
-                       submitted: data.submitted, status: status, onEdit: { setStep(.select) })
+                       submitted: data.submitted, standing: data.standing, status: status, onEdit: { setStep(.select) })
         case .select:
             SelectStep(games: games, draft: draft, frozen: frozen, lockedNow: lockedNow, pickCounts: data.pickCounts, allLocked: allLocked,
                        hasSaved: hasSaved, currentWeek: model.currentWeek, week: week, now: now, openCount: openGames.count,

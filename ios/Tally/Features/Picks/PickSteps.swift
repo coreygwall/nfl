@@ -232,6 +232,17 @@ struct DoneStep: View {
 
 // MARK: Review
 
+/**
+ The week, once your five are in — which on a Sunday is the screen that matters.
+
+ It used to be a receipt: five rows, a points total, "3 of 4 right so far". That is fine on a
+ Tuesday and useless at four o'clock, when what you want to know is which of yours is on, whether
+ it is winning, what is still to play for and where that leaves you. So this is the lock screen's
+ Live Activity, drawn large: the same phase rule, the same words under the header, the same banked
+ / outstanding pairing on the number, and the place beside it — with the room a phone screen has
+ to add the score of each game and who is leading it. One rule and one wording, so the lock screen
+ and the tab never disagree about the afternoon.
+ */
 struct ReviewStep: View {
     @Environment(AppModel.self) private var model
     let week: Int
@@ -241,6 +252,7 @@ struct ReviewStep: View {
     let lockedNow: (Game) -> Bool
     let anyUnlocked: Bool
     let submitted: Int
+    let standing: WeekResponse.Standing?
     let status: (label: String, fill: Color)?
     let onEdit: () -> Void
 
@@ -261,27 +273,31 @@ struct ReviewStep: View {
         }
     }
 
+    /// The same state the lock screen is pushed, worked out from the week in hand.
+    private var state: WeekActivityAttributes.ContentState {
+        .from(picks: myPicks, games: games, now: model.now, place: standing?.place, field: standing?.field)
+    }
+
     var body: some View {
         let rows = rows
-        let points = rows.reduce(0) { $0 + $1.points }
-        let correct = rows.filter { $0.outcome == .win }.count
-        let finals = rows.filter { [.win, .loss, .tie].contains($0.outcome) }.count
+        let state = state
         let started = games.filter(lockedNow)
         let nextKick = games.filter { !lockedNow($0) }.map(\.kickoffAt).min()
 
         VStack(alignment: .leading, spacing: 20) {
             VStack(alignment: .leading, spacing: 12) {
                 HStack(alignment: .top) {
-                    VStack(alignment: .leading, spacing: 4) {
+                    VStack(alignment: .leading, spacing: 5) {
                         HStack(spacing: 8) {
                             Text("Your five").display(26)
                             if let status { Chip(text: status.label, fill: status.fill) }
                         }
-                        Text(finals == 0
+                        WeekStatusLine(state: state)
+                        Text(state.settledCount == 0
                              ? "\(Format.plural(rows.count, "pick")) in · \(Format.plural(submitted, "player")) submitted"
-                             : "\(correct) of \(finals) right so far")
-                            .sans(14).foregroundStyle(Color.ink2)
-                        if let nextKick {
+                             : "\(state.wonCount) of \(state.settledCount) right so far")
+                            .sans(12).foregroundStyle(Color.ink3)
+                        if anyUnlocked, let nextKick {
                             HStack(spacing: 3) {
                                 Image(systemName: "lock.fill").font(.system(size: 9, weight: .bold))
                                 Text("Next game locks \(Format.slot(nextKick))")
@@ -289,11 +305,8 @@ struct ReviewStep: View {
                             .sans(12).foregroundStyle(Color.ink3)
                         }
                     }
-                    Spacer()
-                    VStack(alignment: .trailing, spacing: 0) {
-                        Text("\(points)").font(TallyFont.display(40)).monospacedDigit()
-                        Text("POINTS").font(TallyFont.sans(10, weight: .bold)).tracking(1).foregroundStyle(Color.ink3)
-                    }
+                    Spacer(minLength: 12)
+                    WeekScore(state: state)
                 }
                 VStack(spacing: 8) {
                     ForEach(rows) { row in
@@ -330,6 +343,71 @@ struct ReviewStep: View {
                         WhoPickedWhom(game: g, counts: pickCounts[g.id] ?? PickCount(away: 0, home: 0), mine: myPicks.first { $0.gameId == g.id }?.team)
                     }
                 }
+            }
+        }
+    }
+}
+
+/// The phase, in a sentence, with the lock screen's dot in front of it.
+private struct WeekStatusLine: View {
+    let state: WeekActivityAttributes.ContentState
+
+    var body: some View {
+        HStack(spacing: 6) {
+            if let dot { Circle().fill(dot).frame(width: 7, height: 7) }
+            Text(state.statusLine(clock: Format.time))
+                .sans(14, weight: .semibold).foregroundStyle(Color.ink2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+
+    private var dot: Color? {
+        switch state.phase {
+        case .live: return .turf
+        case .between: return .flag
+        case .final: return state.place == 1 ? .flag : nil
+        case .locked, .watching: return nil
+        }
+    }
+}
+
+/**
+ Banked, and what is still out there — the lock screen's pairing, at phone size.
+
+ Before anything settles a big 0 is an accurate number and a discouraging one, so the stake leads
+ instead. Once points exist they lead and roll as they change, with the outstanding total behind
+ them in green as the reason to keep watching. The place sits underneath when there is one, and
+ takes the flag on a won week.
+ */
+private struct WeekScore: View {
+    let state: WeekActivityAttributes.ContentState
+
+    var body: some View {
+        VStack(alignment: .trailing, spacing: 2) {
+            if state.phase == .locked {
+                Text("\(state.possible)").font(TallyFont.display(40)).monospacedDigit().foregroundStyle(Color.ink2)
+                Text("TO PLAY").font(TallyFont.sans(10, weight: .bold)).tracking(1).foregroundStyle(Color.ink3)
+            } else {
+                HStack(alignment: .firstTextBaseline, spacing: 4) {
+                    Text("\(state.points)").font(TallyFont.display(40)).monospacedDigit()
+                        .contentTransition(.numericText())
+                        .animation(Motion.settle, value: state.points)
+                    if state.possible > 0 {
+                        Text("+\(state.possible)").font(TallyFont.display(16)).monospacedDigit().foregroundStyle(Color.turf)
+                            .accessibilityLabel("\(state.possible) still to play for")
+                    }
+                }
+                Text("POINTS").font(TallyFont.sans(10, weight: .bold)).tracking(1).foregroundStyle(Color.ink3)
+            }
+            if let place = state.place, let field = state.field, field > 1 {
+                let winner = place == 1 && state.phase == .final
+                Text("\(Scoring.ordinal(place)) of \(field)")
+                    .sans(11, weight: .bold).monospacedDigit()
+                    .foregroundStyle(winner ? Color.onAccent : Color.ink2)
+                    .padding(.horizontal, 8).padding(.vertical, 3)
+                    .background(Capsule().fill(winner ? Color.flag : Color.paper2))
+                    .padding(.top, 4)
+                    .accessibilityLabel("\(Scoring.ordinal(place)) of \(field)")
             }
         }
     }

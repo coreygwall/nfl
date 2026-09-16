@@ -165,6 +165,49 @@ public struct WeekActivityAttributes: Codable, Hashable, Sendable {
 
         /// A short line for the places too small to draw five slots, like the Dynamic Island.
         public var summary: String { "\(wonCount)/\(settledCount) · \(points) pts" }
+
+        /**
+         The line under the row, which is where the five phases actually differ.
+
+         Each one answers the question that phase raises and nothing else: when does this start,
+         what is still live, when is the next one, can my position still move, and how did it end.
+         It lives here rather than in the widget so the lock screen and the picks tab say the same
+         thing in the same words — a Sunday afternoon is one situation, not two. `clock` formats a
+         kickoff in the reader's own zone. Staleness outranks everything: it is a statement about
+         whether the rest can be believed.
+         */
+        public func statusLine(stale: Bool = false, clock: (Date) -> String) -> String {
+            if stale { return "Scores may be behind." }
+            let left = outstanding
+            switch phase {
+            case .locked:
+                guard let kickoff = nextKickoff else { return "Picks are in." }
+                return "Picks are in — first game \(clock(kickoff))."
+            case .live:
+                let live = slots.filter { $0.state == .live }.count
+                let onNow = live == 1 ? "1 game on now" : "\(live) games on now"
+                return "\(onNow) · \(left.points) still to play for."
+            case .between:
+                guard let kickoff = nextKickoff else {
+                    return "\(Self.games(left.games)) left, worth \(left.points)."
+                }
+                return "Back at \(clock(kickoff)) · \(Self.games(left.games)) left, worth \(left.points)."
+            case .watching:
+                // Their five are done and the week is not. Saying so is the only honest thing
+                // here: the points have stopped moving and the place has not.
+                return "All five in. Your place can still move."
+            case .final:
+                guard let place, let field, field > 1 else {
+                    return "That is the week — \(Self.points(points))."
+                }
+                return place == 1
+                    ? "You won the week on \(Self.points(points))."
+                    : "\(Scoring.ordinal(place)) of \(field) on \(Self.points(points))."
+            }
+        }
+
+        private static func games(_ n: Int) -> String { n == 1 ? "1 game" : "\(n) games" }
+        private static func points(_ n: Int) -> String { n == 1 ? "1 point" : "\(n) points" }
     }
 }
 
