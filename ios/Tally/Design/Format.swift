@@ -1,4 +1,7 @@
 import Foundation
+// `list` calls through to Names in TallyKit, so that the widget extension and the app say a
+// tie the same way.
+import TallyKit
 
 /// Date and time the way the site writes them, in the phone's own zone.
 enum Format {
