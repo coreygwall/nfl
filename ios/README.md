@@ -285,7 +285,7 @@ nudge is the first message a week sends.
   which it is (`PushEnvironment.current`) so this is usually right automatically — but a token
   registered by one kind of build and then used by the other is silently dropped by Apple.
   Reinstalling re-registers it.
-- **Some people, not others.** Check the switches: Account → Notifications → *Choose what to hear*.
+- **Some people, not others.** Check the switches: Account → Notifications, which opens the per-kind, per-entry switches once permission is granted.
   A muted entry or a switched-off kind is honoured per device.
 - **The lock screen never updates while the app is closed.** That is the Live Activity push path,
   which needs the same key — and also needs Live Activities left on in iOS Settings → Tally.

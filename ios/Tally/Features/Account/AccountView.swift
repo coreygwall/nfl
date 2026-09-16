@@ -3,13 +3,24 @@ import TallyKit
 import UIKit
 
 /**
- Two different jobs used to share one sheet, which is why it felt busy: *which name am I picking
- as* is a thing you do mid-week in two taps, and *my account* is a thing you visit once. The
- switcher is the row of names above the picks (`EntryPicker`); everything else lives here, on its
- own tab.
+ Your account, grouped the way Settings groups things: who you are, what you run, what you have
+ switched on, and the doors out.
+
+ It used to be one long column in which "add an entry", "set up Face ID", the appearance control
+ and a row of small office buttons all carried the same weight, and the two things a commissioner
+ opens most were the smallest controls on the page. The order here is how often each thing is
+ touched: entries (mid-week, often), the offices (weekly, for the few who hold one), settings
+ (once), the other-device link (once per device), and everything about Tally itself last. Every
+ door is a full-width row with a chevron, so the page reads as a list of places rather than a
+ form.
+
+ Two things are deliberately elsewhere. *Which entry am I picking as* is the row of names above the
+ picks (`EntryPicker`); here the entries are managed, not chosen. And *which pool* is the chip in
+ the navigation bar, so the entries section is named after the pool to say whose entries these are.
  */
 struct AccountView: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.openURL) private var openURL
     @State private var showCode = false
     @State private var adding = false
 
@@ -18,20 +29,24 @@ struct AccountView: View {
     private var entries: [Identity] { model.people }
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 22) {
-            VStack(alignment: .leading, spacing: 4) {
-                SectionLabel(text: "Signed in as")
-                Text(accountName).display(28)
-                Text("One account, and every entry it picks for.")
-                    .sans(14).foregroundStyle(Color.ink2)
-            }
-
+        VStack(alignment: .leading, spacing: 24) {
+            header
             entriesSection
-            passkeySection
-            appearanceSection
-            notificationsSection
-            anotherDeviceSection
-            moreSection
+            if model.isCommissioner || model.isLeagueAdmin || model.legacyPin != nil { officeSection }
+            settingsSection
+            deviceSection
+            aboutSection
+        }
+        .task { await model.push.refreshPermission() }
+    }
+
+    // MARK: Who
+
+    private var header: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionLabel(text: "Signed in as")
+            Text(accountName).display(28)
+            PasskeyRow(hasPasskey: (boot?.myPasskeys ?? 0) > 0)
         }
     }
 
@@ -39,7 +54,7 @@ struct AccountView: View {
 
     private var entriesSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionLabel(text: "Your entries")
+            SectionLabel(text: "Entries in \(model.poolName)")
             ForEach(entries) { p in
                 let active = p.id == model.player?.id
                 Button {
@@ -73,78 +88,182 @@ struct AccountView: View {
         }
     }
 
-    // MARK: Face ID
+    // MARK: Offices
 
-    private var passkeySection: some View {
+    /// Drawn only for someone with a door to open — or a PIN saved from when the PIN *was* the door,
+    /// which the claim card inside the commissioner sheet turns into a proper grant.
+    private var officeSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionLabel(text: "Signing in")
-            PasskeyRow(hasPasskey: (boot?.myPasskeys ?? 0) > 0)
+            SectionLabel(text: "Run the pool")
+            SettingsGroup {
+                if model.isCommissioner {
+                    SettingsRow(title: "Commissioner", detail: "\(model.poolName): roster, name, invite, export", symbol: "key.fill") {
+                        model.showCommissioner = true
+                    }
+                } else if model.legacyPin != nil {
+                    SettingsRow(title: "Claim the commissioner's office", detail: "This phone still has the pool's PIN. One tap moves the office onto your account.", symbol: "key.fill") {
+                        model.showCommissioner = true
+                    }
+                }
+                if model.isLeagueAdmin {
+                    if model.isCommissioner || model.legacyPin != nil { SettingsDivider() }
+                    SettingsRow(title: "League office", detail: "Results, schedule and the score feed, for every pool on Tally", symbol: "building.columns.fill") {
+                        model.showLeagueOffice = true
+                    }
+                }
+            }
         }
     }
 
-    // MARK: Appearance
+    // MARK: Settings
 
-    private var appearanceSection: some View {
+    private var settingsSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionLabel(text: "Appearance")
-            TallySegmented(
-                value: Binding(get: { model.theme }, set: { model.theme = $0 }),
-                options: ThemeChoice.allCases.map { ($0, $0.label) }
-            )
-            Text("Auto matches your iPhone. Light or Dark stays selected until you change it.")
-                .sans(12).foregroundStyle(Color.ink2)
+            SectionLabel(text: "Settings")
+            SettingsGroup {
+                notificationsRow
+                SettingsDivider()
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 12) {
+                        Image(systemName: "circle.lefthalf.filled").font(.system(size: 15, weight: .bold)).frame(width: 24)
+                        Text("Appearance").font(TallyFont.display(16))
+                    }
+                    TallySegmented(
+                        value: Binding(get: { model.theme }, set: { model.theme = $0 }),
+                        options: ThemeChoice.allCases.map { ($0, $0.label) }
+                    )
+                    Text("Auto matches your iPhone. Light or Dark stays selected until you change it.")
+                        .sans(12).foregroundStyle(Color.ink2)
+                }
+                .padding(12)
+            }
         }
     }
 
-    // MARK: Notifications
+    /**
+     One row that says where notifications stand and does the one thing that changes it.
 
-    private var notificationsSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SectionLabel(text: "Notifications")
-            NotificationsRow()
+     iOS only ever asks once, so the row's job changes with the answer: not asked yet, it asks;
+     allowed, it opens the per-kind, per-entry switches; refused, it goes to Settings, which is the
+     only place a refusal can be undone. A second in-app prompt after a "no" is silently a no.
+     */
+    @ViewBuilder private var notificationsRow: some View {
+        switch model.push.permission {
+        case .granted:
+            SettingsRow(title: "Notifications", detail: "On · choose what to hear, and about whom", symbol: "bell.fill", tint: .turf) {
+                model.showNotificationSettings = true
+            }
+        case .denied:
+            SettingsRow(title: "Notifications", detail: "Off in Settings — iOS only asks once, so it has to be changed there", symbol: "bell.slash.fill") {
+                if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
+            }
+        case .notAsked, .unknown:
+            SettingsRow(title: "Notifications", detail: "A message when each set of games is done, and a nudge if you haven't picked", symbol: "bell") {
+                Task { await model.offerNotifications() }
+            }
         }
     }
 
     // MARK: Another device
 
-    private var anotherDeviceSection: some View {
+    private var deviceSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionLabel(text: "Play on another device")
+            SectionLabel(text: "Another device")
             if showCode, let code = boot?.myCode {
                 DeviceCodeCard(code: code, name: accountName, accountId: boot?.account?.id)
             } else {
-                Button("Show my sign-in link and code") { showCode = true }
-                    .buttonStyle(.tally(.plain, size: .small))
+                SettingsGroup {
+                    SettingsRow(title: "Sign in on another device", detail: "A one-tap link to text yourself, and the code to type if you'd rather", symbol: "iphone.and.arrow.forward") {
+                        showCode = true
+                    }
                     .disabled(boot?.myCode == nil)
-                Text("A one-tap link you can text yourself, and the code to type if you'd rather.")
-                    .sans(12).foregroundStyle(Color.ink2)
+                }
             }
         }
     }
 
-    // MARK: More
+    // MARK: About
 
-    private var moreSection: some View {
+    private var version: String {
+        let info = Bundle.main.infoDictionary
+        let short = info?["CFBundleShortVersionString"] as? String ?? "—"
+        let build = info?["CFBundleVersion"] as? String
+        return build.map { "\(short) (\($0))" } ?? short
+    }
+
+    private var aboutSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            DashedDivider()
-            HStack(spacing: 8) {
-                if model.isCommissioner {
-                    Button { model.showCommissioner = true } label: { Label("Commissioner", systemImage: "key.fill") }
-                        .buttonStyle(.tally(.plain, size: .small))
+            SectionLabel(text: "About Tally")
+            SettingsGroup {
+                SettingsRow(title: "How scoring works", symbol: "book.fill") { model.showRules = true }
+                SettingsDivider()
+                SettingsRow(title: "Join or start a pool", detail: "And what else Tally plays", symbol: "square.grid.2x2.fill") { model.showPools = true }
+                SettingsDivider()
+                HStack(spacing: 12) {
+                    Image(systemName: "info.circle").font(.system(size: 15, weight: .bold)).foregroundStyle(Color.ink3).frame(width: 24)
+                    Text("Version \(version)").sans(13).foregroundStyle(Color.ink2)
+                    Spacer()
                 }
-                if model.isLeagueAdmin {
-                    Button { model.showLeagueOffice = true } label: { Label("League office", systemImage: "building.columns.fill") }
-                        .buttonStyle(.tally(.plain, size: .small))
-                }
-                Button { model.showPools = true } label: { Label("Pools", systemImage: "square.grid.2x2.fill") }
-                    .buttonStyle(.tally(.plain, size: .small))
+                .padding(12)
             }
             LinkButton(title: "Sign out on this phone", color: .danger) { model.signOut() }
-                .padding(.top, 4)
+                .padding(.top, 6)
             Text("Your picks stay on the board. Signing back in needs \(Biometry.label) or your code.")
                 .sans(12).foregroundStyle(Color.ink3)
         }
     }
+}
+
+// MARK: Rows
+
+/// A door: a symbol, a title, what is behind it, and a chevron. Full width, so it reads as a place.
+private struct SettingsRow: View {
+    let title: String
+    var detail: String? = nil
+    let symbol: String
+    var tint: Color = .ink
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 12) {
+                Image(systemName: symbol)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(tint)
+                    .frame(width: 24)
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(title).font(TallyFont.display(16)).foregroundStyle(Color.ink)
+                    if let detail {
+                        Text(detail).sans(12).foregroundStyle(Color.ink2)
+                            .fixedSize(horizontal: false, vertical: true)
+                    }
+                }
+                Spacer(minLength: 8)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 12, weight: .bold))
+                    .foregroundStyle(Color.ink3)
+                    .accessibilityHidden(true)
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+    }
+}
+
+/// Rows stacked in one card, the way Settings groups them.
+private struct SettingsGroup<Content: View>: View {
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 0) { content }
+            .cardFlat()
+    }
+}
+
+private struct SettingsDivider: View {
+    var body: some View { DashedDivider().padding(.horizontal, 12) }
 }
 
 /// Every signed-in account can create a named entry it owns.
@@ -313,53 +432,5 @@ struct FlowLayout: Layout {
             x += size.width + spacing
             rowHeight = max(rowHeight, size.height)
         }
-    }
-}
-
-/**
- What the app will tell you about, and how to change your mind.
-
- Once iOS has been answered it will not ask again, so a "no" here is a trip to Settings — which is
- what the button does rather than pretending a second prompt would work.
- */
-private struct NotificationsRow: View {
-    @Environment(AppModel.self) private var model
-    @Environment(\.openURL) private var openURL
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 8) {
-            switch model.push.permission {
-            case .granted:
-                HStack(spacing: 8) {
-                    Image(systemName: "bell.fill").foregroundStyle(Color.turf)
-                    Text("On").font(TallyFont.display(16))
-                    Spacer()
-                    Chip(text: "you'll hear", fill: .turfSoft, size: 10)
-                }
-                Text("One message per entry each time a set of games finishes — the 1:00 games, the 4:00 games, Sunday night — plus a nudge if your picks aren't in.")
-                    .sans(12).foregroundStyle(Color.ink2)
-                Button("Choose what to hear") { model.showNotificationSettings = true }
-                    .buttonStyle(.tally(.plain, size: .small))
-            case .denied:
-                Text("Turned off in Settings.").font(TallyFont.display(16))
-                Button("Open Settings") {
-                    if let url = URL(string: UIApplication.openSettingsURLString) { openURL(url) }
-                }
-                .buttonStyle(.tally(.plain, size: .small))
-                Text("iOS only asks once, so this has to be changed there.")
-                    .sans(12).foregroundStyle(Color.ink2)
-            case .notAsked, .unknown:
-                Button("Tell me when my games finish") {
-                    Task { await model.offerNotifications() }
-                }
-                .buttonStyle(.tally(.plain, size: .small))
-                Text("A message when each set of games is done, and a nudge if you haven't picked.")
-                    .sans(12).foregroundStyle(Color.ink2)
-            }
-        }
-        .padding(12)
-        .frame(maxWidth: .infinity, alignment: .leading)
-        .cardFlat()
-        .task { await model.push.refreshPermission() }
     }
 }
