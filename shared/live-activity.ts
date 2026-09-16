@@ -1,5 +1,5 @@
 import { MAX_PICKS } from "./picks.ts";
-import { pointsForRank } from "./scoring.ts";
+import { ordinal, pointsForRank } from "./scoring.ts";
 import type { Game, Pick } from "./types.ts";
 
 /**
@@ -113,6 +113,87 @@ export function buildActivityState(input: BuildActivityInput): ActivityContentSt
 /** Every one of the five has a result. Their points are fixed; their place is not. */
 export function picksSettled(state: ActivityContentState): boolean {
   return state.slots.every((s) => s.state !== "waiting" && s.state !== "live");
+}
+
+/**
+ * Where a week has got to, from one entry's seat.
+ *
+ * Five of them rather than "running" and "over", because the two in the middle are the ones a
+ * Sunday is actually made of. `between` is half past three with the early games in and the late
+ * ones not yet on. `watching` is the hour after your last pick has played, when your points are
+ * fixed and your place is not.
+ */
+export type ActivityPhase = "locked" | "live" | "between" | "watching" | "final";
+
+export function activityPhase(state: ActivityContentState): ActivityPhase {
+  if (state.weekFinal) return "final";
+  if (state.slots.some((s) => s.state === "live")) return "live";
+  if (picksSettled(state)) return "watching";
+  // Nothing of theirs is on: either it has not started at all, or they are between slates.
+  return state.slots.some((s) => s.state !== "waiting") ? "between" : "locked";
+}
+
+/**
+ * Games of theirs still to come or still running, and what those are worth. A pair rather than a
+ * number because "3 games" and "9 points" answer different questions.
+ */
+export function outstanding(state: ActivityContentState): { games: number; points: number } {
+  const left = state.slots.filter((s) => s.state === "waiting" || s.state === "live");
+  return { games: left.length, points: left.reduce((sum, s) => sum + pointsForRank(s.rank), 0) };
+}
+
+export const wonCount = (state: ActivityContentState): number => state.slots.filter((s) => s.state === "won").length;
+export const settledCount = (state: ActivityContentState): number =>
+  state.slots.filter((s) => s.state !== "waiting" && s.state !== "live").length;
+
+const games = (n: number) => (n === 1 ? "1 game" : `${n} games`);
+const points = (n: number) => (n === 1 ? "1 point" : `${n} points`);
+
+/**
+ * The line under the five, which is where the phases actually differ.
+ *
+ * Each answers the question its phase raises and nothing else: when does this start, what is on
+ * now, when is the next one, can my position still move, and how did it end. It is here rather
+ * than in either client because the lock screen and the picks tab say it at the same moment about
+ * the same afternoon, and two copies of a sentence are two sentences. `statusLine(stale:clock:)`
+ * in `WeekActivity.swift` is the same rule for the app, and `liveActivityParity.test.ts` fails if
+ * the wordings drift.
+ *
+ * Staleness outranks everything: it is a statement about whether the rest can be believed.
+ */
+export function statusLine(
+  state: ActivityContentState,
+  opts: { stale?: boolean; clock: (at: Date) => string },
+): string {
+  if (opts.stale) return "Scores may be behind.";
+  const left = outstanding(state);
+  const kickoff = state.nextKickoffEpoch === null ? null : new Date(state.nextKickoffEpoch * 1000);
+  switch (activityPhase(state)) {
+    case "locked":
+      if (!kickoff) return "Picks are in.";
+      return `Picks are in — first game ${opts.clock(kickoff)}.`;
+    case "live": {
+      const live = state.slots.filter((s) => s.state === "live").length;
+      const onNow = live === 1 ? "1 game on now" : `${live} games on now`;
+      return `${onNow} · ${left.points} still to play for.`;
+    }
+    case "between":
+      if (!kickoff) return `${games(left.games)} left, worth ${left.points}.`;
+      return `Back at ${opts.clock(kickoff)} · ${games(left.games)} left, worth ${left.points}.`;
+    case "watching":
+      // Their five are done and the week is not. Saying so is the only honest thing here: the
+      // number above has stopped moving and the position beside it has not.
+      return "All five in. Your place can still move.";
+    case "final": {
+      const { place, field } = state;
+      if (place === null || field === null || field <= 1) {
+        return `That is the week — ${points(state.points)}.`;
+      }
+      return place === 1
+        ? `You won the week on ${points(state.points)}.`
+        : `${ordinal(place)} of ${field} on ${points(state.points)}.`;
+    }
+  }
 }
 
 /** The payload shape ActivityKit expects: a normal `aps` dictionary with the state inside it. */

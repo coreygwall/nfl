@@ -92,6 +92,29 @@ export const Device = ({ size = 18, ...p }: P) => (
     <path d="M9 20h6M12 16v4" />
   </svg>
 );
+export const User = ({ size = 18, ...p }: P) => (
+  <svg {...base(size, p)}>
+    <circle cx="12" cy="8" r="3.6" />
+    <path d="M4.8 20c.9-3.5 3.7-5.4 7.2-5.4s6.3 1.9 7.2 5.4" />
+  </svg>
+);
+export const Key = ({ size = 18, ...p }: P) => (
+  <svg {...base(size, p)}>
+    <circle cx="8" cy="8" r="3.8" />
+    <path d="M10.7 10.7L20 20M17 17l-2 2M20 14l-2 2" />
+  </svg>
+);
+export const Bank = ({ size = 18, ...p }: P) => (
+  <svg {...base(size, p)}>
+    <path d="M3.5 9.5L12 4.5l8.5 5M5.5 9.5v8M18.5 9.5v8M10 9.5v8M14 9.5v8M3.5 20.5h17" />
+  </svg>
+);
+export const Palette = ({ size = 18, ...p }: P) => (
+  <svg {...base(size, p)}>
+    <circle cx="12" cy="12" r="8.5" />
+    <path d="M12 3.5v17" />
+  </svg>
+);
 export const CircleHelp = ({ size = 20, ...p }: P) => (
   <svg {...base(size, p)}>
     <circle cx="12" cy="12" r="9" />

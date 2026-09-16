@@ -15,10 +15,10 @@ struct EntryPicker: View {
     @Environment(AppModel.self) private var model
 
     var body: some View {
-        if model.people.count > 1 {
+        if model.entries.count > 1 {
             ScrollView(.horizontal, showsIndicators: false) {
                 HStack(spacing: 6) {
-                    ForEach(model.people) { p in
+                    ForEach(model.entries) { p in
                         let active = p.id == model.player?.id
                         Button {
                             guard !active else { return }

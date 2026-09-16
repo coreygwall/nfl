@@ -175,7 +175,7 @@ private struct ActivePoolCard: View {
     let failed: Bool
 
     private var boot: BootstrapResponse? { model.boot.value }
-    private var entries: [Identity] { model.people }
+    private var entries: [Identity] { model.entries }
 
     /**
      The board for the week this card is *naming*, and nothing else.

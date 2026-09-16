@@ -8,6 +8,7 @@ import { Welcome } from "./screens/Welcome.tsx";
 import { PickFlow } from "./screens/PickFlow.tsx";
 import { Board } from "./screens/Board.tsx";
 import { Home } from "./screens/Home.tsx";
+import { Account } from "./screens/Account.tsx";
 import { Commissioner } from "./screens/Commissioner.tsx";
 import { League } from "./screens/League.tsx";
 import { Rules } from "./screens/Rules.tsx";
@@ -77,6 +78,7 @@ export default function App() {
               </RequirePlayer>
             }
           />
+          <Route path="account" element={<RequirePlayer><Account /></RequirePlayer>} />
           <Route path="board" element={<BoardIndex />} />
           <Route path="board/week/:week" element={<Board tab="week" />} />
           <Route path="board/season" element={<Board tab="season" />} />

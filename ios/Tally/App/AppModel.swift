@@ -81,7 +81,38 @@ final class AppModel {
 
     private(set) var session: SessionStore
     var player: Identity? { session.active }
+    /// What this device has cached: the tokens, and which name is active. Not the roster — see
+    /// `entries`, which is what every screen showing a list of names should read.
     var people: [Identity] { session.people }
+
+    /**
+     Everyone this account picks for, as the *server* last reported them.
+
+     `people` is a device cache. It exists to hold the token and to remember which name is active,
+     and it used to be the only thing the family was ever drawn from — so whenever the cache fell
+     behind the account, the other entries simply were not in the app, with nothing on screen to
+     say why. `reconcile(with:)` is a silent no-op in exactly the cases that cause it: a bootstrap
+     that came back unauthenticated, a session keyed to a host this install has since moved off, an
+     entry added on the phone in somebody else's pocket. The account owns its entries, so this asks
+     the account, and the cache is only consulted before the first bootstrap has landed.
+
+     The token comes from the cached account row, because a managed entry has none of its own — it
+     rides on the account's. `switchTo` takes an entry into the cache the moment one is chosen.
+     */
+    var entries: [Identity] {
+        guard let boot = boot.value, let account = boot.account, let mine = boot.myEntries, !mine.isEmpty else {
+            return people
+        }
+        let token = people.first { $0.id == account.id }?.token ?? player?.token
+        let all = mine.map { Identity(player: $0, token: token, accountId: account.id, managed: $0.id != account.id) }
+        // The account first, then the names it picks for, however the roster happened to be ordered.
+        return all.filter { $0.id == account.id } + all.filter { $0.id != account.id }
+    }
+
+    /// The server has answered and does not know this device. Everything it is showing is a local
+    /// memory until somebody signs in again, which is worth saying out loud rather than quietly
+    /// drawing one name where a family should be.
+    var deviceUnrecognised: Bool { boot.value != nil && boot.value?.account == nil && player != nil }
 
     // MARK: Data
 
@@ -345,7 +376,7 @@ final class AppModel {
         let firstKickoff = response.games.map(\.kickoffAt).min()
         // The name only earns its place on the lock screen when there is more than one of them to
         // tell apart; on a single entry it is the reader's own name, which they know.
-        let label = people.count > 1 ? entry.name : ""
+        let label = entries.count > 1 ? entry.name : ""
         Task {
             await live.sync(
                 week: week,
@@ -382,13 +413,14 @@ final class AppModel {
         let service = self.service
         let ref = pool
         let name = poolName
-        let entries = people.isEmpty ? [me] : people
+        // The same list the app draws, so the home screen cannot show fewer names than the app.
+        let roster = entries.isEmpty ? [me] : entries
         Task {
             guard let snapshot = try? await WidgetRefresh.snapshot(
                 service: service,
                 pool: ref,
                 poolName: name,
-                entries: entries,
+                entries: roster,
                 bootstrap: boot
             ) else { return }
             if WidgetStore.write(snapshot) { WidgetCenter.shared.reloadAllTimelines() }
@@ -470,7 +502,16 @@ final class AppModel {
 
     func switchTo(_ id: String) {
         var next = session
-        next.setActive(id)
+        if next.people.contains(where: { $0.id == id }) {
+            next.setActive(id)
+        } else if let adopted = entries.first(where: { $0.id == id }) {
+            // Offered from the account rather than from this device's cache. Take it in — with the
+            // account's token, which is the one a managed entry picks on — so the very next request
+            // can be made as them rather than silently staying on the old name.
+            next.save(adopted)
+        } else {
+            return
+        }
         commit(next)
         touchSession()
         Task { await self.refreshBootstrap() }

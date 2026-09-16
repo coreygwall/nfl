@@ -11,11 +11,14 @@ import { clearDraft, emptyDraft, loadDraft, moveInOrder, removeSelection, saveDr
 import { TEAMS, type Abbr } from "../../shared/teams.ts";
 import type { GameDTO } from "../../shared/api.ts";
 import type { Pick } from "../../shared/types.ts";
+import { activityPhase, buildActivityState, outstanding, settledCount, statusLine, wonCount } from "../../shared/live-activity.ts";
+import { ordinal } from "../../shared/scoring.ts";
 import { MAX_PICKS } from "../../shared/picks.ts";
 import { isLocked, WEEKS } from "../../shared/week.ts";
-import { ErrorState, RankBadge, Spinner } from "../components/Common.tsx";
+import { CountUp, ErrorState, RankBadge, Spinner } from "../components/Common.tsx";
 import { GamesSkeleton } from "../components/TallyLoader.tsx";
 import { useHeaderWeek, useHideNav } from "../components/Chrome.tsx";
+import { EntryPicker } from "../components/EntryPicker.tsx";
 import { poolUrl } from "../lib/basename.ts";
 import { ChevronDown, ChevronLeft, ChevronUp, Grip, House, Lock, Share } from "../components/Icons.tsx";
 import { SlideToLock } from "../components/SlideToLock.tsx";
@@ -220,6 +223,7 @@ function PickFlowInner({ week }: { week: number }) {
 
   return (
     <div>
+      <EntryPicker />
       {(step === "select" || step === "rank") && (
         <Link
           to="/"
@@ -232,7 +236,7 @@ function PickFlowInner({ week }: { week: number }) {
       <AnimatePresence mode="wait" initial={false}>
         {step === "review" ? (
           <StepWrap key="review" wide={reviewWide}>
-            <ReviewStep week={week} games={games} myPicks={myPicks} pickCounts={wk.data!.pickCounts} lockedNow={lockedNow} anyUnlocked={anyUnlocked} onEdit={() => setStep("select")} submitted={wk.data!.submitted} status={status} />
+            <ReviewStep week={week} games={games} myPicks={myPicks} pickCounts={wk.data!.pickCounts} lockedNow={lockedNow} anyUnlocked={anyUnlocked} onEdit={() => setStep("select")} submitted={wk.data!.submitted} standing={wk.data!.standing ?? null} status={status} now={now} />
           </StepWrap>
         ) : step === "select" ? (
           <StepWrap key="select" wide>
@@ -713,18 +717,41 @@ function RankRow({
   );
 }
 
+/**
+ * The pick, and how its game is going.
+ *
+ * Before kickoff the second line is the matchup and the time. Once there is a score it is the
+ * score, from this pick's side — "Leading the Raiders 24–17" — because that is what a row is read
+ * for on a Sunday afternoon, and a kickoff time that has already passed says nothing. When it is
+ * over it says how it ended. A game that has started but whose score has not arrived keeps the
+ * matchup rather than inventing 0–0.
+ */
 function MatchupText({ pick, game, compact = false }: { pick: Pick; game?: GameDTO; compact?: boolean }) {
   const t = TEAMS[pick.team];
-  const opp = game ? TEAMS[game.away === pick.team ? game.home : game.away] : null;
   return (
     <div className="min-w-0">
       <div className="font-display truncate text-[15px] font-extrabold leading-tight">{t.nickname}</div>
-      <div className="truncate text-xs text-ink-2">
-        {opp ? (compact ? `over ${opp.display}` : `over the ${opp.nickname}`) : ""}
-        {game ? ` · ${formatTime(game.kickoffAt)}` : ""}
-      </div>
+      <div className="truncate text-xs text-ink-2">{matchupDetail(pick, game, compact)}</div>
     </div>
   );
+}
+
+function matchupDetail(pick: Pick, game: GameDTO | undefined, compact: boolean): string {
+  if (!game) return "";
+  const opp = TEAMS[game.away === pick.team ? game.home : game.away];
+  const name = compact ? opp.display : `the ${opp.nickname}`;
+  const started = game.awayScore !== null && game.homeScore !== null && game.status !== "upcoming";
+  if (!started) return `over ${name} · ${formatTime(game.kickoffAt)}`;
+  const mine = pick.team === game.home ? game.homeScore! : game.awayScore!;
+  const theirs = pick.team === game.home ? game.awayScore! : game.homeScore!;
+  const line = `${mine}\u2013${theirs}`;
+  if (game.winner) {
+    if (game.winner === "TIE") return `Tied ${name} ${line}`;
+    return game.winner === pick.team ? `Won ${line} over ${name}` : `Lost ${line} to ${name}`;
+  }
+  if (mine > theirs) return `Leading ${name} ${line}`;
+  if (mine < theirs) return `Trailing ${name} ${line}`;
+  return `Level with ${name} ${line}`;
 }
 
 /** Home team colour for side-by-side bars; falls back to the secondary colour when both teams share a primary. */
@@ -796,8 +823,18 @@ function DoneStep({
 
 // ---------- Review (picks are in) ----------
 
+/**
+ * The week, once your five are in — which on a Sunday is the screen that matters.
+ *
+ * It used to be a receipt: five rows, a total, "3 of 4 right so far". That is fine on a Tuesday
+ * and useless at four o'clock, when what you want is which of yours is on, whether it is winning,
+ * what is still to play for and where that leaves you. So this is the lock screen's Live Activity
+ * drawn large: the same five-phase rule, the same sentence under the heading, the same banked and
+ * outstanding pairing on the number — off `shared/live-activity.ts`, which the Worker uses to push
+ * the lock screen itself, so the two can never describe the same afternoon differently.
+ */
 function ReviewStep({
-  week, games, myPicks, pickCounts, lockedNow, anyUnlocked, onEdit, submitted, status,
+  week, games, myPicks, pickCounts, lockedNow, anyUnlocked, onEdit, submitted, standing, status, now,
 }: {
   week: number;
   games: GameDTO[];
@@ -807,45 +844,86 @@ function ReviewStep({
   anyUnlocked: boolean;
   onEdit: () => void;
   submitted: number;
+  standing: { place: number; field: number } | null;
   status: { label: string; tone: string };
+  now: string;
 }) {
   const gamesById = new Map(games.map((g) => [g.id, g]));
   const sorted = [...myPicks].sort((a, b) => a.rank - b.rank);
-  let points = 0;
-  let correct = 0;
   const rows = sorted.map((p) => {
     const g = gamesById.get(p.gameId);
     const outcome = !g || g.winner === null ? (g && lockedNow(g) ? "live" : "pending") : g.winner === "TIE" ? "tie" : g.winner === p.team ? "win" : "loss";
-    const pts = outcome === "win" ? 6 - p.rank : 0;
-    points += pts;
-    if (outcome === "win") correct++;
-    return { p, g, outcome, pts };
+    return { p, g, outcome, pts: outcome === "win" ? 6 - p.rank : 0 };
   });
-  const finals = rows.filter((r) => r.outcome === "win" || r.outcome === "loss" || r.outcome === "tie").length;
+  // The same state the Worker pushes to the lock screen, worked out from the week in hand.
+  const state = buildActivityState({
+    picks: myPicks,
+    games,
+    now,
+    place: standing?.place ?? null,
+    field: standing?.field ?? null,
+  });
+  const phase = activityPhase(state);
+  const left = outstanding(state);
+  const settled = settledCount(state);
   const started = games.filter(lockedNow);
   const nextKick = games.filter((g) => !lockedNow(g)).map((g) => g.kickoffAt).sort()[0];
   const twoCol = started.length > 0;
+  const won = phase === "final" && state.place === 1;
   return (
     <div className={twoCol ? "lg:grid lg:grid-cols-[minmax(0,1fr)_minmax(0,380px)] lg:items-start lg:gap-6" : ""}>
       <div className="card p-4">
         <div className="flex items-start justify-between gap-3">
-          <div>
+          <div className="min-w-0">
             <div className="flex flex-wrap items-center gap-2">
               <h2 className="font-display text-2xl font-extrabold tracking-tight">Your five</h2>
               {status.label && <span className={`chip text-sm ${status.tone}`}>{status.label}</span>}
             </div>
-            <p className="text-sm text-ink-2">
-              {finals === 0 ? `${sorted.length} pick${sorted.length === 1 ? "" : "s"} in · ${submitted} player${submitted === 1 ? "" : "s"} submitted` : `${correct} of ${finals} right so far`}
+            <p className="mt-0.5 flex items-center gap-1.5 text-sm font-semibold text-ink-2">
+              {phaseDot(phase, won) && <span className={`h-2 w-2 shrink-0 rounded-full ${phaseDot(phase, won)}`} aria-hidden="true" />}
+              {statusLine(state, { clock: (at) => formatTime(at.toISOString()) })}
             </p>
-            {nextKick && (
+            <p className="text-xs text-ink-3">
+              {settled === 0
+                ? `${sorted.length} pick${sorted.length === 1 ? "" : "s"} in · ${submitted} player${submitted === 1 ? "" : "s"} submitted`
+                : `${wonCount(state)} of ${settled} right so far`}
+            </p>
+            {anyUnlocked && nextKick && (
               <p className="mt-0.5 flex items-center gap-1 text-xs text-ink-3">
                 <Lock size={11} /> Next game locks {formatSlot(nextKick)}
               </p>
             )}
           </div>
-          <div className="text-right">
-            <div className="font-display text-4xl font-extrabold leading-none tabular">{points}</div>
-            <div className="text-[11px] font-bold uppercase tracking-wider text-ink-3">points</div>
+          {/* Banked, and what is still out there. Before anything settles a big 0 is an accurate
+              number and a discouraging one, so the stake leads instead; after that the points lead
+              and roll as they change, with the rest behind them in green as the reason to watch. */}
+          <div className="shrink-0 text-right">
+            {phase === "locked" ? (
+              <>
+                <div className="font-display text-4xl font-extrabold leading-none tabular text-ink-2">{state.possible}</div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-ink-3">to play</div>
+              </>
+            ) : (
+              <>
+                <div className="flex items-baseline justify-end gap-1">
+                  <CountUp value={state.points} className="font-display text-4xl font-extrabold leading-none tabular" />
+                  {left.points > 0 && (
+                    <span className="font-display text-base font-extrabold tabular text-turf" aria-label={`${left.points} still to play for`}>
+                      +{left.points}
+                    </span>
+                  )}
+                </div>
+                <div className="text-[11px] font-bold uppercase tracking-wider text-ink-3">points</div>
+              </>
+            )}
+            {state.place !== null && state.field !== null && state.field > 1 && (
+              <Link
+                to={`/board/week/${week}`}
+                className={`chip mt-1.5 py-0.5 text-[11px] ${won ? "bg-flag" : "bg-paper-2"}`}
+              >
+                {ordinal(state.place)} of {state.field}
+              </Link>
+            )}
           </div>
         </div>
         <ul className="mt-4 space-y-2">
@@ -911,6 +989,14 @@ function ReviewStep({
       )}
     </div>
   );
+}
+
+/** The lock screen puts a dot in front of the line; this is the same one, in the same colours. */
+function phaseDot(phase: string, won: boolean): string | null {
+  if (phase === "live") return "bg-turf";
+  if (phase === "between") return "bg-flag";
+  if (phase === "final") return won ? "bg-flag" : null;
+  return null;
 }
 
 export function outcomeStyle(outcome: string): string {
