@@ -1,0 +1,21 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!-- A sibling of TallyWidgets/ rather than a file inside it, for the same reason
+     TallyWidgetsInfo.plist is: the target's sources are a synchronised folder, so anything in that
+     folder is also copied in as a resource, and a file that is both processed and copied is
+     "Multiple commands produce" — a build failure rather than a warning. -->
+<plist version="1.0">
+<dict>
+	<!-- The two things the extension needs from the app: the shelf the snapshot sits on, and the
+	     one Keychain item that lets it refresh on its own. Both strings match Tally.entitlements
+	     exactly; a mismatch is a container the extension cannot open, with no error to say so. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.app.playtally.ios</string>
+	</array>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)app.playtally.shared</string>
+	</array>
+</dict>
+</plist>
