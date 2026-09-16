@@ -86,6 +86,34 @@ final class AppModel {
 
     private(set) var boot: Loadable<BootstrapResponse> = .idle
     private(set) var bootUpdatedAt: Date = .distantPast
+
+    // MARK: Announcements
+    //
+    // One feed, held here rather than per screen, because three places read it at once: the badge
+    // on the megaphone, the preview on Home, and the sheet the megaphone opens off Home. Three
+    // copies would be three different unread counts.
+
+    // The feed's own behaviour — loading, liking, posting, what counts as read — lives in
+    // `AnnouncementsModel.swift` next to the views that use it, so these are settable across the
+    // module rather than `private(set)` like the rest of this block.
+
+    var messageFeed: Loadable<MessagesResponse> = .idle
+    var messages: [PoolMessage] = []
+    /// The cursor for the next page, or nil once the feed has been walked to its end.
+    var messagesCursor: String?
+    /// The newest announcement this *device* has looked at. Per pool, and deliberately not per
+    /// entry: a phone that picks for the whole family is one reader.
+    var announcementsSeenId: String?
+    /// The megaphone's peek: unread previews, off Home, at a medium detent.
+    var showAnnouncementsSheet = false
+    /// The whole feed. A sheet rather than a fifth tab or a push, because it has to open from any
+    /// tab and from the peek, and a sheet is the one presentation that works the same from both.
+    var showAnnouncementsFeed = false
+    /// The announcement the feed should scroll to and flash on opening — the web's `#message-<id>`.
+    var announcementFocusId: String?
+    /// Bumped to ask Home's scroll view to bring the announcements section into view. A counter
+    /// rather than a flag, so asking twice in a row still scrolls twice.
+    var scrollToAnnouncements = 0
     private var tokenSeenAt: Date = .distantPast
     private(set) var online = true
 
@@ -180,6 +208,7 @@ final class AppModel {
         monitor.start(queue: DispatchQueue(label: "tally.network"))
         theme = UserDefaults.standard.string(forKey: AppModel.themeKey).flatMap(ThemeChoice.init(rawValue:)) ?? .system
         loadLegacyPin()
+        announcementsSeenId = AnnouncementSeen.load(pool: pool)
         connectPush()
         refreshTask = Task { [weak self] in
             while !Task.isCancelled {
@@ -358,6 +387,15 @@ final class AppModel {
         boot = .idle
         pickWeek = nil
         boardWeek = nil
+        messageFeed = .idle
+        messages = []
+        messagesCursor = nil
+        announcementsSeenId = AnnouncementSeen.load(pool: ref)
+        // A feed left open over a pool switch would refill itself with the new pool's posts while
+        // still scrolled to the old one's.
+        showAnnouncementsSheet = false
+        showAnnouncementsFeed = false
+        announcementFocusId = nil
         tab = .picks
         Task { await self.refreshBootstrap() }
     }

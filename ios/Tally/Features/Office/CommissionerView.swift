@@ -71,6 +71,8 @@ struct CommissionerView: View {
 
 private struct PoolSettingsView: View {
     @Environment(AppModel.self) private var model
+    /// The sheet this card sits in, so the announcements door can close it on the way through.
+    @Environment(\.dismiss) private var dismiss
     @State private var data: Loadable<CommissionerOverview> = .idle
     @State private var name = ""
     @State private var saving = false
@@ -87,6 +89,7 @@ private struct PoolSettingsView: View {
             case .loaded(let o):
                 nameCard(o)
                 whosIn(o)
+                announcements
                 commissioners(o)
                 backup()
             }
@@ -110,6 +113,39 @@ private struct PoolSettingsView: View {
                 Spacer()
                 Text("/p/\(o.pool.slug)").sans(11).foregroundStyle(Color.ink3)
             }
+        }
+        .padding(12).frame(maxWidth: .infinity, alignment: .leading).cardFlat()
+    }
+
+    /**
+     The switch, and the door to the posts.
+
+     The composer lives in the feed rather than here, because writing a message to the pool without
+     the last one you sent in front of you is how a commissioner says the same thing twice. What
+     *is* a setting — whether the pool has announcements at all — is a setting, and belongs on the
+     settings page with the pool's name and its invite.
+     */
+    private var announcements: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionLabel(text: "Announcements")
+            Button {
+                Task { await model.setAnnouncementsEnabled(!model.announcementsEnabled) }
+            } label: {
+                Label("Announcements \(model.announcementsEnabled ? "on" : "off")",
+                      systemImage: model.announcementsEnabled ? "megaphone.fill" : "megaphone")
+            }
+            .buttonStyle(.tally(model.announcementsEnabled ? .turf : .plain, size: .small))
+            .accessibilityAddTraits(model.announcementsEnabled ? .isSelected : [])
+            Text("Only commissioners can post. Members can like; replies are off. Turning this off hides posts without deleting them.")
+                .sans(12).foregroundStyle(Color.ink2)
+                .fixedSize(horizontal: false, vertical: true)
+            Button("Post and manage announcements") {
+                dismiss()
+                // Let this sheet finish leaving before the feed arrives, the same way the league
+                // office door does.
+                Task { try? await Task.sleep(for: .milliseconds(350)); model.openAnnouncementsFeed() }
+            }
+            .buttonStyle(.tally(.plain, size: .small))
         }
         .padding(12).frame(maxWidth: .infinity, alignment: .leading).cardFlat()
     }

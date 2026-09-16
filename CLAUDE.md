@@ -65,6 +65,13 @@ say *which pool* and *what needs doing* before a tab is chosen.
   swaps the whole app, so it is a context change and lives on the header lockup. `PoolsView` (iOS)
   and `PoolSheet` (web) are that sheet.
 - **Rules is not a tab.** `RulesSheet` on iOS, `/rules` on web, linked from Home and the board.
+- **Announcements is not a tab either**, and the megaphone does two different things on purpose. On
+  Home the feed is already on the page, so the megaphone scrolls to it; anywhere else it opens a
+  peek — a medium sheet of the unread ones — because reading a notice must not cost you your place
+  in a pick flow. "Read them all" is a second, deliberate tap. Read state is the id of the newest
+  post the *device* has looked at (`AnnouncementRead`, mirrored from `src/lib/announcementRead.ts`),
+  never a count or a timestamp, and never per entry: a phone that picks for the family is one
+  reader.
 - **The brand is not a block of content.** Home wears the full lockup; every other iOS tab carries
   `PoolChip` (mark + pool name + chevron) in the navigation bar, which is also the switcher.
 - **Pinch does nothing.** `.noZoom()` on the root and on each sheet — there is no zoomable content

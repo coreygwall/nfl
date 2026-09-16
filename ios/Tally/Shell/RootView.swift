@@ -23,7 +23,11 @@ struct RootView: View {
         .animation(.easeInOut(duration: 0.2), value: model.player == nil || model.showWelcome)
         .onChange(of: scenePhase) { _, phase in
             // Back from the background: the week may have moved on, a game may have kicked off.
-            if phase == .active { Task { await model.refreshBootstrap() } }
+            if phase == .active {
+                Task { await model.refreshBootstrap() }
+                // And whether anything was said while the phone was in a pocket.
+                Task { await model.refreshMessages(quiet: true) }
+            }
         }
         .sheet(isPresented: $model.showCommissioner) {
             CommissionerView()

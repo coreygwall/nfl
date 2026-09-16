@@ -36,6 +36,9 @@ struct HomeView: View {
         VStack(alignment: .leading, spacing: 22) {
             poolsSection
             exploreSection
+            // Under the standings rather than over them, matching the web: a commissioner posts
+            // once a week at most, and what the pool wants from you today outranks it.
+            AnnouncementsCard()
             joinSection
             moreSection
         }

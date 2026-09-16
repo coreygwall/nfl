@@ -55,6 +55,19 @@ struct PoolShellView: View {
         .sheet(isPresented: $model.showRules) {
             RulesSheet()
         }
+        .sheet(isPresented: $model.showAnnouncementsSheet) {
+            AnnouncementPeekSheet()
+        }
+        .sheet(isPresented: $model.showAnnouncementsFeed) {
+            AnnouncementsFeedSheet()
+        }
+        // The badge belongs to the frame, not to any one tab: it has to be right on Picks and
+        // Board too, so the feed is fetched once here rather than by whichever screen needs it.
+        // Keyed on who is signed in as well as which pool, because whether you may like a post or
+        // post one at all is an answer about the account, and it arrives with the feed.
+        .task(id: "\(model.pool.host)/\(model.pool.slug)#\(model.player?.id ?? "-")") {
+            await model.refreshMessages()
+        }
     }
 }
 
@@ -71,30 +84,42 @@ struct PoolScreen<Content: View>: View {
         NavigationStack {
             ZStack {
                 PaperBackground()
-                ScrollView {
-                    VStack(spacing: 0) {
-                        if !model.online { OfflineBanner() }
-                        if wearsLockup {
-                            Button { model.showPools = true } label: {
-                                Lockup(poolName: model.poolName, switchable: true)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .contentShape(Rectangle())
+                ScrollViewReader { proxy in
+                    ScrollView {
+                        VStack(spacing: 0) {
+                            if !model.online { OfflineBanner() }
+                            if wearsLockup {
+                                Button { model.showPools = true } label: {
+                                    Lockup(poolName: model.poolName, switchable: true)
+                                        .frame(maxWidth: .infinity, alignment: .leading)
+                                        .contentShape(Rectangle())
+                                }
+                                .buttonStyle(.cardPress)
+                                .accessibilityLabel("\(model.poolName). Switch pool")
+                                .padding(.horizontal, 16)
+                                .padding(.top, 10)
                             }
-                            .buttonStyle(.cardPress)
-                            .accessibilityLabel("\(model.poolName). Switch pool")
-                            .padding(.horizontal, 16)
-                            .padding(.top, 10)
+                            content
+                                .padding(.horizontal, 16)
+                                .padding(.top, wearsLockup ? 14 : 6)
+                                .padding(.bottom, 120)
                         }
-                        content
-                            .padding(.horizontal, 16)
-                            .padding(.top, wearsLockup ? 14 : 6)
-                            .padding(.bottom, 120)
+                    }
+                    // Home's megaphone scrolls rather than presents, so the counter it bumps has to
+                    // reach a scroll view. Only Home has a section to scroll to; elsewhere this is
+                    // inert and the megaphone opens the peek instead.
+                    .onChange(of: model.scrollToAnnouncements) {
+                        guard wearsLockup else { return }
+                        withAnimation(Motion.settle) { proxy.scrollTo(AnnouncementAnchor.home, anchor: .top) }
                     }
                 }
             }
             .toolbar {
                 if !wearsLockup {
                     ToolbarItem(placement: .topBarLeading) { PoolChip() }
+                }
+                if model.announcementsAvailable {
+                    ToolbarItem(placement: .topBarTrailing) { MegaphoneButton() }
                 }
                 if let week {
                     ToolbarItem(placement: .topBarTrailing) {
