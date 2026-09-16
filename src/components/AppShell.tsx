@@ -19,6 +19,8 @@ import { Check } from "./Icons.tsx";
 import { fallbackPoolWeeks } from "../lib/poolFallback.ts";
 import { feedMessages, useMessagesFeed } from "../api/messages.ts";
 import { useAnnouncementRead } from "../lib/announcementRead.ts";
+import { formatShortDay } from "../lib/time.ts";
+import type { PoolMessage } from "../../shared/messages.ts";
 
 export function AppShell() {
   const { player, people, setPlayer, syncEntries, switchTo, forget } = usePlayer();
@@ -126,29 +128,10 @@ export function AppShell() {
   const isActive = (t: { match: string; exact?: boolean }) =>
     t.exact ? loc.pathname === "/" : loc.pathname.startsWith(t.match);
 
-  const openAnnouncements = () => {
-    if (loc.pathname !== "/") {
-      nav("/#announcements");
-      return;
-    }
-    document.getElementById("announcements")?.scrollIntoView({ behavior: "smooth", block: "start" });
-  };
-
-  const announcementButton = announcementsAvailable && !onWelcome ? (
-    <button
-      type="button"
-      className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-ink bg-surface hover:bg-paper-2"
-      aria-label={`Announcements${unread ? `, ${unread} new` : ""}`}
-      onClick={openAnnouncements}
-    >
-      <Megaphone size={19} />
-      {unread > 0 ? (
-        <span className="font-display absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-ink bg-flag px-1 text-[10px] font-extrabold leading-none" aria-hidden="true">
-          {unread > 9 ? "9+" : unread}
-        </span>
-      ) : null}
-    </button>
-  ) : null;
+  const announcementButton =
+    announcementsAvailable && !onWelcome ? (
+      <AnnouncementMenu messages={messages} unread={unread} onHome={loc.pathname === "/"} />
+    ) : null;
 
   return (
     <div className="relative mx-auto flex min-h-dvh w-full max-w-[1180px] flex-col">
@@ -200,7 +183,7 @@ export function AppShell() {
                 {headerWeek && <HeaderWeekNav week={headerWeek.week} max={headerWeek.max} onChange={changeWeek} />}
                 {announcementButton}
                 <ThemeToggle className="hidden md:flex" />
-                <button className="chip min-w-0 max-w-[12ch] sm:max-w-[22ch]" onClick={() => setSwitching(true)} aria-label="Switch player">
+                <button className="chip min-h-10 min-w-0 max-w-[12ch] sm:max-w-[22ch]" onClick={() => setSwitching(true)} aria-label="Switch player">
                   <span className="truncate">{player.name}</span>
                   <Swap className="shrink-0 text-ink-2" />
                 </button>
@@ -569,16 +552,31 @@ function DeviceCode({ code, name, accountId }: { code: string; name: string; acc
 }
 
 /** Week stepper that lives in the app header; the arrows fold away on phones, the label always picks. */
+/** A borderless, h-10 icon button — the arrows step through a choice the dropdown already
+ * states, so they read as an accessory to it rather than a second control with its own weight. */
+function WeekStepButton({ direction, disabled, onClick }: { direction: "prev" | "next"; disabled: boolean; onClick: () => void }) {
+  return (
+    <button
+      type="button"
+      className="flex h-10 w-8 shrink-0 items-center justify-center rounded-full text-ink-2 transition-colors hover:bg-paper-2 hover:text-ink disabled:pointer-events-none disabled:opacity-30"
+      aria-label={direction === "prev" ? "Previous week" : "Next week"}
+      disabled={disabled}
+      onClick={onClick}
+    >
+      {direction === "prev" ? <ChevronLeft size={18} /> : <ChevronRight size={18} />}
+    </button>
+  );
+}
+
 function HeaderWeekNav({ week, max, onChange }: { week: number; max: number; onChange: (w: number) => void }) {
   return (
-    <div className="flex shrink-0 items-center gap-1">
-      {/* .btn sets display, so the arrows hide from a wrapper rather than a utility class. */}
+    <div className="flex shrink-0 items-center gap-0.5">
       <span className="hidden sm:block">
-        <button className="btn btn-sm px-1.5" aria-label="Previous week" disabled={week <= 1} onClick={() => onChange(week - 1)}>
-          <ChevronLeft />
-        </button>
+        <WeekStepButton direction="prev" disabled={week <= 1} onClick={() => onChange(week - 1)} />
       </span>
-      <label className="chip relative cursor-pointer gap-1 px-2.5">
+      {/* min-h-10 matches every other control in this row — chip's own padding falls well short
+          of that on its own, which is what made the row read as three different heights. */}
+      <label className="chip relative min-h-10 cursor-pointer gap-1 px-2.5">
         <span className="font-display font-extrabold">Week {week}</span>
         <ChevronDown size={16} className="text-ink-2" />
         <select
@@ -595,10 +593,135 @@ function HeaderWeekNav({ week, max, onChange }: { week: number; max: number; onC
         </select>
       </label>
       <span className="hidden sm:block">
-        <button className="btn btn-sm px-1.5" aria-label="Next week" disabled={week >= max} onClick={() => onChange(week + 1)}>
-          <ChevronRight />
-        </button>
+        <WeekStepButton direction="next" disabled={week >= max} onClick={() => onChange(week + 1)} />
       </span>
+    </div>
+  );
+}
+
+/**
+ * On Home the megaphone can just point down the page — the announcements are already there.
+ * Anywhere else, clicking it used to leave whatever you were doing to go read them; now it opens a
+ * short preview in place instead, so seeing what's new doesn't cost you your spot in the pick flow
+ * or the board. "View all announcements" is still one tap away for when a preview isn't enough.
+ */
+function AnnouncementMenu({ messages, unread, onHome }: { messages: PoolMessage[]; unread: number; onHome: boolean }) {
+  const [open, setOpen] = useState(false);
+  const wrap = useRef<HTMLDivElement>(null);
+  const trigger = useRef<HTMLButtonElement>(null);
+  // The megaphone isn't always the rightmost thing in the header — the theme toggle and, signed
+  // in, the player chip sit to its right. A popover pinned `right-0` to the button's own tiny
+  // wrapper inherits that: it hangs off the button's edge and, on a narrow phone, that's often
+  // enough to push its own left edge past the screen's. Pinning it to the viewport instead, offset
+  // from the button but clamped so it can never run past either margin, keeps it fully on screen
+  // regardless of where in the row the button lands.
+  const [pos, setPos] = useState<{ top: number; right: number } | null>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const place = () => {
+      const rect = trigger.current?.getBoundingClientRect();
+      if (!rect) return;
+      const margin = 16;
+      const width = Math.min(336, window.innerWidth - margin * 2);
+      const natural = window.innerWidth - rect.right;
+      const right = Math.min(Math.max(natural, margin), window.innerWidth - width - margin);
+      setPos({ top: rect.bottom + 8, right });
+    };
+    place();
+    window.addEventListener("resize", place);
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      setOpen(false);
+      trigger.current?.focus();
+    };
+    const onDown = (e: MouseEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("mousedown", onDown);
+    return () => {
+      window.removeEventListener("resize", place);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("mousedown", onDown);
+    };
+  }, [open]);
+
+  // A pool that goes quiet for a few weeks comes back to a stack of unread posts, not two or
+  // three — capped here, with the list itself scrollable too, so neither a long stack nor a short
+  // viewport can push "View all announcements" out of reach.
+  const preview = messages.slice(0, unread);
+  const shown = preview.slice(0, 3);
+  const moreCount = preview.length - shown.length;
+
+  return (
+    <div ref={wrap} className="relative shrink-0">
+      <button
+        ref={trigger}
+        type="button"
+        className="relative flex h-10 w-10 shrink-0 items-center justify-center rounded-full border-2 border-ink bg-surface hover:bg-paper-2"
+        aria-label={`Announcements${unread ? `, ${unread} new` : ""}`}
+        aria-haspopup={onHome ? undefined : "dialog"}
+        aria-expanded={onHome ? undefined : open}
+        onClick={() =>
+          onHome
+            ? document.getElementById("announcements")?.scrollIntoView({ behavior: "smooth", block: "start" })
+            : setOpen((v) => !v)
+        }
+      >
+        <Megaphone size={19} />
+        {unread > 0 ? (
+          <span className="font-display absolute -right-1.5 -top-1.5 flex h-5 min-w-5 items-center justify-center rounded-full border-2 border-ink bg-flag px-1 text-[10px] font-extrabold leading-none" aria-hidden="true">
+            {unread > 9 ? "9+" : unread}
+          </span>
+        ) : null}
+      </button>
+      <AnimatePresence>
+        {open && !onHome && pos && (
+          <motion.div
+            role="dialog"
+            aria-label="Announcements"
+            initial={{ opacity: 0, y: -4 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -4 }}
+            transition={{ duration: 0.12 }}
+            style={{ top: pos.top, right: pos.right }}
+            // Fixed to the viewport, not the button's own tiny wrapper: the megaphone isn't always
+            // the rightmost thing in the row, and a popover pinned to its edge could hang its own
+            // left edge off a narrow screen. `pos` is pre-clamped so this never runs past either
+            // margin. Below md the tab bar is also fixed to the bottom of the viewport rather than
+            // scrolled away with the page, so the shorter cap on this side of that breakpoint
+            // leaves it clear; md: drops the cap once that bar is gone.
+            className="card fixed z-30 flex max-h-[min(22rem,calc(100dvh-13rem))] w-[min(21rem,calc(100vw-2rem))] flex-col overflow-hidden p-3 md:max-h-[min(28rem,calc(100dvh-6rem))]"
+          >
+            <p className="font-display shrink-0 text-sm font-extrabold">
+              {preview.length ? `${preview.length} new announcement${preview.length === 1 ? "" : "s"}` : "You're all caught up"}
+            </p>
+            {shown.length > 0 && (
+              <ul className="mt-2 min-h-0 space-y-2 overflow-y-auto">
+                {shown.map((m) => (
+                  <li key={m.id}>
+                    <Link
+                      to={`/announcements#message-${m.id}`}
+                      className="block rounded-xl border-2 border-line p-2.5 hover:bg-paper-2"
+                      onClick={() => setOpen(false)}
+                    >
+                      <p className="truncate text-xs font-bold text-ink-2">
+                        {m.authorName} · {formatShortDay(m.createdAt)}
+                      </p>
+                      <p className="mt-0.5 line-clamp-2 text-sm">{m.body}</p>
+                    </Link>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {moreCount > 0 && <p className="mt-2 shrink-0 text-xs text-ink-2">+{moreCount} more unread</p>}
+            <Link to="/announcements" className="btn btn-sm mt-3 w-full shrink-0" onClick={() => setOpen(false)}>
+              View all announcements
+            </Link>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

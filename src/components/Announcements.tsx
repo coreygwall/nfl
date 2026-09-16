@@ -19,11 +19,21 @@ export function Announcements({ preview = false, settings = false }: { preview?:
   const shown = preview ? messages.slice(0, 2) : messages;
   const section = useRef<HTMLElement>(null);
   const { markRead } = useAnnouncementRead(messages);
+  // A tap on the header's announcement preview links here with `#message-<id>` — the full list
+  // has no other way to say "that one there" among a page of them, so a landing highlights and
+  // fades rather than just scrolling and leaving the reader to find it themselves.
+  const [highlightId, setHighlightId] = useState<string | null>(null);
   useEffect(() => {
     if (!messages.length || !section.current) return;
     const element = section.current;
+    let highlightTimer: ReturnType<typeof setTimeout> | undefined;
     if (preview && window.location.hash === '#announcements') {
       requestAnimationFrame(() => element.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+    } else if (!preview && window.location.hash.startsWith('#message-')) {
+      const id = window.location.hash.slice('#message-'.length);
+      requestAnimationFrame(() => document.getElementById(`message-${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' }));
+      setHighlightId(id);
+      highlightTimer = setTimeout(() => setHighlightId(null), 2500);
     }
     const observer = new IntersectionObserver(entries => {
       if (entries.some(entry => entry.isIntersecting && entry.intersectionRatio >= 0.5)) {
@@ -32,7 +42,10 @@ export function Announcements({ preview = false, settings = false }: { preview?:
       }
     }, { threshold: 0.5 });
     observer.observe(element);
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      if (highlightTimer) clearTimeout(highlightTimer);
+    };
   }, [preview, messages.length, markRead]);
   if (feed.isPending) return <p className="mt-5 text-sm text-ink-2" role="status">Loading announcements…</p>;
   if (!data) return <div className="mt-5 text-sm" role="alert">Couldn't load announcements. <button className="underline" onClick={() => void feed.refetch()}>Try again</button></div>;
@@ -68,7 +81,9 @@ export function Announcements({ preview = false, settings = false }: { preview?:
       {feed.isRefetchError && <p role="alert" className="mt-3 text-sm text-danger">Couldn't refresh. Showing the last loaded announcements.</p>}
       {data.enabled && !messages.length && <p className="mt-4 text-sm text-ink-2">No announcements yet.</p>}
       <div className="mt-3 space-y-4">
-        {shown.map(message => <Announcement key={message.id} message={message} canManage={data.canManage && !preview} canReact={data.canReact} />)}
+        {shown.map(message => (
+          <Announcement key={message.id} message={message} canManage={data.canManage && !preview} canReact={data.canReact} highlighted={message.id === highlightId} />
+        ))}
       </div>
       {!preview && feed.hasNextPage && <button className="btn btn-sm mt-4" disabled={feed.isFetchingNextPage} onClick={() => void feed.fetchNextPage()}>{feed.isFetchingNextPage ? 'Loading…' : 'Older announcements'}</button>}
       {!preview && feed.isFetchNextPageError && <p role="alert" className="mt-2 text-sm text-danger">Couldn't load older announcements. Try again.</p>}
@@ -76,7 +91,7 @@ export function Announcements({ preview = false, settings = false }: { preview?:
   );
 }
 
-function Announcement({ message, canManage, canReact }: { message: PoolMessage; canManage: boolean; canReact: boolean }) {
+function Announcement({ message, canManage, canReact, highlighted = false }: { message: PoolMessage; canManage: boolean; canReact: boolean; highlighted?: boolean }) {
   const qc = useQueryClient();
   const [editing, setEditing] = useState(false);
   const [deleting, setDeleting] = useState(false);
@@ -86,7 +101,10 @@ function Announcement({ message, canManage, canReact }: { message: PoolMessage; 
     onSuccess: () => qc.invalidateQueries({ queryKey: ['messages'] }),
   });
   return (
-    <article className="border-t-2 border-line pt-4">
+    <article
+      id={`message-${message.id}`}
+      className={`scroll-mt-24 border-t-2 border-line pt-4 transition-colors duration-500 ${highlighted ? 'rounded-2xl bg-flag/15 -mx-3 px-3 pb-3' : ''}`}
+    >
       <p className="text-sm font-bold">{message.authorName} <span className="chip ml-1 bg-paper-2 text-xs">Commissioner</span></p>
       <p className="mt-1 text-xs text-ink-2"><time dateTime={message.createdAt}>{new Date(message.createdAt).toLocaleString()}</time>{message.updatedAt !== message.createdAt ? ' · Edited' : ''}</p>
       {editing ? <form className="mt-3" onSubmit={e => { e.preventDefault(); write.mutate({ method: 'PATCH', body: { body } }, { onSuccess: () => setEditing(false) }); }}>
