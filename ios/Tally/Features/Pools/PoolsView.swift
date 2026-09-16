@@ -2,14 +2,12 @@ import SwiftUI
 import TallyKit
 
 /**
- The pool switcher, opened from the lockup in the header.
+ Joining a pool, starting one, and what else there is to play.
 
- It is deliberately *not* a tab. Switching pools swaps the whole app — pool, session, board, header
- — because `AppModel` only ever holds one, so this is a context switch rather than a destination,
- and the header is where iOS puts those (a workspace picker, an account picker). Home is the tab
- that lists pools; this is the two-tap way to change which one you are standing in.
-
- Three jobs, in the order you need them: switch, join, and see what else there is to play.
+ This used to be the switcher as well, which is why it never felt like one: a list to switch with,
+ a form to join with and a catalogue to read were three jobs on one sheet, and the one people
+ came for was buried under the other two. Switching is the pool chip's menu now — the one in the
+ navigation bar of every tab — and this sheet is the last item on it.
  */
 struct PoolsView: View {
     @Environment(AppModel.self) private var model
@@ -24,37 +22,7 @@ struct PoolsView: View {
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
                         VStack(alignment: .leading, spacing: 8) {
-                            SectionLabel(text: "Your pools")
-                            ForEach(model.catalog.pools) { pool in
-                                let current = pool.ref == model.pool
-                                Button {
-                                    model.switchPool(pool.ref)
-                                    dismiss()
-                                } label: {
-                                    HStack(spacing: 12) {
-                                        VStack(alignment: .leading, spacing: 2) {
-                                            Text(pool.name).font(TallyFont.display(17))
-                                            Text("\(pool.poolType) · \(pool.ref.host)").sans(12).foregroundStyle(Color.ink2)
-                                        }
-                                        Spacer()
-                                        if current { Chip(text: "Open", fill: .flag, label: .onAccent) }
-                                    }
-                                    .padding(12)
-                                    .frame(maxWidth: .infinity, alignment: .leading)
-                                    .contentShape(Rectangle())
-                                }
-                                .buttonStyle(.cardPress)
-                                .modifier(TallyCard(hard: current, fill: .surface, border: .cardBorder, radius: TallyRadius.card, dashed: false))
-                                .contextMenu {
-                                    if model.catalog.pools.count > 1 {
-                                        Button("Remove from this phone", role: .destructive) { model.removePool(pool.id) }
-                                    }
-                                }
-                            }
-                        }
-
-                        VStack(alignment: .leading, spacing: 8) {
-                            SectionLabel(text: "Join another pool")
+                            SectionLabel(text: "Join a pool")
                             Text("Paste the link your commissioner sent. Tapping one in Messages opens it here too.").sans(14).foregroundStyle(Color.ink2)
                             TextField("https://playtally.app/p/…", text: $link)
                                 .tallyField(font: TallyFont.sans(15))
@@ -121,7 +89,7 @@ struct PoolsView: View {
                 }
             }
             .noZoom()
-            .navigationTitle("Pools")
+            .navigationTitle("Join or start a pool")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
         }

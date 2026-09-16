@@ -2,21 +2,19 @@ import SwiftUI
 import TallyKit
 
 /**
- Announcements, in the three sizes a phone needs them.
+ Announcements, in the two sizes a phone needs them.
 
  The web puts the feed on a route and a preview on the pool home. A phone has four tabs and none of
- them is going to become "Announcements", so the same three jobs are done by a card, a peek and a
- sheet:
+ them is going to become "Announcements", so the same jobs are done by a peek and a sheet, both
+ opened from the megaphone in the navigation bar of every tab:
 
- - `AnnouncementsCard` sits on Home under the standings previews, showing the last two.
- - `AnnouncementPeekSheet` is what the megaphone opens from Picks, Board or Account — the unread
-   ones, in a medium detent, over whatever you were doing. Reading a notice should not cost you
-   your place in a pick flow.
+ - `AnnouncementPeekSheet` is what the megaphone opens — the unread ones, in a medium detent, over
+   whatever you were doing. Reading a notice should not cost you your place in a pick flow.
  - `AnnouncementsFeedSheet` is the whole thing, with the composer and the switch for whoever runs
    the pool.
 
- All three read one feed off `AppModel`, so the badge, the card and the sheet can never disagree
- about what is unread.
+ Both read one feed off `AppModel`, so the badge and the sheets can never disagree about what is
+ unread.
  */
 
 // MARK: The megaphone
@@ -57,86 +55,6 @@ struct MegaphoneButton: View {
         return "Announcements, \(Format.plural(unread, "unread message"))"
     }
 }
-
-// MARK: Home
-
-/// Home's section: the two most recent, and a way into the rest. Hidden entirely when there is no
-/// feed to read and no office to manage one from — the same rule the megaphone follows.
-struct AnnouncementsCard: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        if model.announcementsAvailable {
-            VStack(alignment: .leading, spacing: 10) {
-                SectionLabel(text: "From your commissioners")
-                VStack(alignment: .leading, spacing: 12) {
-                    header
-                    if !model.announcementsEnabled {
-                        Text("Announcements are off. Existing posts are visible only to commissioners.")
-                            .sans(13).foregroundStyle(Color.ink2)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                    content
-                }
-                .padding(14)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .card()
-            }
-            .id(AnnouncementAnchor.home)
-            // The web marks the feed read when the section scrolls half into view, and this is the
-            // same rule: half of the card on screen is someone looking at it, where `onAppear`
-            // would fire the moment Home was built and clear the badge nobody had seen.
-            .onScrollVisibilityChange(threshold: 0.5) { visible in
-                if visible { model.markAnnouncementsRead() }
-            }
-        }
-    }
-
-    private var header: some View {
-        HStack(alignment: .top, spacing: 8) {
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Announcements").display(19)
-                Text("Like a message to show you've seen it.")
-                    .sans(12).foregroundStyle(Color.ink2)
-            }
-            Spacer()
-            if model.unreadAnnouncements > 0 {
-                Chip(text: "\(model.unreadAnnouncements) new", fill: .flag, size: 10, label: .onAccent)
-            }
-        }
-    }
-
-    @ViewBuilder private var content: some View {
-        switch model.messageFeed {
-        case .idle, .loading:
-            SkeletonLine(width: 220)
-            SkeletonLine(width: 160)
-        case .failed(let err):
-            Text(err.message).sans(13).foregroundStyle(Color.ink2)
-            Button("Try again") { Task { await model.refreshMessages() } }
-                .buttonStyle(.tally(.plain, size: .small))
-        case .loaded:
-            if model.messages.isEmpty {
-                Text(model.announcementsEnabled ? "No announcements yet." : "Nothing posted yet.")
-                    .sans(13).foregroundStyle(Color.ink2)
-            } else {
-                ForEach(Array(model.messages.prefix(2).enumerated()), id: \.element.id) { index, message in
-                    if index > 0 { DashedDivider() }
-                    AnnouncementRow(message: message, canManage: false) {
-                        model.openAnnouncementsFeed(focus: message.id)
-                    }
-                }
-            }
-            Button(model.canPostAnnouncements ? "View all and post" : "View all announcements") {
-                model.openAnnouncementsFeed()
-            }
-            .buttonStyle(.tally(.plain, size: .small, fullWidth: true))
-        }
-    }
-}
-
-/// The scroll id Home's section answers to, so the megaphone can bring it into view.
-enum AnnouncementAnchor: Hashable { case home }
 
 // MARK: The peek
 

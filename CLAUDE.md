@@ -125,22 +125,30 @@ draws from the snapshot and simply does not refresh.
 
 ## Four tabs, and what is deliberately not one
 
-Home · Picks · Board · Account, on both surfaces. Home is the landing and the only screen that can
-say *which pool* and *what needs doing* before a tab is chosen.
+Home · Picks · Board · Account, on both surfaces. Home is the landing and is about the pool you are
+standing in: what week it is, whose picks are missing, where you stand.
 
-- **Switching pools is not a tab.** `AppModel` holds one pool, one session, one service; switching
-  swaps the whole app, so it is a context change and lives on the header lockup. `PoolsView` (iOS)
-  and `PoolSheet` (web) are that sheet.
+- **Switching pools is not a tab, and on iOS it is not a sheet either.** `AppModel` holds one pool,
+  one session, one service; switching swaps the whole app and keeps the tab you were on. The
+  control is `PoolChip` — the mark and the pool name, top-left of *every* tab, Home included (Home
+  wears the fuller lockup in the same spot) — and it is a native `Menu` with the pools ticked, so it
+  reads as a switch. `PoolsView` is only join / start / the catalogue, behind the menu's last item.
+  Home lists the *other* pools as a strip under its card, each with one line from its own session
+  (`PoolPeek`) saying whether anything over there needs picks; that strip is the one cross-pool
+  fact the chip cannot say. Web still uses `PoolSheet` off the lockup.
+- **The entry switcher is not in the navigation bar.** On iOS it is `EntryPicker`, a row of names
+  above the picks and above the board — the two places the answer changes anything — and it is
+  drawn only when there is more than one name. Home shows every entry already and Account manages
+  them. It used to sit next to the megaphone, which made the megaphone look like part of it.
 - **Rules is not a tab.** `RulesSheet` on iOS, `/rules` on web, linked from Home and the board.
-- **Announcements is not a tab either**, and the megaphone does two different things on purpose. On
-  Home the feed is already on the page, so the megaphone scrolls to it; anywhere else it opens a
-  peek — a medium sheet of the unread ones — because reading a notice must not cost you your place
-  in a pick flow. "Read them all" is a second, deliberate tap. Read state is the id of the newest
-  post the *device* has looked at (`AnnouncementRead`, mirrored from `src/lib/announcementRead.ts`),
+- **Announcements is not a tab either**, and the megaphone differs by surface on purpose. On iOS it
+  always opens a peek — a medium sheet of the unread ones — from every tab, and there is no
+  announcements section on Home; reading a notice must not cost you your place in a pick flow, and
+  "Read them all" is a second, deliberate tap. On web the feed is a section on the pool home, so
+  there the megaphone scrolls to it and peeks elsewhere. Read state is the id of the newest post
+  the *device* has looked at (`AnnouncementRead`, mirrored from `src/lib/announcementRead.ts`),
   never a count or a timestamp, and never per entry: a phone that picks for the family is one
   reader.
-- **The brand is not a block of content.** Home wears the full lockup; every other iOS tab carries
-  `PoolChip` (mark + pool name + chevron) in the navigation bar, which is also the switcher.
 - **Pinch does nothing.** `.noZoom()` on the root and on each sheet — there is no zoomable content
   in Tally, so a pinch that scales the page is always an accident.
 - Web keeps the pick flow's step in the query string, so switching entries clears it

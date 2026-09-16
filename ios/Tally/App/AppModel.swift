@@ -90,9 +90,9 @@ final class AppModel {
 
     // MARK: Announcements
     //
-    // One feed, held here rather than per screen, because three places read it at once: the badge
-    // on the megaphone, the preview on Home, and the sheet the megaphone opens off Home. Three
-    // copies would be three different unread counts.
+    // One feed, held here rather than per screen, because more than one place reads it at once:
+    // the badge on the megaphone, the peek it opens, and the full feed. Two copies would be two
+    // different unread counts.
 
     // The feed's own behaviour — loading, liking, posting, what counts as read — lives in
     // `AnnouncementsModel.swift` next to the views that use it, so these are settable across the
@@ -105,22 +105,19 @@ final class AppModel {
     /// The newest announcement this *device* has looked at. Per pool, and deliberately not per
     /// entry: a phone that picks for the whole family is one reader.
     var announcementsSeenId: String?
-    /// The megaphone's peek: unread previews, off Home, at a medium detent.
     /// What this install has asked to hear. Read from the server rather than kept locally: the
     /// switches belong to the token, and a phone that reinstalls should find its old answers
     /// rather than silently start from everything-on.
     var notifyPrefs: Loadable<NotifyPrefs> = .idle
     var savingPrefs = false
     var showNotificationSettings = false
+    /// The megaphone's peek: the unread ones, at a medium detent, over whatever you were doing.
     var showAnnouncementsSheet = false
     /// The whole feed. A sheet rather than a fifth tab or a push, because it has to open from any
     /// tab and from the peek, and a sheet is the one presentation that works the same from both.
     var showAnnouncementsFeed = false
     /// The announcement the feed should scroll to and flash on opening — the web's `#message-<id>`.
     var announcementFocusId: String?
-    /// Bumped to ask Home's scroll view to bring the announcements section into view. A counter
-    /// rather than a flag, so asking twice in a row still scrolls twice.
-    var scrollToAnnouncements = 0
     private var tokenSeenAt: Date = .distantPast
     private(set) var online = true
 
@@ -131,8 +128,6 @@ final class AppModel {
     var boardWeek: Int?
     var boardScope: BoardScope = .week
     var boardSort: BoardSort = .points
-    /// The entry switcher over the name chip. Account settings live on their own tab.
-    var showEntrySwitcher = false
     var showRules = false
     var showCommissioner = false
     var showLeagueOffice = false
@@ -528,7 +523,8 @@ final class AppModel {
         showAnnouncementsSheet = false
         showAnnouncementsFeed = false
         announcementFocusId = nil
-        tab = .picks
+        // The tab stays put: switching from the board lands on the other pool's board. A switch
+        // is a change of *where*, and the frame should not also decide *what* you were doing.
         Task { await self.refreshBootstrap() }
     }
 

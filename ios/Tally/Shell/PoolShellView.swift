@@ -2,15 +2,19 @@ import SwiftUI
 import TallyKit
 
 /**
- The pool's frame: four tabs on Liquid Glass, and a header that no longer repeats itself.
+ The pool's frame: four tabs on Liquid Glass, and one control that says which pool you are in.
 
- The full lockup — the mark over "Tally" over the pool's name — used to sit at the top of every
- tab's scroll content, which meant scrolling the board pushed the brand off screen and coming back
- to Picks put it up again, in the middle of the page, for no reason. It is a cover, and a cover
- belongs on the front: Home wears it, and every other tab carries the mark and the pool's name as a
- compact control in the navigation bar, where it is always visible, always says which pool you are
- in, and opens the switcher. The brand is more present than it was, not less — it just stopped
- being a block of content.
+ Three things used to claim that job — the lockup on Home, the pool cards under it, and a chip on
+ the other tabs — and none of them looked like a switcher, so a phone with two pools felt like an
+ app with four single-pool tabs and a mystery. Now there is one: the pool chip, top-left on every
+ tab, and it is a native menu. Tap it and the pools are listed with a tick against the one you are
+ standing in; tap another and the whole app moves there, on the tab you were already on. Home wears
+ the fuller lockup in that same spot because it is the cover; everywhere else it is the compact
+ chip. Either way it is the same menu in the same place.
+
+ The right-hand side of the bar is the megaphone, and on Picks and Board the week. Who you are
+ picking as is no longer up here: it is a row of names above the picks and above the board (see
+ `EntryPicker`), which are the two places the answer changes anything.
  */
 struct PoolShellView: View {
     @Environment(AppModel.self) private var model
@@ -19,14 +23,17 @@ struct PoolShellView: View {
         @Bindable var model = model
         TabView(selection: $model.tab) {
             Tab("Home", systemImage: "house.fill", value: AppTab.home) {
-                PoolScreen(week: nil, onWeek: { _ in }, wearsLockup: true) {
+                PoolScreen(week: nil, onWeek: { _ in }, home: true) {
                     HomeView()
                 }
             }
             Tab("Picks", systemImage: "football.fill", value: AppTab.picks) {
                 PoolScreen(week: model.activePickWeek, onWeek: { model.pickWeek = $0 }) {
-                    PickFlowView(week: model.activePickWeek)
-                        .id("\(model.player?.id ?? "-"):\(model.activePickWeek)")
+                    VStack(alignment: .leading, spacing: 14) {
+                        EntryPicker()
+                        PickFlowView(week: model.activePickWeek)
+                            .id("\(model.player?.id ?? "-"):\(model.activePickWeek)")
+                    }
                 }
                 .safeAreaInset(edge: .bottom) {
                     if let tray = model.tray {
@@ -40,7 +47,10 @@ struct PoolShellView: View {
             }
             Tab("Board", systemImage: "trophy.fill", value: AppTab.board) {
                 PoolScreen(week: model.boardScope == .week ? model.activeBoardWeek : nil, onWeek: { model.boardWeek = $0 }) {
-                    BoardView()
+                    VStack(alignment: .leading, spacing: 14) {
+                        EntryPicker()
+                        BoardView()
+                    }
                 }
             }
             Tab("Account", systemImage: "person.crop.circle.fill", value: AppTab.account) {
@@ -48,9 +58,6 @@ struct PoolShellView: View {
                     AccountView()
                 }
             }
-        }
-        .sheet(isPresented: $model.showEntrySwitcher) {
-            EntrySwitcherSheet()
         }
         .sheet(isPresented: $model.showRules) {
             RulesSheet()
@@ -76,48 +83,26 @@ struct PoolScreen<Content: View>: View {
     @Environment(AppModel.self) private var model
     let week: Int?
     let onWeek: (Int) -> Void
-    /// Home only. Everywhere else the brand is the mark in the navigation bar.
-    var wearsLockup = false
+    /// Home wears the full lockup in the bar; everywhere else it is the compact chip.
+    var home = false
     @ViewBuilder let content: Content
 
     var body: some View {
         NavigationStack {
             ZStack {
                 PaperBackground()
-                ScrollViewReader { proxy in
-                    ScrollView {
-                        VStack(spacing: 0) {
-                            if !model.online { OfflineBanner() }
-                            if wearsLockup {
-                                Button { model.showPools = true } label: {
-                                    Lockup(poolName: model.poolName, switchable: true)
-                                        .frame(maxWidth: .infinity, alignment: .leading)
-                                        .contentShape(Rectangle())
-                                }
-                                .buttonStyle(.cardPress)
-                                .accessibilityLabel("\(model.poolName). Switch pool")
-                                .padding(.horizontal, 16)
-                                .padding(.top, 10)
-                            }
-                            content
-                                .padding(.horizontal, 16)
-                                .padding(.top, wearsLockup ? 14 : 6)
-                                .padding(.bottom, 120)
-                        }
-                    }
-                    // Home's megaphone scrolls rather than presents, so the counter it bumps has to
-                    // reach a scroll view. Only Home has a section to scroll to; elsewhere this is
-                    // inert and the megaphone opens the peek instead.
-                    .onChange(of: model.scrollToAnnouncements) {
-                        guard wearsLockup else { return }
-                        withAnimation(Motion.settle) { proxy.scrollTo(AnnouncementAnchor.home, anchor: .top) }
+                ScrollView {
+                    VStack(spacing: 0) {
+                        if !model.online { OfflineBanner() }
+                        content
+                            .padding(.horizontal, 16)
+                            .padding(.top, 6)
+                            .padding(.bottom, 120)
                     }
                 }
             }
             .toolbar {
-                if !wearsLockup {
-                    ToolbarItem(placement: .topBarLeading) { PoolChip() }
-                }
+                ToolbarItem(placement: .topBarLeading) { PoolChip(full: home) }
                 if model.announcementsAvailable {
                     ToolbarItem(placement: .topBarTrailing) { MegaphoneButton() }
                 }
@@ -126,19 +111,6 @@ struct PoolScreen<Content: View>: View {
                         WeekMenu(week: week, max: model.maxWeek, onChange: onWeek)
                     }
                 }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button {
-                        model.showEntrySwitcher = true
-                    } label: {
-                        HStack(spacing: 4) {
-                            Text(model.player?.name ?? "Sign in").lineLimit(1).truncationMode(.tail)
-                            Image(systemName: "chevron.up.chevron.down").font(.system(size: 10, weight: .bold)).foregroundStyle(Color.ink2)
-                        }
-                        .font(TallyFont.display(14, weight: .bold))
-                        .frame(maxWidth: 120)
-                    }
-                    .accessibilityLabel("Switch entry")
-                }
             }
             .toolbarTitleDisplayMode(.inline)
         }
@@ -146,62 +118,93 @@ struct PoolScreen<Content: View>: View {
 }
 
 /**
- The pool you are in, small enough to live in a navigation bar on every screen.
+ The pool you are in, in the navigation bar of every tab, and the menu that changes it.
 
- It is the switcher as well as the label, which is the point: the one control that says *where am
- I* is the same one that changes it, and it is the left-hand counterpart to the entry chip on the
- right — where am I, and who am I.
+ Where am I and how do I go somewhere else are the same control on purpose: the one thing on
+ screen that names the pool is the one thing you tap to leave it. A native menu rather than a
+ sheet because a switch should look like a switch — a short list with a tick — and because it
+ costs one tap to see and one to change, over whatever you were doing. Joining, starting and the
+ catalogue of what Tally plays are a different job and live on their own sheet, behind the last
+ item.
  */
 struct PoolChip: View {
     @Environment(AppModel.self) private var model
+    /// The full lockup — the mark, "Tally", and the pool in small caps — rather than the chip.
+    var full = false
 
     var body: some View {
-        Button { model.showPools = true } label: {
-            HStack(spacing: 6) {
+        PoolMenu {
+            HStack(spacing: full ? 8 : 6) {
                 Image("TallyMark")
                     .resizable()
                     .scaledToFit()
-                    .frame(width: 22, height: 22)
-                Text(model.poolName)
-                    .font(TallyFont.display(15, weight: .bold))
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 9, weight: .black))
-                    .foregroundStyle(Color.ink3)
+                    .frame(width: full ? 28 : 22, height: full ? 28 : 22)
+                if full {
+                    VStack(alignment: .leading, spacing: 0) {
+                        Text("Tally").font(TallyFont.display(17)).foregroundStyle(Color.ink)
+                        HStack(spacing: 3) {
+                            Text(model.poolName.uppercased())
+                                .font(TallyFont.sans(8, weight: .bold)).tracking(1.2)
+                                .foregroundStyle(Color.ink2).lineLimit(1)
+                            chevron
+                        }
+                    }
+                } else {
+                    Text(model.poolName)
+                        .font(TallyFont.display(15, weight: .bold))
+                        .foregroundStyle(Color.ink)
+                        .lineLimit(1)
+                        .truncationMode(.tail)
+                    chevron
+                }
             }
-            .frame(maxWidth: 150)
+            .frame(maxWidth: full ? 190 : 150)
         }
         .accessibilityLabel("\(model.poolName). Switch pool")
     }
+
+    private var chevron: some View {
+        Image(systemName: "chevron.up.chevron.down")
+            .font(.system(size: full ? 7 : 9, weight: .black))
+            .foregroundStyle(Color.ink3)
+    }
 }
 
-/// "Tally" over the pool's name in small caps — the same lockup as the site header.
-struct Lockup: View {
-    let poolName: String
-    /// Draws the chevron that says this is a control. False wherever it is only a wordmark.
-    var switchable = false
+/// The pool menu itself, around whatever label opens it.
+struct PoolMenu<Label: View>: View {
+    @Environment(AppModel.self) private var model
+    @ViewBuilder let label: Label
 
     var body: some View {
-        HStack(spacing: 8) {
-            Image("TallyMark")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 34, height: 34)
-            VStack(alignment: .leading, spacing: 2) {
-                Text("Tally").font(TallyFont.display(21)).foregroundStyle(Color.ink)
-                HStack(spacing: 3) {
-                    Text(poolName.uppercased()).font(TallyFont.sans(9, weight: .bold)).tracking(1.4).foregroundStyle(Color.ink2).lineLimit(1)
-                    if switchable {
-                        Image(systemName: "chevron.up.chevron.down")
-                            .font(.system(size: 7, weight: .black))
-                            .foregroundStyle(Color.ink3)
-                    }
+        Menu {
+            // A picker inside a menu is how iOS draws "one of these, ticked" — the same shape as
+            // the mailbox list in Mail or the folder list in Notes.
+            Picker("Pool", selection: Binding(get: { model.pool }, set: { ref in
+                Haptics.tap()
+                model.switchPool(ref)
+            })) {
+                ForEach(model.catalog.pools) { pool in
+                    Text(pool.name).tag(pool.ref)
                 }
             }
+            .pickerStyle(.inline)
+            Divider()
+            Button { model.showPools = true } label: {
+                SwiftUI.Label("Join or start a pool", systemImage: "plus.circle")
+            }
+            if model.catalog.pools.count > 1 {
+                Menu {
+                    ForEach(model.catalog.pools) { pool in
+                        Button(role: .destructive) { model.removePool(pool.id) } label: { Text(pool.name) }
+                    }
+                } label: {
+                    SwiftUI.Label("Remove from this phone", systemImage: "minus.circle")
+                }
+            }
+        } label: {
+            label
         }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Tally — \(poolName)")
+        .menuOrder(.fixed)
     }
 }
 
