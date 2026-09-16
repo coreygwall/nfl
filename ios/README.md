@@ -147,6 +147,32 @@ nowhere else: the tab bar and toolbar (free), the floating pick tray, the toast,
 Content stays on paper. The two families are registered at launch from `Resources/Fonts`; if a
 file is missing the rounded system face stands in rather than a blank.
 
+## Widgets, and the two doors into the extension
+
+`TallyWidgetsExtension` carries the Live Activity, three home-screen widgets (this week's picks,
+the week board, the season board) and three lock-screen accessories. It cannot see the app target —
+not its asset catalog, not its design system. It has `TallyKit`, an App Group and one shared
+Keychain item, and that is all.
+
+**Data comes from two places, in this order.** The app writes a `WidgetSnapshot` into the App Group
+container whenever it goes to the background, so a widget is correct the instant it is added and on
+a phone that has not been opened since Thursday — it reads in microseconds and needs no network.
+Then the widget's own timeline refreshes, using a read-only session in the shared Keychain item, so
+a phone left alone all Sunday still moves. A widget with only the first goes stale in a pocket; one
+with only the second opens on a placeholder. Neither is acceptable on a Sunday.
+
+Both paths build the snapshot through `WidgetRefresh`, so there is one idea of what the top three
+is and one set of rounding.
+
+**Three things will bite you** in this target, and each already has:
+
+- An app asset (`Image("TallyMark")`) builds and then draws nothing. Draw it, or put it in TallyKit.
+- A copied colour is how the Live Activity shipped light-only. `themeParity.test.ts` now fails on a
+  hex in either iOS target.
+- `TallyWidgetsInfo.plist` and `TallyWidgets.entitlements` sit *beside* `TallyWidgets/`, never
+  inside it: the target's sources are a synchronised folder, so a file in there is also copied as a
+  resource, and processed-and-copied is "Multiple commands produce".
+
 ## Notifications and the lock screen
 
 The app asks for notifications after the first set of picks is locked in — never at launch, which

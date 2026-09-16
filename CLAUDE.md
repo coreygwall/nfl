@@ -65,6 +65,34 @@ Every pair clears 4.5:1; the tightest is ink-3 on paper-2 at 4.76. The preferenc
 in localStorage / UserDefaults, absent meaning "system", and `index.html` applies it inline before
 the first paint so there is no white flash.
 
+## The widget extension can see two things, and only two
+
+`TallyWidgetsExtension` draws the Live Activity, three home-screen widgets and three lock-screen
+accessories. It cannot see the app target at all — not its asset catalog, not its design system, not
+its model. It has exactly two doors:
+
+| Door | What comes through | Named in |
+| --- | --- | --- |
+| `TallyKit` | the palette, the rules, the models, `WidgetSnapshot` | both targets link the package |
+| App Group `group.app.playtally.ios` | the snapshot the app leaves for it | both `.entitlements` files |
+| Keychain group `$(AppIdentifierPrefix)app.playtally.shared` | one read-only session, so the widget can refresh itself | both `.entitlements` files |
+
+Three rules follow, and each of them has already been learned the hard way:
+
+- **Never reach for an app asset.** `Image("TallyMark")` builds and then draws nothing. Anything the
+  extension needs is drawn in code or lives in TallyKit.
+- **Never copy a colour.** That is how the Live Activity shipped with no dark mode — see the dark
+  mode section. `themeParity.test.ts` fails if either target writes a hex.
+- **The extension's Info.plist and entitlements sit *beside* `TallyWidgets/`, not inside it.** The
+  target's sources are a `PBXFileSystemSynchronizedRootGroup`, so a file in that folder is also
+  copied in as a resource, and a file that is both processed and copied is "Multiple commands
+  produce" — a build failure.
+
+The shared Keychain item is deliberately a *second* item rather than the app's session moved into
+the group: a Keychain lookup is scoped by access group, so re-homing the existing one would hide it
+from the app that wrote it and sign every install out on update. If it is missing the widget still
+draws from the snapshot and simply does not refresh.
+
 ## Four tabs, and what is deliberately not one
 
 Home · Picks · Board · Account, on both surfaces. Home is the landing and the only screen that can

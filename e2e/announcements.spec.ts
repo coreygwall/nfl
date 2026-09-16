@@ -131,7 +131,13 @@ test('off Home, the announcement icon previews instead of pulling the reader awa
       await shortcut.click();
       await popover.getByRole('link', { name: new RegExp(posts[3]!.slice(0, 20)) }).click();
       await expect(guest).toHaveURL(/\/announcements#message-/);
-      await expect(guest.getByText(posts[3]!, { exact: true })).toBeInViewport();
+      // Scoped to the feed on purpose. The popover closes on this click, but it leaves through an
+      // AnimatePresence transition, so for a few frames its own truncated copy of the same text is
+      // still in the document — and an unscoped locator matches both and fails strict mode. What
+      // this line is actually asserting is that the *announcement* is on screen, not that a
+      // fading popover is.
+      const feed = guest.getByRole("region", { name: "Announcements" });
+      await expect(feed.getByText(posts[3]!, { exact: true })).toBeInViewport();
 
       // Reading it marked the whole feed seen — a reopened preview off Home says so rather than
       // repeating any of the four.

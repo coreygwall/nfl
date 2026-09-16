@@ -17,5 +17,20 @@
 	     there is nothing to do in the developer portal beyond minting the key itself. -->
 	<key>aps-environment</key>
 	<string>development</string>
+	<!-- The container the widgets read their snapshot out of. A widget process gets woken for a
+	     fraction of a second with no session and no guarantee of a network, so the app leaves it
+	     the week already worked out; this is the shelf it leaves it on. -->
+	<key>com.apple.security.application-groups</key>
+	<array>
+		<string>group.app.playtally.ios</string>
+	</array>
+	<!-- One Keychain item, shared, so a widget can refresh on its own timeline instead of showing
+	     whatever the app last saw. Deliberately a *second* item rather than the app's own session
+	     moved into the group: a Keychain lookup is scoped by access group, so re-homing the
+	     existing one would hide it from the app that wrote it and sign every install out. -->
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)app.playtally.shared</string>
+	</array>
 </dict>
 </plist>

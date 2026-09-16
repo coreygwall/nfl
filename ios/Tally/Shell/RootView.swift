@@ -28,6 +28,11 @@ struct RootView: View {
                 // And whether anything was said while the phone was in a pocket.
                 Task { await model.refreshMessages(quiet: true) }
             }
+            // On the way out is the right moment to leave the home screen current: the app has
+            // just been used, so everything is fresh, and the widgets are what the next glance
+            // lands on. Doing it on every bootstrap poll instead would be three requests every
+            // five minutes for a number nobody is looking at yet.
+            if phase == .background { model.publishWidgetSnapshot() }
         }
         .sheet(isPresented: $model.showCommissioner) {
             CommissionerView()

@@ -8,19 +8,30 @@ import Security
  */
 public struct Keychain: Sendable {
     public let service: String
+    /**
+     The shared access group, for the one item the widget extension also has to read.
+
+     Nil for everything else, and that is load-bearing: a Keychain lookup is *scoped* by access
+     group, so putting the app's existing session into a group would hide it from the app that
+     wrote it and sign every install out on update. Only the widget's own copy names a group.
+     */
+    public let accessGroup: String?
 
     public static let shared = Keychain(service: "app.playtally.tally")
 
-    public init(service: String) {
+    public init(service: String, accessGroup: String? = nil) {
         self.service = service
+        self.accessGroup = accessGroup
     }
 
     private func query(_ key: String) -> [String: Any] {
-        [
+        var q: [String: Any] = [
             kSecClass as String: kSecClassGenericPassword,
             kSecAttrService as String: service,
             kSecAttrAccount as String: key,
         ]
+        if let accessGroup { q[kSecAttrAccessGroup as String] = accessGroup }
+        return q
     }
 
     public func data(forKey key: String) -> Data? {

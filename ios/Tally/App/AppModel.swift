@@ -3,6 +3,7 @@ import Network
 import Observation
 import SwiftUI
 import TallyKit
+import WidgetKit
 import UIKit
 
 enum AppTab: Hashable {
@@ -306,6 +307,51 @@ final class AppModel {
         }
     }
 
+    /**
+     Leave the home screen everything it needs.
+
+     A widget process wakes for a fraction of a second with no session and no promise of a network,
+     so the app does the work while it is already awake and leaves the answer in the shared
+     container. The widget refreshes on its own too, but this is what makes one correct the instant
+     it is added, and on a phone that has been in a pocket since Thursday.
+
+     It also parks a read-only credential in the shared Keychain item, which is the only way the
+     widget's own refresh can ask the server anything.
+     */
+    func publishWidgetSnapshot() {
+        guard let boot = boot.value, let me = player else { return }
+        WidgetSessionStore.write(
+            WidgetSession(
+                host: pool.host,
+                slug: pool.slug,
+                token: session.authHeaders.token ?? "",
+                entryId: session.authHeaders.entryId
+            )
+        )
+        let service = self.service
+        let ref = pool
+        let name = poolName
+        let entries = people.isEmpty ? [me] : people
+        Task {
+            guard let snapshot = try? await WidgetRefresh.snapshot(
+                service: service,
+                pool: ref,
+                poolName: name,
+                entries: entries,
+                bootstrap: boot
+            ) else { return }
+            if WidgetStore.write(snapshot) { WidgetCenter.shared.reloadAllTimelines() }
+        }
+    }
+
+    /// Signing out takes the home screen with it: a widget left showing somebody else's week on a
+    /// phone they handed back is worse than a widget showing nothing.
+    func clearWidgetSnapshot() {
+        WidgetStore.clear()
+        WidgetSessionStore.clear()
+        WidgetCenter.shared.reloadAllTimelines()
+    }
+
     private static func makeService(pool: PoolRef, session: @escaping @Sendable () -> AuthHeaders) -> PoolService {
         PoolService(client: APIClient(pool: pool, auth: session))
     }
@@ -388,6 +434,10 @@ final class AppModel {
 
     func signOut() {
         commit(.empty)
+        // The home screen goes with it. A widget still showing somebody's week on a phone they
+        // just handed over is worse than one showing nothing.
+        clearWidgetSnapshot()
+        Task { await live.endAll() }
         Task { _ = try? await self.service.endSession() }
         Task { await self.refreshBootstrap() }
     }
