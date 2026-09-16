@@ -137,9 +137,36 @@ public struct WeekResponse: Codable, Sendable {
     public let pickCounts: [String: PickCount]
     /// Players with at least one pick this week.
     public let submitted: Int
+    /// Where this entry stands, when there is a board to stand on. It travels with the week so the
+    /// lock screen and the widgets can say "12 points, 2nd" off one request.
+    public let standing: Standing?
 
-    public init(now: Date, week: Int, games: [Game], myPicks: [Pick], pickCounts: [String: PickCount], submitted: Int) {
-        self.now = now; self.week = week; self.games = games; self.myPicks = myPicks; self.pickCounts = pickCounts; self.submitted = submitted
+    public struct Standing: Codable, Hashable, Sendable {
+        public let place: Int
+        public let field: Int
+
+        public init(place: Int, field: Int) {
+            self.place = place
+            self.field = field
+        }
+    }
+
+    public init(
+        now: Date,
+        week: Int,
+        games: [Game],
+        myPicks: [Pick],
+        pickCounts: [String: PickCount],
+        submitted: Int,
+        standing: Standing? = nil
+    ) {
+        self.now = now
+        self.week = week
+        self.games = games
+        self.myPicks = myPicks
+        self.pickCounts = pickCounts
+        self.submitted = submitted
+        self.standing = standing
     }
 }
 

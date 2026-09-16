@@ -35,15 +35,24 @@ Then put the key's 10-character Key ID into `APNS_KEY_ID` in `wrangler.jsonc` (i
 it travels in the header of every push) and deploy. `APPLE_TEAM_ID` and `APPLE_BUNDLE_ID` are
 already there.
 
+The same key is what lights up **Live Activities**, which are pushed rather than polled:
+`worker/activities.ts` rewrites every registered lock screen on each cron sweep, addressed to the
+`<bundle>.push-type.liveactivity` sub-topic. Until the key exists it reports `skipped` and the lock
+screen only moves while the app is open — which is the one time nobody is looking at a lock screen.
+
 Nothing else needs doing in the developer portal. The Push Notifications capability is in
 `ios/Tally/Tally.entitlements`, and Xcode enables it on the App ID itself when it provisions with
 automatic signing — the same way it already handles associated domains.
 
 ## Dark mode is a re-light, not an inversion
 
-`src/index.css` holds the reasoning and the hex values; `ios/Tally/Design/Theme.swift` mirrors them
-as `Color(light:dark:)` pairs that resolve at draw time, so `.preferredColorScheme` on the root
-re-lights every screen without a call site knowing. Three things make it work:
+`src/index.css` holds the reasoning and the hex values; `ios/TallyKit/Sources/TallyKit/Design/Palette.swift`
+mirrors them as `Color(light:dark:)` pairs that resolve at draw time, so `.preferredColorScheme` on
+the root re-lights every screen without a call site knowing. It lives in TallyKit rather than the
+app because **the widget extension cannot see the app target** — when the Live Activity needed
+these colours it grew a private copy of seven of them as flat light hexes, which is how that
+surface shipped with no dark mode at all. `themeParity.test.ts` now fails if either iOS target
+writes a hex of its own. Three things make the palette work:
 
 - **`ink` draws text *and* the 2pt border**, so flipping it would turn every hard offset shadow
   white. `Color.shadow` / `--color-shadow` is separate and stays black.

@@ -86,6 +86,15 @@ export interface WeekResponse {
   pickCounts: Record<string, { away: number; home: number }>;
   /** Players with at least one pick this week. */
   submitted: number;
+  /**
+   * Where the requester stands this week, once there is a board to stand on.
+   *
+   * It rides along with the week because the two are always wanted together — the lock screen and
+   * the widgets both say "12 points, 2nd" — and because a client that had to fetch the board
+   * separately would briefly show a week with no position, then flicker one in. Null when nobody
+   * is signed in or the requester has no row yet.
+   */
+  standing: { place: number; field: number } | null;
 }
 
 export interface PutPicksRequest {

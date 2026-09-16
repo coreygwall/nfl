@@ -29,6 +29,28 @@ public enum WeekActivity {
         public var stake: Int { Scoring.points(forRank: rank) }
     }
 
+    /**
+     Where a week has got to, from one entry's seat.
+
+     Five states rather than "running" and "over", because the two in the middle are the ones a
+     lock screen is actually for. `between` is a Sunday at half past three with the early games in
+     and the late ones not yet on. `watching` is the hour after your last pick has played, when
+     your points are fixed and your place is not. Both used to end the activity; both are exactly
+     when somebody wants it.
+     */
+    public enum Phase: String, Codable, Hashable, Sendable {
+        /// Picks are in, nothing has kicked off.
+        case locked
+        /// At least one of their games is on.
+        case live
+        /// None of theirs is on, and some have not played. The gap between slates.
+        case between
+        /// All five have settled. The week has not, so their place can still move.
+        case watching
+        /// The week is over for everyone.
+        case final
+    }
+
     public enum State: String, Codable, Hashable, Sendable {
         /// Not kicked off.
         case waiting
@@ -46,11 +68,16 @@ public struct WeekActivityAttributes: Codable, Hashable, Sendable {
     /// Which entry this is, so someone running three of them can tell the lock screens apart.
     public let entryName: String
     public let poolName: String
+    /// The entry's id. `entryName` is what a person reads; this is what the app matches on when it
+    /// relaunches mid-Sunday and has to work out which of the running activities is which. Two
+    /// entries in one household can share a first name — they cannot share an id.
+    public let entryId: String
 
-    public init(week: Int, entryName: String, poolName: String) {
+    public init(week: Int, entryName: String, poolName: String, entryId: String = "") {
         self.week = week
         self.entryName = entryName
         self.poolName = poolName
+        self.entryId = entryId
     }
 
     /// The parts that change as the week goes, pushed from the Worker.
@@ -64,27 +91,80 @@ public struct WeekActivityAttributes: Codable, Hashable, Sendable {
         /// Where they stand, when there is a board worth quoting. Nil early on, when it is noise.
         public let place: Int?
         public let field: Int?
+        /// Whether the *week* is over, which is a different question from whether this entry's
+        /// five have settled. Somebody whose last pick played in the early game is done at four
+        /// o'clock and their position is not: it moves under them all afternoon as everyone else
+        /// finishes. The activity has to stay up for that, and only this says when it may stop.
+        public let weekFinal: Bool
+        /**
+         When this entry's next game starts, if one has not — Unix seconds, deliberately not a
+         `Date`.
 
-        public init(slots: [WeekActivity.Slot], points: Int, possible: Int, place: Int? = nil, field: Int? = nil) {
+         This shape is also a push payload. ActivityKit decodes `content-state` with a stock
+         `JSONDecoder`, whose default strategy reads a `Date` as seconds since *2001*, so a Worker
+         that sent the obvious ISO-8601 string — or the obvious Unix timestamp — would have its
+         updates rejected, or silently land in the wrong century, with nothing on either side to
+         say why. An `Int` cannot be misread.
+
+         It is what makes a Sunday afternoon with nothing currently live still worth a glance:
+         "back at 4:05" rather than silence.
+         */
+        public let nextKickoffEpoch: Int?
+
+        /// The kickoff as a date, for the one place that formats it.
+        public var nextKickoff: Date? { nextKickoffEpoch.map { Date(timeIntervalSince1970: TimeInterval($0)) } }
+
+        public init(
+            slots: [WeekActivity.Slot],
+            points: Int,
+            possible: Int,
+            place: Int? = nil,
+            field: Int? = nil,
+            weekFinal: Bool = false,
+            nextKickoffEpoch: Int? = nil
+        ) {
             self.slots = slots
             self.points = points
             self.possible = possible
             self.place = place
             self.field = field
+            self.weekFinal = weekFinal
+            self.nextKickoffEpoch = nextKickoffEpoch
         }
 
         /// Left to right as drawn: the five-pointer first, the one-pointer last.
         public var inDisplayOrder: [WeekActivity.Slot] { slots.sorted { $0.rank < $1.rank } }
 
-        /// Nothing left to play. The activity ends shortly after this goes true.
-        public var isFinished: Bool { slots.allSatisfy { $0.state != .waiting && $0.state != .live } }
+        /// Every one of this entry's five has a result. Their *points* cannot move after this;
+        /// their *place* very much can, which is why this is not the same as being over.
+        public var picksSettled: Bool { slots.allSatisfy { $0.state != .waiting && $0.state != .live } }
+
+        /// Where the week has got to, from this entry's seat. The view draws one of five things
+        /// and this is the only place that decides which, so the rule is testable without a
+        /// simulator — which matters, because a lock screen is the one surface nobody can watch
+        /// while they work.
+        public var phase: WeekActivity.Phase {
+            if weekFinal { return .final }
+            if slots.contains(where: { $0.state == .live }) { return .live }
+            if picksSettled { return .watching }
+            // Nothing of theirs is on. Either it has not started at all, or they are between
+            // slates — the Sunday afternoon gap that the old build treated as a reason to pack up.
+            return slots.contains(where: { $0.state != .waiting }) ? .between : .locked
+        }
+
+        /// Games of theirs still to come or still running, and what those are worth. The reason
+        /// to keep watching, stated as a pair because "3 games" and "9 points" answer different
+        /// questions.
+        public var outstanding: (games: Int, points: Int) {
+            let left = slots.filter { $0.state == .waiting || $0.state == .live }
+            return (left.count, left.reduce(0) { $0 + $1.stake })
+        }
+
+        public var wonCount: Int { slots.filter { $0.state == .won }.count }
+        public var settledCount: Int { slots.filter { $0.state != .waiting && $0.state != .live }.count }
 
         /// A short line for the places too small to draw five slots, like the Dynamic Island.
-        public var summary: String {
-            let won = slots.filter { $0.state == .won }.count
-            let done = slots.filter { $0.state != .waiting && $0.state != .live }.count
-            return "\(won)/\(done) · \(points) pts"
-        }
+        public var summary: String { "\(wonCount)/\(settledCount) · \(points) pts" }
     }
 }
 
@@ -134,12 +214,27 @@ extension WeekActivityAttributes.ContentState {
             slots.append(WeekActivity.Slot(rank: rank, team: pick.team, state: state))
         }
 
+        // The week is over when every game in it has a result — not when this entry's five do.
+        // An empty slate is not a finished one, or a week the app has no schedule for would land
+        // on the lock screen already declaring itself done.
+        let weekFinal = !games.isEmpty && games.allSatisfy { $0.winner != nil }
+
+        // The next of *their* games, which is the only kickoff worth putting on screen. The next
+        // game in the league is not news to somebody who has no pick in it.
+        let mine = Set(picks.map(\.gameId))
+        let nextKickoff = games
+            .filter { mine.contains($0.id) && $0.winner == nil && $0.kickoffAt > now }
+            .map(\.kickoffAt)
+            .min()
+
         return WeekActivityAttributes.ContentState(
             slots: slots,
             points: points,
             possible: possible,
             place: place,
-            field: field
+            field: field,
+            weekFinal: weekFinal,
+            nextKickoffEpoch: nextKickoff.map { Int($0.timeIntervalSince1970) }
         )
     }
 }

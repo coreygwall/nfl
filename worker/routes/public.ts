@@ -9,7 +9,8 @@ import { clearedSessionCookie, hashToken, isLockedOut, lockUntil, MAX_CLAIM_ATTE
 import { validatePicks } from "../../shared/picks.ts";
 import { buildSeasonBoard, buildWeekBoard } from "../../shared/scoring.ts";
 import { boardWeek, gameStatus, isLocked, pickWeek, SEASON_START_WEEK, weekSummaries, WEEKS } from "../../shared/week.ts";
-import type { Game } from "../../shared/types.ts";
+import type { Game, Player } from "../../shared/types.ts";
+import type { PlayerPick } from "../../shared/scoring.ts";
 import type {
   BootstrapResponse,
   ClaimResponse,
@@ -259,10 +260,11 @@ publicRoutes.get("/weeks/:week", async (c) => {
   const week = parseWeek(c.req.param("week"));
   const now = c.get("now");
   const me = c.get("player");
-  const [games, allPicks, myPicks] = await Promise.all([
+  const [games, allPicks, myPicks, players] = await Promise.all([
     listWeekGames(c.env.DB, SEASON, week),
     listWeekPicks(c.env.DB, week),
     me ? listPicks(c.env.DB, me.id, week) : Promise.resolve([]),
+    listPlayers(c.env.DB),
   ]);
   const pickCounts: WeekResponse["pickCounts"] = {};
   for (const g of games) {
@@ -278,9 +280,21 @@ publicRoutes.get("/weeks/:week", async (c) => {
     myPicks,
     pickCounts,
     submitted: new Set(allPicks.map((p) => p.playerId)).size,
+    standing: standingFor(me?.id, { week, players, picks: allPicks, games, now }),
   };
   return c.json(body);
 });
+
+/** The requester's row on this week's board, reduced to the two numbers anybody quotes. */
+function standingFor(
+  playerId: string | undefined,
+  input: { week: number; players: Player[]; picks: PlayerPick[]; games: Game[]; now: string },
+): WeekResponse["standing"] {
+  if (!playerId) return null;
+  const board = buildWeekBoard({ ...input, requesterId: playerId });
+  const mine = board.rows.find((r) => r.playerId === playerId);
+  return mine ? { place: mine.place, field: board.rows.length } : null;
+}
 
 publicRoutes.put("/weeks/:week/picks", async (c) => {
   const week = parseWeek(c.req.param("week"));
