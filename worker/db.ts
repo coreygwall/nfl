@@ -1,6 +1,7 @@
 import type { Abbr } from "../shared/teams.ts";
 import type { Game, Pick, Player, Winner } from "../shared/types.ts";
 import type { PlayerPick } from "../shared/scoring.ts";
+import { parsePrefs, type NotifyPrefs } from "../shared/notify-prefs.ts";
 
 interface GameRow {
   id: string;
@@ -606,7 +607,9 @@ export interface PushTokenRecord {
   environment: "sandbox" | "production";
   accountId: string | null;
   playerId: string | null;
-  prefs: Record<string, boolean>;
+  /// Already parsed and normalised: every reader gets the same shape, including from rows an
+  /// older build wrote in the flat form.
+  prefs: NotifyPrefs;
 }
 
 interface PushTokenRow {
@@ -618,12 +621,13 @@ interface PushTokenRow {
 }
 
 const pushToken = (r: PushTokenRow): PushTokenRecord => {
-  let prefs: Record<string, boolean> = {};
+  let prefs: NotifyPrefs = {};
   try {
-    const parsed: unknown = JSON.parse(r.prefs);
-    if (parsed && typeof parsed === "object") prefs = parsed as Record<string, boolean>;
+    // A malformed blob, or one from an older build, both come back as "everything on" rather than
+    // as silence — a phone that has gone quiet with no way to find out why is the worse failure.
+    prefs = parsePrefs(JSON.parse(r.prefs));
   } catch {
-    // A malformed prefs blob means "everything on", which is the default anyway.
+    prefs = {};
   }
   return {
     token: r.token,
@@ -638,6 +642,15 @@ const pushToken = (r: PushTokenRow): PushTokenRecord => {
  * Record where an install can be reached. Re-registering is the normal case — the app does it on
  * every launch — so this is an upsert that also moves the token to whoever is signed in now.
  */
+/**
+ * Record where an install can be reached.
+ *
+ * **Registration deliberately does not touch `prefs`.** The app calls this on every launch, so an
+ * upsert that wrote preferences would hand back whatever that build happened to send — which for
+ * every build so far is nothing — and quietly reset the switches somebody set last week. It is the
+ * same "looks like it works" failure the column already had, arrived at from the other end.
+ * Preferences are their own write, through `savePushPrefs`.
+ */
 export async function savePushToken(
   db: D1Database,
   input: {
@@ -645,7 +658,6 @@ export async function savePushToken(
     environment: "sandbox" | "production";
     accountId: string | null;
     playerId: string | null;
-    prefs?: Record<string, boolean>;
     appVersion?: string | null;
   },
   now: string,
@@ -653,12 +665,11 @@ export async function savePushToken(
   await db
     .prepare(
       `INSERT INTO push_tokens (token, environment, account_id, player_id, prefs, app_version, created_at, last_seen_at, retired_at)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, NULL)
+       VALUES (?, ?, ?, ?, '{}', ?, ?, ?, NULL)
        ON CONFLICT(token) DO UPDATE SET
          environment = excluded.environment,
          account_id = excluded.account_id,
          player_id = excluded.player_id,
-         prefs = excluded.prefs,
          app_version = excluded.app_version,
          last_seen_at = excluded.last_seen_at,
          retired_at = NULL`,
@@ -668,12 +679,39 @@ export async function savePushToken(
       input.environment,
       input.accountId,
       input.playerId,
-      JSON.stringify(input.prefs ?? {}),
       input.appVersion ?? null,
       now,
       now,
     )
     .run();
+}
+
+/** The switches, and only the switches. Returns false when the token is not one we know. */
+export async function savePushPrefs(
+  db: D1Database,
+  token: string,
+  prefs: NotifyPrefs,
+  now: string,
+): Promise<boolean> {
+  const result = await db
+    .prepare("UPDATE push_tokens SET prefs = ?, last_seen_at = ? WHERE token = ? AND retired_at IS NULL")
+    .bind(JSON.stringify(prefs), now, token)
+    .run();
+  return (result.meta.changes ?? 0) > 0;
+}
+
+/** What this install currently has set, for a settings screen to draw. */
+export async function getPushPrefs(db: D1Database, token: string): Promise<NotifyPrefs | null> {
+  const row = await db
+    .prepare("SELECT prefs FROM push_tokens WHERE token = ? AND retired_at IS NULL")
+    .bind(token)
+    .first<{ prefs: string }>();
+  if (!row) return null;
+  try {
+    return parsePrefs(JSON.parse(row.prefs));
+  } catch {
+    return {};
+  }
 }
 
 export async function deletePushToken(db: D1Database, token: string): Promise<void> {

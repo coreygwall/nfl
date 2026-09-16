@@ -408,6 +408,8 @@ private struct NotificationsRow: View {
                 }
                 Text("One message per entry each time a set of games finishes — the 1:00 games, the 4:00 games, Sunday night — plus a nudge if your picks aren't in.")
                     .sans(12).foregroundStyle(Color.ink2)
+                Button("Choose what to hear") { model.showNotificationSettings = true }
+                    .buttonStyle(.tally(.plain, size: .small))
             case .denied:
                 Text("Turned off in Settings.").font(TallyFont.display(16))
                 Button("Open Settings") {

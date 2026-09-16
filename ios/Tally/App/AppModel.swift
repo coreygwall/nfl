@@ -106,6 +106,12 @@ final class AppModel {
     /// entry: a phone that picks for the whole family is one reader.
     var announcementsSeenId: String?
     /// The megaphone's peek: unread previews, off Home, at a medium detent.
+    /// What this install has asked to hear. Read from the server rather than kept locally: the
+    /// switches belong to the token, and a phone that reinstalls should find its old answers
+    /// rather than silently start from everything-on.
+    var notifyPrefs: Loadable<NotifyPrefs> = .idle
+    var savingPrefs = false
+    var showNotificationSettings = false
     var showAnnouncementsSheet = false
     /// The whole feed. A sheet rather than a fifth tab or a push, because it has to open from any
     /// tab and from the peek, and a sheet is the one presentation that works the same from both.
@@ -267,6 +273,56 @@ final class AppModel {
         guard push.permission == .notAsked else { return }
         if await push.requestPermission() {
             toast("You'll hear when your games finish.")
+        }
+    }
+
+    // MARK: Notification preferences
+
+    func loadNotifyPrefs() async {
+        guard let token = push.token else {
+            // No token means this phone has never registered — there is nothing on the server to
+            // read, and everything is on by definition.
+            notifyPrefs = .loaded(.everything)
+            return
+        }
+        if notifyPrefs.value == nil { notifyPrefs = .loading }
+        do {
+            notifyPrefs = .loaded(try await service.notificationPrefs(token: token))
+        } catch {
+            if notifyPrefs.value == nil { notifyPrefs = .failed(error.asAPIError) }
+        }
+    }
+
+    func setNotifyKind(_ kind: NotificationKind, on: Bool) async {
+        guard var prefs = notifyPrefs.value else { return }
+        prefs.set(kind, on: on)
+        await save(prefs)
+    }
+
+    func setNotifyEntry(_ entryId: String, on: Bool) async {
+        guard var prefs = notifyPrefs.value else { return }
+        prefs.setMuted(!on, entry: entryId)
+        await save(prefs)
+    }
+
+    /**
+     Move the switch, then tell the server, and put it back if the server disagrees.
+
+     The control answers immediately because a toggle that waits on a round trip feels broken, and
+     rolls back on failure because a switch that shows "off" while the server still says "on" is
+     the one outcome nobody could diagnose from the outside.
+     */
+    private func save(_ prefs: NotifyPrefs) async {
+        guard let token = push.token else { return }
+        let previous = notifyPrefs.value
+        notifyPrefs = .loaded(prefs)
+        savingPrefs = true
+        defer { savingPrefs = false }
+        do {
+            notifyPrefs = .loaded(try await service.setNotificationPrefs(token: token, prefs: prefs))
+        } catch {
+            if let previous { notifyPrefs = .loaded(previous) }
+            toast(error.asAPIError.message, kind: .error)
         }
     }
 

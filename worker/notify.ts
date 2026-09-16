@@ -1,5 +1,6 @@
 import type { Notification } from "../shared/notify.ts";
 import { planNotifications, WINDOW_MS } from "../shared/notify-plan.ts";
+import { allows } from "../shared/notify-prefs.ts";
 import { ms } from "../shared/week.ts";
 import { send, type ApnsConfig, type PushResult } from "./apns.ts";
 import {
@@ -39,11 +40,13 @@ export interface DispatchReport {
   retired: number;
   /** Messages claimed but with nobody reachable, released for a later run. */
   unreachable: number;
+  /** Messages nobody had switched on. Not a failure — a preference, honoured. */
+  muted: number;
   /** Set when there is no APNs key configured, so nothing could be sent. */
   skipped?: string;
 }
 
-const EMPTY: DispatchReport = { sent: 0, delivered: 0, retired: 0, unreachable: 0 };
+const EMPTY: DispatchReport = { sent: 0, delivered: 0, retired: 0, unreachable: 0, muted: 0 };
 
 /** Everything one install should hear about, in entry order. */
 function entriesFor(token: PushTokenRecord, owned: Map<string, string[]>): string[] {
@@ -123,8 +126,24 @@ export async function dispatchNotifications(
 
   const report: DispatchReport = { ...EMPTY };
   for (const plan of plans) {
-    const targets = tokensByEntry.get(plan.playerId) ?? [];
-    if (targets.length === 0) continue;
+    const reachable = tokensByEntry.get(plan.playerId) ?? [];
+    // No device at all is not a decision anybody made — nobody has installed the app yet, or has
+    // not signed in on it. Leaving the message unclaimed is what lets a phone that registers an
+    // hour from now still hear about the slate, and that has to stay true.
+    if (reachable.length === 0) continue;
+
+    // Only the installs that asked for this. The `prefs` column has existed since push landed and
+    // nothing read it, so every switch anybody set was decoration — this is the line that makes
+    // one mean something.
+    const targets = reachable.filter((token) => allows(token.prefs, plan.notification.kind, plan.playerId));
+    if (targets.length === 0) {
+      // Every device that could hear this has switched it off. That *is* a decision, and it will
+      // be the same one in half an hour, so the message is settled rather than retried all week.
+      // `unreachable` is for a delivery that failed; this did not fail.
+      report.muted += 1;
+      await claimNotification(env.DB, { id: plan.id, kind: plan.notification.kind, playerId: plan.playerId }, now);
+      continue;
+    }
     if (!(await claimNotification(env.DB, { id: plan.id, kind: plan.notification.kind, playerId: plan.playerId }, now))) {
       continue;
     }

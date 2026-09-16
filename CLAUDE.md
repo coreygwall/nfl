@@ -44,6 +44,30 @@ Nothing else needs doing in the developer portal. The Push Notifications capabil
 `ios/Tally/Tally.entitlements`, and Xcode enables it on the App ID itself when it provisions with
 automatic signing — the same way it already handles associated domains.
 
+## Notifications: what is built, and the one switch that was decoration
+
+Three kinds, all written and all tested: `picksDue` (two anchors a week — the first game, and again
+before Sunday), `segment` (one message per *slate* that settles, because `shared/segments.ts` splits
+a week into Thu / Fri / Sat / Sun early / Sun late / Sun night / Mon, which is the unit people talk
+in) and `weekDone` (where you finished, and where that leaves the season). The wording lives in
+`shared/notify.ts` so every message the app can send can be read in one file.
+
+`push_tokens.prefs` existed from the start and **nothing read it** — `dispatchNotifications` sent
+every message to every device, so a settings screen built against it would have been a row of
+controls that did nothing. `shared/notify-prefs.ts` is now the one rule (`allows`), and two things
+about it are load-bearing:
+
+- **Absent means on**, everywhere: a malformed blob, an unknown key, an empty object, all mean
+  everything. The opposite turns a deploy into a phone that has gone quiet with nothing on screen
+  to say why.
+- **Registration never writes prefs.** `POST /push` runs on every launch, so an upsert that carried
+  preferences would reset them to whatever that build happened to send. They have their own
+  endpoint (`PATCH /push/prefs`).
+
+A message *nobody has switched on* is claimed and counted as `muted`; a message with **no device at
+all** is left unclaimed, so a phone that registers an hour later still hears about the slate. Those
+are different facts and conflating them swallows notifications permanently.
+
 ## Dark mode is a re-light, not an inversion
 
 `src/index.css` holds the reasoning and the hex values; `ios/TallyKit/Sources/TallyKit/Design/Palette.swift`
