@@ -154,7 +154,7 @@ Four places, on both surfaces:
 | **Home** | What does this pool want from me? The week, whose picks are missing, where you stand, who took last week. On iOS the other pools are a strip underneath, each saying whether it needs picks. |
 | **Picks** | This week's five. |
 | **Board** | Who is winning. |
-| **Account** | Your entries, signing in, notifications — and the office doors, for whoever holds one. |
+| **Account** | Grouped like Settings, in the order things get touched: your entries in this pool, the office doors for whoever holds one, notifications and appearance, the other-device link, and about Tally. |
 
 The brand is in the navigation bar of every tab as the pool chip — the fuller lockup on Home, the
 mark and the pool's name elsewhere — rather than repeating as a block at the top of every tab's
