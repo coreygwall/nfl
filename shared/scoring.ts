@@ -4,6 +4,18 @@ import { isLocked, SEASON_START_WEEK } from "./week.ts";
 import { MAX_PICKS } from "./picks.ts";
 
 export const pointsForRank = (rank: number): number => MAX_PICKS + 1 - rank;
+
+/**
+ * "1st", "2nd", "11th". Written once here because the board, home and the week's status line all
+ * say a place out loud, and the two copies this replaced disagreed about how they got there — one
+ * special-cased the teens, the other leaned on a `(v - 20) % 10` trick. `Scoring.ordinal` in
+ * TallyKit is the same rule for the app.
+ */
+export function ordinal(n: number): string {
+  const teens = n % 100;
+  if (teens >= 11 && teens <= 13) return `${n}th`;
+  return `${n}${["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
+}
 export const MAX_WEEK_POINTS = Array.from({ length: MAX_PICKS }, (_, i) => pointsForRank(i + 1)).reduce((a, b) => a + b, 0);
 
 export type Outcome = "win" | "loss" | "tie" | "pending";

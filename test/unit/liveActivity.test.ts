@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { activityPayload, buildActivityState, picksSettled, staleEpochFor } from "../../shared/live-activity.ts";
+import { activityPayload, activityPhase, buildActivityState, picksSettled, staleEpochFor, statusLine } from "../../shared/live-activity.ts";
 import type { Game, Pick } from "../../shared/types.ts";
 
 /**
@@ -147,5 +147,63 @@ describe("the payload Apple is handed", () => {
     });
     expect(staleEpochFor(live, NOW)).toBe(Math.floor(Date.parse(NOW) / 1000) + 30 * 60);
     expect(staleEpochFor(state, NOW)).toBe((state.nextKickoffEpoch ?? 0) + 30 * 60);
+  });
+});
+
+/**
+ * The five phases, and the sentence each one says.
+ *
+ * A Sunday is not "running" or "over": it is the gap between the early games and the late ones,
+ * and the hour after your last pick has played when your points are fixed and your place is not.
+ * Both of those used to end the lock screen, which is exactly when somebody wants it. The same
+ * rule drives the picks tab, so these sentences are the ones on both surfaces at once.
+ */
+describe("where the week has got to, from one entry's seat", () => {
+  const clock = () => "4:05 PM";
+  const two = [pick("a", "BUF", 1), pick("b", "KC", 2)];
+  const line = (games: Game[], extra: { place?: number; field?: number } = {}) =>
+    statusLine(buildActivityState({ picks: two, games, now: NOW, ...extra }), { clock });
+  const phase = (games: Game[]) => activityPhase(buildActivityState({ picks: two, games, now: NOW }));
+
+  it("says when it starts before anything has", () => {
+    const games = [game("a", "BUF", "HOU", { kickoff: 60 }), game("b", "KC", "DEN", { kickoff: 120 })];
+    expect(phase(games)).toBe("locked");
+    expect(line(games)).toBe("Picks are in — first game 4:05 PM.");
+  });
+
+  it("says what is on now, and what it is worth", () => {
+    const games = [game("a", "BUF", "HOU"), game("b", "KC", "DEN", { kickoff: 120 })];
+    expect(phase(games)).toBe("live");
+    expect(line(games)).toBe("1 game on now · 9 still to play for.");
+  });
+
+  it("names the next kickoff in the gap between slates", () => {
+    const games = [game("a", "BUF", "HOU", { winner: "BUF" }), game("b", "KC", "DEN", { kickoff: 120 })];
+    expect(phase(games)).toBe("between");
+    expect(line(games)).toBe("Back at 4:05 PM · 1 game left, worth 4.");
+  });
+
+  it("admits the points have stopped moving while the place has not", () => {
+    const games = [
+      game("a", "BUF", "HOU", { winner: "BUF" }),
+      game("b", "KC", "DEN", { winner: "DEN" }),
+      // Somebody else's game, still running: this entry is done and the week is not.
+      game("c", "SF", "SEA"),
+    ];
+    expect(phase(games)).toBe("watching");
+    expect(line(games)).toBe("All five in. Your place can still move.");
+  });
+
+  it("calls the week once every game in it has a result", () => {
+    const games = [game("a", "BUF", "HOU", { winner: "BUF" }), game("b", "KC", "DEN", { winner: "KC" })];
+    expect(phase(games)).toBe("final");
+    expect(line(games, { place: 1, field: 12 })).toBe("You won the week on 9 points.");
+    expect(line(games, { place: 4, field: 12 })).toBe("4th of 12 on 9 points.");
+  });
+
+  it("says nothing it cannot stand behind when the scores are stale", () => {
+    const games = [game("a", "BUF", "HOU"), game("b", "KC", "DEN", { kickoff: 120 })];
+    const state = buildActivityState({ picks: two, games, now: NOW });
+    expect(statusLine(state, { stale: true, clock })).toBe("Scores may be behind.");
   });
 });

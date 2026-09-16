@@ -4,6 +4,7 @@ import { useBootstrap, useSeasonBoard, useWeekBoard } from "../api/queries.ts";
 import { usePlayer } from "../lib/player.tsx";
 import { formatKickoff } from "../lib/time.ts";
 import { MAX_PICKS } from "../../shared/picks.ts";
+import { ordinal } from "../../shared/scoring.ts";
 import { SEASON_START_WEEK } from "../../shared/week.ts";
 import { Announcements } from "../components/Announcements.tsx";
 import { PoolPlays } from "../components/PoolPlays.tsx";
@@ -130,11 +131,6 @@ function PoolOpenCard({ now }: { now: string }) {
   );
 }
 
-function ordinal(n: number): string {
-  const tens = n % 100;
-  if (tens >= 11 && tens <= 13) return `${n}th`;
-  return `${n}${["th", "st", "nd", "rd"][n % 10] ?? "th"}`;
-}
 
 function PoolCard() {
   const boot = useBootstrap();

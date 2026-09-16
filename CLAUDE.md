@@ -170,6 +170,23 @@ standing in: what week it is, whose picks are missing, where you stand.
   place — so anything that has to be reachable mid-pick needs its own route out. That is what the
   flow's "Go to pool home" link is for, and why the e2e helpers reach Account by address.
 
+## One Sunday, one set of words
+
+A week in progress is described in three places at once — the lock screen, the home-screen widgets
+and the Picks tab — so the rule that decides *what is happening* lives once per language and
+nowhere else: `shared/live-activity.ts` for the Worker and the web, `WeekActivity.swift` for the
+app and its widgets. Five phases rather than "running" and "over", because the two in the middle
+are what a Sunday is actually made of: `between` is half past three with the early games in and the
+late ones not yet on, `watching` is the hour after your last pick has played when your points are
+fixed and your place is not. Both used to end a Live Activity, which is precisely when somebody
+wants one.
+
+`statusLine` is the sentence each phase says, and `liveActivityParity.test.ts` compares the two
+implementations phrase by phrase in both directions — reword one and it fails naming the other.
+It strips comments first, because the comments quote the sentences they explain. The same test
+holds the pairing on the number: before anything settles the *stake* leads ("15 to play"), because
+a big honest 0 is discouraging; after that the points lead with what is still out there behind them.
+
 ## Two offices, one PIN that is no longer a login
 
 `migrations/0010_roles.sql` split what used to be "admin" in two:
