@@ -86,25 +86,17 @@ extension AppModel {
         AnnouncementSeen.save(newest, pool: pool)
     }
 
-    /// Home's announcements section, brought into view.
-    func revealAnnouncements() {
-        scrollToAnnouncements += 1
-    }
-
     /**
-     What the megaphone does, and it is not the same thing everywhere.
+     What the megaphone does: peek, from anywhere.
 
-     On Home the feed is already on the page, so covering it with a sheet would be hiding the thing
-     you just asked to see: it scrolls instead. Anywhere else there is nothing to scroll to and you
-     are in the middle of something — a pick flow, a board you were reading — so it peeks, and
-     going any further is a second, deliberate tap.
+     It used to scroll on Home and peek everywhere else, which made one button do two things
+     depending on where you happened to be standing. Now the feed is not on Home at all, and the
+     megaphone is the one door to it: a medium sheet of what is new, over whatever you were doing,
+     and going any further is a second, deliberate tap. The web keeps its section on the pool
+     home and scrolls to it, because a page can afford a section; a tab cannot.
      */
     func tapMegaphone() {
-        if tab == .home {
-            revealAnnouncements()
-        } else {
-            showAnnouncementsSheet = true
-        }
+        showAnnouncementsSheet = true
     }
 
     /// The whole feed, optionally landing on one announcement.

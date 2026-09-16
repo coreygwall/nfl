@@ -2,16 +2,17 @@ import SwiftUI
 import TallyKit
 
 /**
- Home: which pools you are in, and what each of them wants from you.
+ Home: the pool you are standing in, and what it wants from you.
 
- It exists because "which pool am I in" stopped being a rhetorical question. With one pool the
- answer was the whole app, so the app *was* the pool and the question never came up. With two it is
- the first thing you need to know on opening the app, and no other screen can tell you — Picks and
- Board are already inside a pool by the time you get to them.
+ It used to list every pool on the phone as a card, which made the page a second switcher and made
+ the tabs under it feel like they belonged to no pool in particular. Which pool you are in is now
+ the chip in the navigation bar — on this tab and on every other — and Home is about *this* one:
+ what week it is, whose picks are missing, where you stand, who took last week, who leads the
+ season.
 
- The rule it is built to: **the pool you are in is never more than a glance away.** At one pool this
- screen is one card that says what week it is, whether your picks are in, and where you stand — so
- it earns its tab today rather than becoming useful later. At five it is the same card, five times.
+ The other pools are still here, but as a short strip under the card rather than as peers of it:
+ one line each, saying whether anything over there needs you. That is the one thing a pool you are
+ not in has to tell you on a Thursday, and it is the thing no chip can say.
  */
 struct HomeView: View {
     @Environment(AppModel.self) private var model
@@ -19,6 +20,8 @@ struct HomeView: View {
     @State private var season: Loadable<SeasonBoardResponse> = .idle
     /// The last week with every result in — usually not the week being picked, so its own request.
     @State private var completed: Loadable<WeekBoardResponse> = .idle
+    /// What each of the other pools wants, by pool id.
+    @State private var others: [String: PoolPeek.Status] = [:]
 
     private var boot: BootstrapResponse? { model.boot.value }
     private var completedWeek: Int? { PoolHome.latestCompletedWeek(boot?.weeks ?? []) }
@@ -34,11 +37,9 @@ struct HomeView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
-            poolsSection
+            poolSection
+            if !otherPools.isEmpty { otherPoolsSection }
             exploreSection
-            // Under the standings rather than over them, matching the web: a commissioner posts
-            // once a week at most, and what the pool wants from you today outranks it.
-            AnnouncementsCard()
             joinSection
             moreSection
         }
@@ -46,20 +47,41 @@ struct HomeView: View {
         // and the board tab is where a live week belongs. What the key is made of, and why each
         // part of it has to be in there, is on `loadKey`.
         .task(id: loadKey) { await load() }
+        // The other pools answer for themselves, with their own sessions. Keyed on the current
+        // pool because switching changes which ones are "other".
+        .task(id: "\(model.pool.host)/\(model.pool.slug)#others:\(otherPools.count)") { await loadOthers() }
     }
 
-    // MARK: Your pools
+    // MARK: This pool
 
-    private var poolsSection: some View {
+    private var poolSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionLabel(text: model.catalog.pools.count > 1 ? "Your pools" : "Your pool")
-            ForEach(model.catalog.pools) { pool in
-                if pool.ref == model.pool {
-                    ActivePoolCard(pool: pool, week: week.value, season: season.value, failed: week.error != nil)
-                } else {
-                    OtherPoolCard(pool: pool)
-                }
+            SectionLabel(text: "This week")
+            if let pool = model.catalog.current {
+                ActivePoolCard(pool: pool, week: week.value, season: season.value, failed: week.error != nil)
             }
+        }
+    }
+
+    // MARK: Your other pools
+
+    private var otherPools: [PoolMembership] { model.catalog.pools.filter { $0.ref != model.pool } }
+
+    private var otherPoolsSection: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            SectionLabel(text: "Your other pools")
+            ForEach(otherPools) { pool in
+                OtherPoolRow(pool: pool, status: others[pool.id])
+            }
+        }
+    }
+
+    private func loadOthers() async {
+        // One after another rather than all at once: there are two or three of these at most, and
+        // each is its own session, its own host and its own two requests.
+        for pool in otherPools {
+            if others[pool.id] == nil { others[pool.id] = .loading }
+            others[pool.id] = await PoolPeek.status(pool.ref)
         }
     }
 
@@ -208,8 +230,6 @@ private struct ActivePoolCard: View {
                 }
             }
             Spacer()
-            // Only information when there is somewhere else to be.
-            if model.catalog.pools.count > 1 { Chip(text: "open", fill: .flag, size: 10, label: .onAccent) }
         }
     }
 
@@ -288,24 +308,70 @@ private struct ActivePoolCard: View {
     }
 }
 
-/// A pool this phone knows about but is not currently inside. Its board lives behind its own
-/// sign-in, so there is nothing honest to show beyond its name until you open it.
-private struct OtherPoolCard: View {
+/**
+ One line about a pool this phone is not standing in.
+
+ Its board lives behind its own sign-in, so the question is answered the way the widgets answer it:
+ with that pool's session, out of the Keychain, and that pool's two requests. What comes back is
+ the one fact worth carrying across pools — whether anyone over there still owes picks — and the
+ week it is about.
+ */
+enum PoolPeek {
+    enum Status: Equatable {
+        case loading
+        /// The request failed, or the phone has never signed into that pool.
+        case unknown
+        case ready(week: Int, owing: Int, entries: Int)
+    }
+
+    static func status(_ ref: PoolRef) async -> Status {
+        let session = SessionStore.load(host: ref.host)
+        guard !session.people.isEmpty else { return .unknown }
+        let service = PoolService(client: APIClient(pool: ref, auth: { session.authHeaders }))
+        do {
+            let boot = try await service.bootstrap()
+            let board = try await service.weekBoard(boot.currentWeek)
+            let made = Dictionary(board.rows.map { ($0.playerId, $0.picksMade) }, uniquingKeysWith: { a, _ in a })
+            let owing = session.people.filter { (made[$0.id] ?? 0) < Scoring.maxPicks }.count
+            return .ready(week: boot.currentWeek, owing: owing, entries: session.people.count)
+        } catch {
+            return .unknown
+        }
+    }
+}
+
+/// A pool this phone knows about but is not currently inside: its name, and whether it needs you.
+private struct OtherPoolRow: View {
     @Environment(AppModel.self) private var model
     let pool: PoolMembership
+    let status: PoolPeek.Status?
+
+    /// The line under the name, and whether it is asking for something.
+    private var line: (text: String, urgent: Bool) {
+        switch status {
+        case .ready(let week, let owing, let entries):
+            if owing == 0 { return ("Week \(week) · picks in", false) }
+            if entries == 1 { return ("Week \(week) · picks needed", true) }
+            return ("Week \(week) · \(owing) of \(entries) entries need picks", true)
+        case .loading, .unknown, nil:
+            return (pool.poolType, false)
+        }
+    }
 
     var body: some View {
+        let line = line
         Button {
+            Haptics.tap()
             model.switchPool(pool.ref)
-            model.tab = .home
         } label: {
             HStack(spacing: 10) {
                 VStack(alignment: .leading, spacing: 2) {
-                    Text(pool.name).font(TallyFont.display(17))
-                    Text("\(pool.poolType) · \(pool.ref.host)").sans(12).foregroundStyle(Color.ink2)
+                    Text(pool.name).font(TallyFont.display(16))
+                    Text(line.text)
+                        .sans(12, weight: line.urgent ? .semibold : .regular)
+                        .foregroundStyle(line.urgent ? Color.ink : Color.ink2)
                 }
                 Spacer()
-                Text("Open").sans(12, weight: .bold).foregroundStyle(Color.ink2)
                 Image(systemName: "chevron.right").font(.system(size: 12, weight: .bold)).foregroundStyle(Color.ink3)
             }
             .padding(12)
@@ -314,6 +380,7 @@ private struct OtherPoolCard: View {
         }
         .buttonStyle(.cardPress)
         .cardFlat()
+        .accessibilityLabel("\(pool.name). \(line.text). Open this pool")
     }
 }
 

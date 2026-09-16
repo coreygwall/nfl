@@ -151,13 +151,14 @@ Four places, on both surfaces:
 
 | | What it answers |
 | --- | --- |
-| **Home** | Which pool am I in, and what does it want from me? One card per pool: the week, whose picks are missing, where you stand. At one pool it is one card; at five it is five. |
+| **Home** | What does this pool want from me? The week, whose picks are missing, where you stand, who took last week. On iOS the other pools are a strip underneath, each saying whether it needs picks. |
 | **Picks** | This week's five. |
 | **Board** | Who is winning. |
 | **Account** | Your entries, signing in, notifications — and the office doors, for whoever holds one. |
 
-The brand is on Home as the full lockup and in the navigation bar everywhere else, rather than
-repeating as a block at the top of every tab's content.
+The brand is in the navigation bar of every tab as the pool chip — the fuller lockup on Home, the
+mark and the pool's name elsewhere — rather than repeating as a block at the top of every tab's
+content.
 
 **Dark mode** follows the device by default; Account → Appearance sets Light or Dark instead. It is
 a re-light rather than an inversion — cards sit above a warm dark ground, the hard offset shadow
@@ -166,9 +167,10 @@ icon to match. Every colour pair clears 4.5:1.
 
 Two things deliberately *not* in that list:
 
-- **Switching pools** is a context change, not a destination — it swaps the whole app. It lives on
-  the lockup in the header (tap "Tally / HIGH FIVE"), where iOS and the web both put workspace and
-  account pickers. It costs nothing at one pool: the header looks exactly as it did.
+- **Switching pools** is a context change, not a destination — it swaps the whole app and keeps the
+  tab you were on. It lives on the pool chip in the header, where iOS and the web both put workspace
+  and account pickers: on iOS a native menu with the pools ticked, on the web a sheet. It costs
+  nothing at one pool: the header looks exactly as it did.
 - **Rules** is a document you read once and then send to someone. It was holding a quarter of the
   navigation; it now opens from Home and from the board, which is where the question occurs.
 

@@ -5,7 +5,8 @@ import UIKit
 /**
  Two different jobs used to share one sheet, which is why it felt busy: *which name am I picking
  as* is a thing you do mid-week in two taps, and *my account* is a thing you visit once. The
- switcher stays on the name chip; everything else lives here, on its own tab.
+ switcher is the row of names above the picks (`EntryPicker`); everything else lives here, on its
+ own tab.
  */
 struct AccountView: View {
     @Environment(AppModel.self) private var model
@@ -143,77 +144,6 @@ struct AccountView: View {
             Text("Your picks stay on the board. Signing back in needs \(Biometry.label) or your code.")
                 .sans(12).foregroundStyle(Color.ink3)
         }
-    }
-}
-
-/// The name chip's sheet: who am I picking as, and nothing else to read.
-struct EntrySwitcherSheet: View {
-    @Environment(AppModel.self) private var model
-    @Environment(\.dismiss) private var dismiss
-    @State private var adding = false
-
-    var body: some View {
-        NavigationStack {
-            ZStack {
-                Color.surface.ignoresSafeArea()
-                ScrollView {
-                    VStack(alignment: .leading, spacing: 12) {
-                        ForEach(model.people) { p in
-                            let active = p.id == model.player?.id
-                            Button {
-                                if !active { model.switchTo(p.id) }
-                                dismiss()
-                            } label: {
-                                HStack(spacing: 10) {
-                                    Image(systemName: active ? "largecircle.fill.circle" : "circle")
-                                        .font(.system(size: 20, weight: .bold))
-                                        .foregroundStyle(active ? Color.turf : Color.ink3)
-                                    Text(p.name).font(TallyFont.display(17))
-                                    if p.isManagedEntry { Chip(text: "you manage", size: 10) }
-                                    Spacer()
-                                }
-                                .padding(12)
-                                .frame(maxWidth: .infinity, alignment: .leading)
-                                .contentShape(Rectangle())
-                            }
-                            .buttonStyle(.cardPress)
-                            .cardFlat()
-                        }
-
-                        if adding {
-                            AddEntryForm(onDone: { identity in
-                                adding = false
-                                model.setPlayer(identity)
-                                model.tab = .picks
-                                dismiss()
-                            }, onCancel: { adding = false })
-                        } else {
-                            Button("Add an entry") { adding = true }
-                                .buttonStyle(.tally(.plain, size: .small))
-                                .padding(.top, 2)
-                            Text("Pick for someone who isn't going to install anything.")
-                                .sans(12).foregroundStyle(Color.ink2)
-                        }
-
-                        DashedDivider().padding(.top, 8)
-                        Button {
-                            model.tab = .account
-                            dismiss()
-                        } label: {
-                            Label("Account settings", systemImage: "person.crop.circle")
-                        }
-                        .buttonStyle(.tally(.plain, size: .small))
-                    }
-                    .padding(20)
-                }
-            }
-            .noZoom()
-            .navigationTitle("Picking as")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
-        }
-        .presentationDetents([.medium, .large])
-        .presentationDragIndicator(.visible)
     }
 }
 
