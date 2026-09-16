@@ -2,11 +2,11 @@ import { useState } from "react";
 import { Link, useNavigate } from "react-router";
 import { useBootstrap, useSeasonBoard, useWeekBoard } from "../api/queries.ts";
 import { usePlayer } from "../lib/player.tsx";
-import { POOL_TYPES } from "../../shared/pools.ts";
 import { formatKickoff } from "../lib/time.ts";
 import { MAX_PICKS } from "../../shared/picks.ts";
 import { SEASON_START_WEEK } from "../../shared/week.ts";
 import { Announcements } from "../components/Announcements.tsx";
+import { PoolPlays } from "../components/PoolPlays.tsx";
 import { fallbackPoolWeeks } from "../lib/poolFallback.ts";
 import { joinPromptOpen, latestCompletedWeek } from "../lib/poolHome.ts";
 import { SeasonRowItem, WeekRowItem } from "./Board.tsx";
@@ -370,7 +370,8 @@ function PreviewSkeleton() {
   );
 }
 
-/** Joining another pool, and what Tally plays. Kept below the fold: nobody opens the app for it. */
+/** Joining another pool, and what Tally plays. Kept below the fold: nobody opens the app for it,
+ * and the same panel is behind the lockup and on the account page — written once, in `PoolPlays`. */
 function MorePools() {
   const [open, setOpen] = useState(false);
   return (
@@ -379,30 +380,8 @@ function MorePools() {
         {open ? "Hide" : "Join or start a pool"}
       </button>
       {open && (
-        <div className="mt-3 grid gap-2 sm:grid-cols-2">
-          <div className="card-flat bg-surface p-4">
-            <h3 className="font-display font-extrabold">Join a pool</h3>
-            <p className="text-sm text-ink-2">
-              Open the link your commissioner sent. Every pool lives at its own address, so the link is the way in.
-            </p>
-          </div>
-          <div className="card-flat bg-surface p-4">
-            <h3 className="font-display font-extrabold">
-              Start a pool <span className="chip ml-1 bg-paper-2 py-0 text-[10px]">coming soon</span>
-            </h3>
-            <p className="text-sm text-ink-2">Pick a game, name it, share one link.</p>
-          </div>
-          {POOL_TYPES.map((t) => (
-            <div key={t.slug} className="card-flat bg-surface p-4">
-              <h3 className="font-display font-extrabold">
-                {t.name}{" "}
-                <span className={`chip ml-1 py-0 text-[10px] ${t.status === "live" ? "bg-turf text-on-turf" : "bg-paper-2"}`}>
-                  {t.status === "live" ? "live now" : "coming soon"}
-                </span>
-              </h3>
-              <p className="text-sm text-ink-2">{t.blurb}</p>
-            </div>
-          ))}
+        <div className="mt-3">
+          <PoolPlays />
         </div>
       )}
     </div>

@@ -16,6 +16,7 @@ import { isLocked, WEEKS } from "../../shared/week.ts";
 import { ErrorState, RankBadge, Spinner } from "../components/Common.tsx";
 import { GamesSkeleton } from "../components/TallyLoader.tsx";
 import { useHeaderWeek, useHideNav } from "../components/Chrome.tsx";
+import { EntryPicker } from "../components/EntryPicker.tsx";
 import { poolUrl } from "../lib/basename.ts";
 import { ChevronDown, ChevronLeft, ChevronUp, Grip, House, Lock, Share } from "../components/Icons.tsx";
 import { SlideToLock } from "../components/SlideToLock.tsx";
@@ -220,6 +221,7 @@ function PickFlowInner({ week }: { week: number }) {
 
   return (
     <div>
+      <EntryPicker />
       {(step === "select" || step === "rank") && (
         <Link
           to="/"

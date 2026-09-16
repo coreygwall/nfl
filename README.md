@@ -154,7 +154,7 @@ Four places, on both surfaces:
 | **Home** | What does this pool want from me? The week, whose picks are missing, where you stand, who took last week. On iOS the other pools are a strip underneath, each saying whether it needs picks. |
 | **Picks** | This week's five — and once they are in, how they are going: each game's score from your side, what is banked, what is still to play for, where that leaves you. The lock screen's Live Activity, drawn large. |
 | **Board** | Who is winning. |
-| **Account** | Grouped like Settings, in the order things get touched: your entries in this pool, the office doors for whoever holds one, notifications and appearance, the other-device link, and about Tally. |
+| **Account** | Grouped like Settings, in the order things get touched: your entries in this pool, the office doors for whoever holds one, notifications (iOS) and appearance, the other-device link, and about Tally. |
 
 The brand is in the navigation bar of every tab as the pool chip — the fuller lockup on Home, the
 mark and the pool's name elsewhere — rather than repeating as a block at the top of every tab's
@@ -168,9 +168,12 @@ icon to match. Every colour pair clears 4.5:1.
 Two things deliberately *not* in that list:
 
 - **Switching pools** is a context change, not a destination — it swaps the whole app and keeps the
-  tab you were on. It lives on the pool chip in the header, where iOS and the web both put workspace
-  and account pickers: on iOS a native menu with the pools ticked, on the web a sheet. It costs
-  nothing at one pool: the header looks exactly as it did.
+  tab you were on. It lives on the pool chip in the header, as a native menu with the pools ticked.
+  It is an iOS feature only: on the web a pool is an address, so the same lockup opens a sheet that
+  names this pool and says how to get into another.
+- **Which entry you are picking as** is a row of names above the picks and above the board, on both
+  surfaces, drawn only when there is more than one. It is not in the header on either: there it sat
+  next to the megaphone on iOS, and doubled as the account door on the web.
 - **Rules** is a document you read once and then send to someone. It was holding a quarter of the
   navigation; it now opens from Home and from the board, which is where the question occurs.
 
@@ -181,13 +184,13 @@ Two different jobs used to share one PIN.
 **The commissioner** runs a pool: its roster, its name, its invite, who still needs chasing, the
 backup. That is attached to an *account* — `pool_commissioners` in `migrations/0010_roles.sql` —
 so it travels with the person rather than with whoever knows a secret. `/commissioner` on the web;
-Account → **Commissioner** in the app, and the button is not drawn at all for anyone else.
+Account → **Commissioner** on both surfaces, and the row is not drawn at all for anyone else.
 
 **The league office** owns the results, the schedule and the score feed. Every Tally pool scores
 the same fourteen NFL games, so there is exactly one authority on who won them and it sits above
 every pool rather than inside one — a pool that could set its own results is a pool that can
 disagree with the one next door. That is `platform_admins`, and it is `/league` on the web,
-Account → **League office** in the app. Today it is a person with a feed to pull from; when it is
+Account → **League office** on both surfaces. Today it is a person with a feed to pull from; when it is
 fully automated the screen becomes a window onto a job that runs itself and nothing else moves.
 
 **`ADMIN_PIN` is now break-glass, not a login.** It does one thing: `POST /api/roles/claim` attaches

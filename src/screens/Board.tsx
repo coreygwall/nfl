@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useBootstrap, useSeasonBoard, useWeekBoard } from "../api/queries.ts";
 import { usePlayer } from "../lib/player.tsx";
 import { useHeaderWeek } from "../components/Chrome.tsx";
+import { EntryPicker } from "../components/EntryPicker.tsx";
 import { TEAMS } from "../../shared/teams.ts";
 import type { ScoredPick, SeasonRow, WeekRow } from "../../shared/scoring.ts";
 import { SEASON_START_WEEK, WEEKS } from "../../shared/week.ts";
@@ -30,6 +31,7 @@ export function Board({ tab }: { tab: "week" | "season" }) {
     <div className="mx-auto w-full max-w-[760px] lg:max-w-[1060px]">
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start lg:gap-8">
         <div>
+          <EntryPicker />
           {/* Both toggles share one line on a phone: two taps, no scrolling, nothing stacked. */}
           <div className="grid grid-cols-2 gap-2 sm:gap-3">
             <Segmented

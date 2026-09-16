@@ -135,11 +135,24 @@ standing in: what week it is, whose picks are missing, where you stand.
   reads as a switch. `PoolsView` is only join / start / the catalogue, behind the menu's last item.
   Home lists the *other* pools as a strip under its card, each with one line from its own session
   (`PoolPeek`) saying whether anything over there needs picks; that strip is the one cross-pool
-  fact the chip cannot say. Web still uses `PoolSheet` off the lockup.
-- **The entry switcher is not in the navigation bar.** On iOS it is `EntryPicker`, a row of names
-  above the picks and above the board — the two places the answer changes anything — and it is
+  fact the chip cannot say.
+- **The web has no switcher, and stopped pretending to.** A pool *is* an address there: the Worker
+  serving a page serves exactly one, so a second pool is a second host, and browser storage is per
+  origin — a catalogue of them is not something a tab can hold. `PoolSheet` off the lockup names
+  the pool you are standing in and hands over to `PoolPlays` (join / start / what Tally plays),
+  which is one component behind three doors: that sheet, the account page and the fold at the
+  bottom of Home. The iOS app keeps a catalogue because it can talk to each host in turn.
+- **The entry switcher is not in the navigation bar, on either surface.** It is `EntryPicker`, a
+  row of names above the picks and above the board — the two places the answer changes anything —
   drawn only when there is more than one name. Home shows every entry already and Account manages
-  them. It used to sit next to the megaphone, which made the megaphone look like part of it.
+  them. On iOS it used to sit next to the megaphone, which made the megaphone look like part of
+  it; on the web the same chip was *also* the account door, so one control held both the
+  mid-week question and the once-a-season one.
+- **Account is a tab on the web too**, which is how the offices became reachable: `/commissioner`
+  and `/league` were routes with nothing in the app linking to them, so a commissioner had to
+  remember the address. Both are rows on `src/screens/Account.tsx`, drawn from `roles` in the
+  bootstrap, the same rule the app follows. Switching entries clears the pick flow's `step` from
+  the query (`EntryPicker`), or the previous entry's "locked in" screen follows you.
 - **Rules is not a tab.** `RulesSheet` on iOS, `/rules` on web, linked from Home and the board.
 - **Announcements is not a tab either**, and the megaphone differs by surface on purpose. On iOS it
   always opens a peek — a medium sheet of the unread ones — from every tab, and there is no
@@ -151,9 +164,11 @@ standing in: what week it is, whose picks are missing, where you stand.
   reader.
 - **Pinch does nothing.** `.noZoom()` on the root and on each sheet — there is no zoomable content
   in Tally, so a pinch that scales the page is always an accident.
-- Web keeps the pick flow's step in the query string, so switching entries clears it
-  (`AppShell.onSwitch`) and `PickFlowRoute` keys the flow by identity. Without both, the previous
-  entry's "locked in" screen follows you.
+- Web keeps the pick flow's step in the query string, and `PickFlowRoute` keys the flow by
+  identity; the clearing half lives in `EntryPicker` now, next to the switch that causes it.
+- **The web tab bar is not drawn while picks are being made** (`useHideNav`) — the tray takes its
+  place — so anything that has to be reachable mid-pick needs its own route out. That is what the
+  flow's "Go to pool home" link is for, and why the e2e helpers reach Account by address.
 
 ## Two offices, one PIN that is no longer a login
 

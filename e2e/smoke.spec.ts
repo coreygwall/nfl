@@ -14,6 +14,30 @@ const enablePlatformBiometrics = (page: Page) => page.addInitScript(() => {
   });
 });
 
+/** The account tab: the name, the entries, the sign-in code and the appearance control. It used
+ *  to be a sheet hanging off a chip in the header; the chip was also the entry switcher, and the
+ *  two jobs have gone their separate ways. */
+async function openAccount(page: Page) {
+  // By address rather than by tab, because the tab bar is deliberately *not* drawn while picks are
+  // being made — the tray takes its place — and half of these tests are standing in the pick flow
+  // when they ask for it. The clock override lives in sessionStorage, so a full load keeps it.
+  // Reaching it by tab is covered once, from home, in the smoke test above.
+  await page.goto("/p/high-five/account");
+  await expect(page).toHaveURL(/\/account$/);
+}
+
+/** The account this device is signed in as, which the account tab states in its heading. */
+async function expectSignedInAs(page: Page, name: string) {
+  await openAccount(page);
+  await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
+}
+
+/** The entry being picked as, which the picker above the picks answers — it is drawn whenever
+ *  there is more than one entry, which is the only time the question has an answer worth giving. */
+async function expectPickingAs(page: Page, name: string) {
+  await expect(page.getByRole("button", { name: `Pick as ${name}` })).toHaveAttribute("aria-pressed", "true");
+}
+
 /** Alex's claim code, read off the first device in one test and typed into the next. */
 let alexCode = "";
 
@@ -50,9 +74,21 @@ test.describe.serial("pool flow", () => {
     await expect(page.getByRole("link", { name: "Week 1", exact: true })).toBeVisible();
     await page.getByRole("button", { name: "High Five. Switch pool" }).click();
     const pools = page.getByRole("dialog", { name: "Pools" });
-    await expect(pools.getByRole("link", { name: /Pool home/ })).toBeVisible();
-    await pools.getByRole("link", { name: /Pool home/ }).click();
+    // The lockup is not a switcher here and has stopped pretending to be one: on the web a pool is
+    // an address, so this names the one you are standing in and says how to get into another.
+    await expect(pools.getByText("High Five").first()).toBeVisible();
+    await expect(pools.getByRole("heading", { name: "Join a pool" })).toBeVisible();
+    await pools.getByRole("button", { name: "Close" }).click();
     await expect(pools).toBeHidden();
+
+    // Account is a tab now, not a chip in the header. The offices behind it — a commissioner's and
+    // the league's — were routes with nothing in the app linking to them.
+    await page.getByRole("link", { name: "Account" }).first().click();
+    await expect(page).toHaveURL(/\/account$/);
+    await expect(page.getByRole("heading", { name: "Signed in as" })).toBeVisible();
+    await expect(page.getByRole("heading", { name: "Corey", level: 1 })).toBeVisible();
+    // Nobody here runs the pool, so the office rows are not drawn at all.
+    await expect(page.getByRole("link", { name: /Commissioner/ })).toHaveCount(0);
     await page.goto(`/week/1?now=${BEFORE}`);
     await expect(page.getByRole("heading", { name: "Pick 5 winners" })).toBeVisible();
 
@@ -78,7 +114,7 @@ test.describe.serial("pool flow", () => {
     // Reload keeps the identity and the saved picks.
     await page.reload();
     await expect(page.getByText("Your five")).toBeVisible();
-    await expect(page.getByRole("button", { name: "Switch player" })).toContainText("Corey");
+    await expectSignedInAs(page, "Corey");
 
     // Rules left the nav bar: it is a document you read once, reached from home and the board,
     // which is also where the question occurs to people.
@@ -124,14 +160,12 @@ test.describe.serial("pool flow", () => {
     await page.getByRole("button", { name: "Rank 3" }).click();
     await page.getByRole("button", { name: "Lock it in" }).click();
     await expect(page.getByText("Locked in")).toBeVisible();
-    // The code that moves this name to another device is under the name chip, one tap in.
-    await page.getByRole("button", { name: "Switch player" }).click();
-    const sheet = page.getByRole("dialog", { name: "Your account" });
-    await sheet.getByRole("button", { name: /Play on another device/ }).click();
-    alexCode = (await sheet.getByText(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/).innerText()).trim();
+    // The code that moves this name to another device is on the account tab, one row in.
+    await openAccount(page);
+    await page.getByRole("button", { name: /Sign in on another device/ }).click();
+    alexCode = (await page.getByText(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/).innerText()).trim();
     expect(alexCode).toMatch(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/);
-    await sheet.getByRole("button", { name: "Close" }).click();
-    await expect(sheet).toBeHidden();
+    await page.goBack();
     await page.getByRole("link", { name: "See the board" }).click();
 
     await expect(page).toHaveURL(/\/board\/week\/1$/);
@@ -347,11 +381,11 @@ test("a sign-in link claims the name in one tap, with no code to type", async ({
 
   await page.goto(`/welcome?claim=${player.id}&code=${code}&now=${BEFORE}`);
   await expect(page).toHaveURL(/\/week\/1$/);
-  await expect(page.getByRole("button", { name: "Switch player" })).toContainText(name);
+  await expectSignedInAs(page, name);
 
   // The code does not stay in the address bar, and the device is really signed in.
   await page.reload();
-  await expect(page.getByRole("button", { name: "Switch player" })).toContainText(name);
+  await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
 });
 
 test("a sign-in link with the wrong code falls back to typing it", async ({ page, request }) => {
@@ -369,37 +403,37 @@ test("one phone can pick for the whole family, and the code stays out of the way
   const parent = await (await request.post("/api/players", { data: { name: `Parent ${stamp}` } })).json();
 
   await page.goto(`/welcome?claim=${parent.player.id}&code=${parent.code}&now=${BEFORE}`);
-  await expect(page.getByRole("button", { name: "Switch player" })).toContainText(`Parent ${stamp}`);
+  await expect(page).toHaveURL(/\/week\/1$/);
 
   await page.getByRole("button", { name: "Pick Buffalo Bills" }).click();
 
-  // The code is not on show; it is one deliberate tap away.
-  await page.getByRole("button", { name: "Switch player" }).click();
-  const sheet = page.getByRole("dialog", { name: "Your account" });
-  await expect(sheet.getByText(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/)).toBeHidden();
-  await sheet.getByRole("button", { name: /Play on another device/ }).click();
-  await expect(sheet.getByText(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/)).toBeVisible();
+  // The code is not on show; it is one deliberate tap away, on the account tab.
+  await expectSignedInAs(page, `Parent ${stamp}`);
+  await expect(page.getByText(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/)).toBeHidden();
+  await page.getByRole("button", { name: /Sign in on another device/ }).click();
+  await expect(page.getByText(/^[A-Z2-9]{4}-[A-Z2-9]{4}$/)).toBeVisible();
 
   // Any account can create a child entry: no PIN, code, or separate sign-in.
-  await sheet.getByRole("button", { name: "Add an entry", exact: true }).click();
-  await expect(sheet.getByLabel("Admin PIN")).toBeHidden();
-  await sheet.getByLabel("Entry name").fill(`Kid ${stamp}`);
-  await sheet.getByRole("button", { name: "Add entry & make picks" }).click();
-  await expect(page.getByRole("button", { name: "Switch player" })).toContainText(`Kid ${stamp}`);
+  await page.getByRole("button", { name: "Add an entry", exact: true }).click();
+  await expect(page.getByLabel("Admin PIN")).toBeHidden();
+  await page.getByLabel("Entry name").fill(`Kid ${stamp}`);
+  await page.getByRole("button", { name: "Add entry & make picks" }).click();
+
+  // Adding one moves you to their picks, and the picker above them says whose they are.
+  await expect(page).toHaveURL(/\/week\/1$/);
+  await expectPickingAs(page, `Kid ${stamp}`);
 
   await expect(page.getByRole("button", { name: "Pick Buffalo Bills" })).toHaveAttribute("aria-pressed", "false");
 
   // Picks for the kid go in from here, and switching back is one tap.
-  await expect(page).toHaveURL(/\/week\/1$/);
   await page.getByRole("button", { name: "Pick Seattle Seahawks" }).click();
   // One pick of five: the tray offers to rank what you have.
   await page.getByRole("button", { name: "Rank 1" }).click();
   await page.getByRole("button", { name: "Lock it in" }).click();
   await expect(page.getByText("Locked in")).toBeVisible();
 
-  await page.getByRole("button", { name: "Switch player" }).click();
-  await page.getByRole("dialog", { name: "Your account" }).getByRole("button", { name: `Parent ${stamp}` }).click();
-  await expect(page.getByRole("button", { name: "Switch player" })).toContainText(`Parent ${stamp}`);
+  await page.getByRole("button", { name: `Pick as Parent ${stamp}` }).click();
+  await expectPickingAs(page, `Parent ${stamp}`);
 
   await expect(page.getByRole("heading", { name: "Pick 5 winners" })).toBeVisible();
 
@@ -443,12 +477,11 @@ test("an entry removed by the commissioner doesn't strand the device that held i
   await page.getByRole("button", { name: "Let's go" }).click();
   await expect(page).toHaveURL(/\/week\/1$/);
 
-  await page.getByRole("button", { name: "Switch player" }).click();
+  await openAccount(page);
   await page.getByRole("button", { name: "Add an entry" }).click();
   await page.getByLabel("Entry name").fill("Robin");
   await page.getByRole("button", { name: "Add entry & make picks" }).click();
-  const chip = page.getByRole("button", { name: "Switch player" });
-  await expect(chip).toContainText("Robin");
+  await expectPickingAs(page, "Robin");
 
   // The commissioner clears Robin out of the roster while this phone is still picking as Robin.
   const roster = await page.request.get("/api/commissioner/players", { headers: { "x-admin-pin": "1234" } });
@@ -458,8 +491,11 @@ test("an entry removed by the commissioner doesn't strand the device that held i
   // Every request from this device is now refused. It should land back on the account rather than
   // on an error with a retry button that can never work.
   await page.reload();
-  await expect(chip).toContainText("Dana");
   await expect(page.getByText("isn't on this account any more")).toBeVisible();
+  // Robin is gone, so there is nobody left to choose between and the picker goes with them.
+  await expect(page.getByRole("button", { name: /^Pick as / })).toHaveCount(0);
+  await expectSignedInAs(page, "Dana");
+  await page.goBack();
   await expect(page.getByRole("heading", { name: /Pick 5 winners/ })).toBeVisible();
 });
 
@@ -501,11 +537,11 @@ test("appearance follows the device and stays in sync across the desktop shortcu
 
   // Auto restores the independent light/dark metadata, so a later system change requires no
   // mounted settings sheet or JavaScript listener to keep the browser chrome current.
-  // Auto is still available in the account menu; return to it below once a player has joined.
+  // Auto is still available on the account tab; return to it below once a player has joined.
   await page.goto(`/p/high-five/welcome?now=${BEFORE}`);
   await page.getByPlaceholder("Your name").fill(`Appearance ${Date.now().toString(36)}`);
   await page.getByRole("button", { name: "Let's go" }).click();
-  await page.getByRole("button", { name: "Switch player" }).click();
+  await openAccount(page);
   await page.getByRole("radio", { name: "Auto" }).click();
   expect(await page.getAttribute("html", "data-theme")).toBeNull();
   expect(await page.locator('meta[name="theme-color"]').evaluateAll((tags) => tags.map((tag) => tag.getAttribute("content")))).toEqual(["#F6F1E8", "#1A1713"]);
@@ -594,16 +630,15 @@ test("Face ID: turn it on, lose the device's memory, and sign back in with no ty
   const welcome = page.getByRole("dialog", { name: "You’re all set" });
   await welcome.getByRole("button", { name: "Turn on Face ID or fingerprint" }).click();
   await expect(page).toHaveURL(/\/week\/1$/);
-  await expect(page.getByRole("button", { name: "Switch player" })).toContainText(name);
+  await expectSignedInAs(page, name);
 
   // Add two children before registering the account passkey while picking as a child.
   for (const childName of [`Child A ${name}`, `Child B ${name}`]) {
-    await page.getByRole("button", { name: "Switch player" }).click();
-    const account = page.getByRole("dialog", { name: "Your account" });
-    await account.getByRole("button", { name: "Add an entry", exact: true }).click();
-    await account.getByLabel("Entry name").fill(childName);
-    await account.getByRole("button", { name: "Add entry & make picks" }).click();
-    await expect(page.getByRole("button", { name: "Switch player" })).toContainText(childName);
+    await openAccount(page);
+    await page.getByRole("button", { name: "Add an entry", exact: true }).click();
+    await page.getByLabel("Entry name").fill(childName);
+    await page.getByRole("button", { name: "Add entry & make picks" }).click();
+    await expectPickingAs(page, childName);
   }
 
   // Now forget everything this device knows: no token, no cookie, as if it were a new phone.
@@ -624,14 +659,12 @@ test("Face ID: turn it on, lose the device's memory, and sign back in with no ty
   await page.getByRole("button", { name: "Sign in with Face ID or fingerprint" }).click();
   await cdp.send("WebAuthn.setAutomaticPresenceSimulation", { authenticatorId, enabled: true });
   await expect(page).toHaveURL(/\/week\/1$/);
-  await expect(page.getByRole("button", { name: "Switch player" })).toContainText(name);
+  await expectPickingAs(page, name);
 
   // Both children follow the passkey onto the recovered device.
-  await page.getByRole("button", { name: "Switch player" }).click();
-  const sheet = page.getByRole("dialog", { name: "Your account" });
-  await expect(sheet.getByRole("button", { name: `Child A ${name}`, exact: true })).toBeVisible();
-  await sheet.getByRole("button", { name: `Child B ${name}`, exact: true }).click();
-  await expect(page.getByRole("button", { name: "Switch player" })).toContainText(`Child B ${name}`);
+  await expect(page.getByRole("button", { name: `Pick as Child A ${name}` })).toBeVisible();
+  await page.getByRole("button", { name: `Pick as Child B ${name}` }).click();
+  await expectPickingAs(page, `Child B ${name}`);
 
   // And it is a real session: picks save.
   await page.getByRole("button", { name: "Pick Seattle Seahawks" }).click();
