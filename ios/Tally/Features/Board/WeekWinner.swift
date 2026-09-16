@@ -46,7 +46,7 @@ struct WeekWinnerBanner: View {
         }
         .padding(12)
         .frame(maxWidth: .infinity, alignment: .leading)
-        .cardFlat(fill: .flagSoft, border: .ink)
+        .cardFlat(fill: .flagSoft, border: .cardBorder)
         .accessibilityElement(children: .combine)
         .accessibilityLabel("\(headline). \(detail)")
     }

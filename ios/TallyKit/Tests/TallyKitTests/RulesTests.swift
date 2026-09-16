@@ -158,3 +158,31 @@ final class Base64URLTests: XCTestCase {
         XCTAssertEqual(Base64URL.decode(s), data)
     }
 }
+
+final class PoolHomeTests: XCTestCase {
+    private func week(_ week: Int, final finalCount: Int, games gameCount: Int = 16) -> WeekSummary {
+        WeekSummary(
+            week: week,
+            firstKickoff: Date(timeIntervalSince1970: 0),
+            lastKickoff: Date(timeIntervalSince1970: 86_400),
+            gameCount: gameCount,
+            lockedCount: gameCount,
+            finalCount: finalCount
+        )
+    }
+
+    func testFeaturesTheLatestWeekWithEveryResultRecorded() {
+        XCTAssertEqual(PoolHome.latestCompletedWeek([week(1, final: 16), week(2, final: 3), week(3, final: 16)]), 3)
+        XCTAssertNil(PoolHome.latestCompletedWeek([week(1, final: 15), week(2, final: 0)]))
+    }
+
+    /// An empty week is trivially "all final" by arithmetic, and must not outrank a real one.
+    func testAWeekWithNoGamesNeverCounts() {
+        XCTAssertNil(PoolHome.latestCompletedWeek([week(1, final: 0, games: 0)]))
+        XCTAssertEqual(PoolHome.latestCompletedWeek([week(1, final: 16), week(2, final: 0, games: 0)]), 1)
+    }
+
+    func testNoWeeksAtAll() {
+        XCTAssertNil(PoolHome.latestCompletedWeek([]))
+    }
+}

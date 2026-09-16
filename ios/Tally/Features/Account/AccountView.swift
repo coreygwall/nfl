@@ -55,7 +55,7 @@ struct AccountView: View {
                     .contentShape(Rectangle())
                 }
                 .buttonStyle(.cardPress)
-                .modifier(TallyCard(hard: active, fill: .surface, border: .ink, radius: TallyRadius.card, dashed: false))
+                .modifier(TallyCard(hard: active, fill: .surface, border: .cardBorder, radius: TallyRadius.card, dashed: false))
             }
             if adding {
                 AddEntryForm(onDone: { identity in

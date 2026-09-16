@@ -44,7 +44,7 @@ struct PoolsView: View {
                                     .contentShape(Rectangle())
                                 }
                                 .buttonStyle(.cardPress)
-                                .modifier(TallyCard(hard: current, fill: .surface, border: .ink, radius: TallyRadius.card, dashed: false))
+                                .modifier(TallyCard(hard: current, fill: .surface, border: .cardBorder, radius: TallyRadius.card, dashed: false))
                                 .contextMenu {
                                     if model.catalog.pools.count > 1 {
                                         Button("Remove from this phone", role: .destructive) { model.removePool(pool.id) }

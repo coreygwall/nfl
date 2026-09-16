@@ -7,10 +7,13 @@ import UIKit
 //
 // Every colour is a pair. The hex values are the same ones in `src/index.css`, and the reasoning
 // behind the dark half lives there too — the short version is that paper-and-ink cannot be
-// inverted. `ink` draws both the text and the 2pt border, so flipping it to a light colour turns
-// every hard shadow white, which reads as a glow rather than as a card lying on a page. The shadow
-// therefore has its own colour and stays black in both themes, cards sit a step above a warm dark
-// ground rather than being white, and anything *filled* with an accent keeps dark text on it.
+// inverted. The shadow has its own colour and stays black in both themes, because a light shadow
+// reads as a glow rather than as a card lying on a page; cards sit a step above a warm dark ground
+// rather than being white; and anything *filled* with an accent keeps dark text on it.
+//
+// A card's outline is its own colour too (`cardBorder`), for the same reason pulled apart: in the
+// dark theme it is a warm off-white a step down from `ink`, so an outline stays an outline instead
+// of competing with the heading inside it. Buttons and chips still draw theirs in `ink`.
 
 extension UIColor {
     fileprivate convenience init(hex: String) {
@@ -45,13 +48,13 @@ extension Color {
         })
     }
 
-    static let paper = Color(light: "#F6F1E8", dark: "#1A1713")
-    static let paper2 = Color(light: "#EDE5D6", dark: "#2E2921")
-    static let paper3 = Color(light: "#E3D9C6", dark: "#3A342A")
+    static let paper = Color(light: "#F6F1E8", dark: "#191611")
+    static let paper2 = Color(light: "#EDE5D6", dark: "#2C261F")
+    static let paper3 = Color(light: "#E3D9C6", dark: "#3A3229")
     static let ink = Color(light: "#14120F", dark: "#F4EFE6")
     static let ink2 = Color(light: "#5B554B", dark: "#B8AF9E")
     static let ink3 = Color(light: "#6B6456", dark: "#9C9384")
-    static let line = Color(light: "#D9D0C0", dark: "#443C30")
+    static let line = Color(light: "#D9D0C0", dark: "#51483A")
     static let turf = Color(light: "#0B7A3B", dark: "#3FBF74")
     static let turf2 = Color(light: "#0F9A4C", dark: "#5AD48C")
     static let turfSoft = Color(light: "#DFF2E6", dark: "#16301F")
@@ -65,7 +68,13 @@ extension Color {
 
     /// Where the light theme said `.white`: the fill of a card, a button, a chip. It is a step
     /// lighter than the ground in the dark theme rather than white, or the cards shout.
-    static let surface = Color(light: "#FFFFFF", dark: "#24201A")
+    static let surface = Color(light: "#FFFFFF", dark: "#27221B")
+
+    /// The outline of a card. Ink in the light theme, where it is the same black as the text; a
+    /// warm off-white in the dark one, a step down from `ink` so an outline never competes with a
+    /// heading for the eye. Only cards take it — buttons and chips keep drawing their border in
+    /// `ink`, exactly as `.btn` and `.chip` do on the web.
+    static let cardBorder = Color(light: "#14120F", dark: "#D8CFC0")
 
     /// The hard offset shadow. Black in both themes — it is what makes a card look lifted, and a
     /// light shadow is a glow.
