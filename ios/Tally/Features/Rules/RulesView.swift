@@ -37,10 +37,9 @@ struct HowToPlay: View {
             VStack(spacing: 12) {
                 ForEach(Array(pool.steps.enumerated()), id: \.element.id) { i, step in
                     VStack(alignment: .leading, spacing: 8) {
-                        Text("\(i + 1)")
-                            .font(TallyFont.display(18))
-                            .frame(width: 36, height: 36)
-                            .background(Circle().fill(Color.flag))
+                        FlagMark(size: 36, bordered: false) {
+                            Text("\(i + 1)").font(TallyFont.display(18))
+                        }
                         Text(step.title).display(20)
                         Text(step.body).sans(14).foregroundStyle(Color.ink2)
                         if step.showRanks {

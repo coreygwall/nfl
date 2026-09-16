@@ -11,11 +11,9 @@ struct BiometricOfferSheet: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 12) {
-            Image(systemName: "checkmark")
-                .font(.system(size: 22, weight: .black))
-                .frame(width: 48, height: 48)
-                .background(RoundedRectangle(cornerRadius: 14).fill(Color.flag))
-                .overlay(RoundedRectangle(cornerRadius: 14).strokeBorder(Color.ink, lineWidth: 2))
+            FlagMark(size: 48, corner: 14) {
+                Image(systemName: "checkmark").font(.system(size: 22, weight: .black))
+            }
             Text("You're all set").display(26)
             (Text("We'll remember ") + Text(player.name).bold() + Text(" on this phone, so you won't be asked again here."))
                 .sans(14).foregroundStyle(Color.ink2)

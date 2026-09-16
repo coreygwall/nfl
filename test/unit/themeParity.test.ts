@@ -23,6 +23,22 @@ import { describe, expect, it } from "vitest";
 const css = readFileSync(new URL("../../src/index.css", import.meta.url), "utf8");
 const swift = readFileSync(new URL("../../ios/TallyKit/Sources/TallyKit/Design/Palette.swift", import.meta.url), "utf8");
 const appTheme = readFileSync(new URL("../../ios/Tally/Design/Theme.swift", import.meta.url), "utf8");
+import { readdirSync, statSync } from "node:fs";
+import { join } from "node:path";
+
+/** Every Swift file under a directory, with its path — so a failure names the file. */
+function swiftFiles(dir: string): { path: string; source: string }[] {
+  const out: { path: string; source: string }[] = [];
+  for (const name of readdirSync(dir)) {
+    const full = join(dir, name);
+    if (statSync(full).isDirectory()) out.push(...swiftFiles(full));
+    else if (name.endsWith(".swift")) out.push({ path: full, source: readFileSync(full, "utf8") });
+  }
+  return out;
+}
+const appRoot = new URL("../../ios/Tally", import.meta.url).pathname;
+const appSwift = swiftFiles(appRoot);
+
 const widgets = ["WeekLiveActivity.swift", "TallyWidgetsBundle.swift"]
   .map((f) => {
     try {
@@ -55,6 +71,11 @@ const MIRRORED: Record<string, string> = {
   surface: "surface",
   shadow: "shadow",
   "card-border": "cardBorder",
+  "rank-5": "rank5",
+  "rank-4": "rank4",
+  "rank-3": "rank3",
+  "rank-2": "rank2",
+  "rank-1": "rank1",
   // iOS calls this one after its job rather than after the green it started on: the label drawn on
   // any filled accent, which is what `--color-on-turf` became.
   "on-turf": "onFill",
@@ -135,5 +156,39 @@ describe("the palette is the same on both surfaces", () => {
   it("the widget extension defines no colours of its own", () => {
     const hexes = widgets.match(/"#[0-9A-Fa-f]{6}"/g) ?? [];
     expect(hexes, "the widgets should draw from TallyPalette, not a private copy").toEqual([]);
+  });
+});
+
+/**
+ * Yellow under text is the one pairing the two themes disagree about.
+ *
+ * The flag is the same yellow in both, and `ink` — the default text colour — is near-white in the
+ * dark one. So anything that fills with the flag and lets its text inherit ships white-on-yellow
+ * in dark mode, and four screens did exactly that before anyone held a phone up in the dark. Two
+ * rules make it structural rather than a thing to remember:
+ */
+describe("yellow never carries inherited text", () => {
+  const designSystem = join(appRoot, "Design", "Components.swift");
+
+  /** A raw `.fill(Color.flag)` belongs only in `FlagMark`, which sets the label colour itself. */
+  it("nothing outside the design system fills with the flag directly", () => {
+    const offenders = appSwift
+      .filter((f) => f.path !== designSystem)
+      .filter((f) => /\.fill\(\s*(Color|TallyPalette)\.flag\s*\)/.test(f.source))
+      .map((f) => f.path.replace(appRoot, "ios/Tally"));
+    expect(offenders, "draw a yellow mark with FlagMark, which knows its text is black").toEqual([]);
+  });
+
+  /** A yellow chip has to say so: `Chip(..., fill: .flag, ..., label: .onAccent)`. */
+  it("every yellow chip names its label colour", () => {
+    const offenders: string[] = [];
+    for (const f of appSwift) {
+      for (const [i, line] of f.source.split("\n").entries()) {
+        if (/Chip\(/.test(line) && /fill:\s*\.flag\b/.test(line) && !/label:\s*\.onAccent\b/.test(line)) {
+          offenders.push(`${f.path.replace(appRoot, "ios/Tally")}:${i + 1}`);
+        }
+      }
+    }
+    expect(offenders, "a Chip filled with .flag must pass label: .onAccent").toEqual([]);
   });
 });

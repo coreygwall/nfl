@@ -22,6 +22,11 @@ extension Color {
     static let turf = TallyPalette.turf
     static let turf2 = TallyPalette.turf2
     static let turfSoft = TallyPalette.turfSoft
+    static let rank5 = TallyPalette.rank5
+    static let rank4 = TallyPalette.rank4
+    static let rank3 = TallyPalette.rank3
+    static let rank2 = TallyPalette.rank2
+    static let rank1 = TallyPalette.rank1
     static let flag = TallyPalette.flag
     static let flagSoft = TallyPalette.flagSoft
     static let danger = TallyPalette.danger

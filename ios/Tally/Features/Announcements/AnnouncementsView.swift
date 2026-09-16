@@ -101,7 +101,7 @@ struct AnnouncementsCard: View {
             }
             Spacer()
             if model.unreadAnnouncements > 0 {
-                Chip(text: "\(model.unreadAnnouncements) new", fill: .flag, size: 10)
+                Chip(text: "\(model.unreadAnnouncements) new", fill: .flag, size: 10, label: .onAccent)
             }
         }
     }

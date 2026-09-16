@@ -160,10 +160,14 @@ struct Chip: View {
     var fill: Color = .surface
     var display = false
     var size: CGFloat = 12.5
+    /// The label's colour. Defaults to ink; a yellow chip passes `.onAccent`, because the flag is
+    /// the same yellow in both themes and ink is white in the dark one. The parity test insists.
+    var label: Color = .ink
 
     var body: some View {
         Text(text)
             .font(display ? TallyFont.display(size, weight: .extraBold) : TallyFont.sans(size, weight: .bold))
+            .foregroundStyle(label)
             .padding(.horizontal, 10)
             .padding(.vertical, 4)
             .background(Capsule().fill(fill))
@@ -183,6 +187,18 @@ struct RankBadge: View {
         switch size { case .small: return 28; case .medium: return 40; case .large: return 56 }
     }
 
+    /**
+     One green in five steps: the five-pointer solid, the rest fading towards paper.
+
+     Gold used to mark rank 1 and is deliberately gone from here — it is reserved for *place*, the
+     winner of a week or the leader of the season, so a confident pick and a result never read as
+     the same thing. It was also the dark-mode bug in the screenshot: a yellow fill under `ink`,
+     which is near-white in the dark theme. The ramp's label colour comes from the palette with
+     the fill, so the two cannot be paired wrong again.
+
+     The "PTS" label takes the same colour as the number. A second, dimmer colour would be a second
+     contrast pair to keep legal on every step, and size already carries the hierarchy.
+     */
     var body: some View {
         let points = Scoring.points(forRank: rank)
         VStack(spacing: 1) {
@@ -190,14 +206,47 @@ struct RankBadge: View {
                 .font(TallyFont.display(size == .large ? 24 : size == .small ? 12 : 16))
                 .monospacedDigit()
             if size != .small {
-                Text("PTS").font(TallyFont.sans(8, weight: .bold)).foregroundStyle(Color.ink2).tracking(0.8)
+                Text("PTS").font(TallyFont.sans(8, weight: .bold)).tracking(0.8)
             }
         }
-        .foregroundStyle(muted ? Color.ink3 : Color.ink)
+        .foregroundStyle(muted ? Color.ink3 : TallyPalette.onRank(rank))
         .frame(width: side, height: side)
-        .background(RoundedRectangle(cornerRadius: TallyRadius.badge, style: .continuous).fill(muted ? Color.paper2 : rank == 1 ? Color.flag : Color.surface))
+        .background(RoundedRectangle(cornerRadius: TallyRadius.badge, style: .continuous).fill(muted ? Color.paper2 : TallyPalette.rank(rank)))
         .overlay(RoundedRectangle(cornerRadius: TallyRadius.badge, style: .continuous).strokeBorder(Color.ink, lineWidth: 2))
         .accessibilityLabel("Rank \(rank), \(points) points")
+    }
+}
+
+/**
+ A yellow mark with something drawn on it — a step number, a trophy, a tick.
+
+ This is the one place the flag is used as a fill *under* text, so it is the one place that text's
+ colour lives: black in both themes, because the flag is the same yellow in both and `ink` is
+ near-white in the dark one. Every yellow-with-a-glyph used to be drawn by hand at its call site,
+ and every one of them inherited `ink` — which is how four screens shipped white-on-yellow in dark
+ mode without anybody noticing. `themeParity.test.ts` fails on a raw flag fill outside this file.
+ */
+struct FlagMark<Content: View>: View {
+    var size: CGFloat = 36
+    /// Nil draws a circle.
+    var corner: CGFloat? = nil
+    var bordered = true
+    @ViewBuilder let content: Content
+
+    var body: some View {
+        let glyph = content
+            .foregroundStyle(Color.onAccent)
+            .frame(width: size, height: size)
+        if let corner {
+            let shape = RoundedRectangle(cornerRadius: corner, style: .continuous)
+            glyph
+                .background(shape.fill(Color.flag))
+                .overlay(shape.strokeBorder(Color.ink, lineWidth: bordered ? 2 : 0))
+        } else {
+            glyph
+                .background(Circle().fill(Color.flag))
+                .overlay(Circle().strokeBorder(Color.ink, lineWidth: bordered ? 2 : 0))
+        }
     }
 }
 

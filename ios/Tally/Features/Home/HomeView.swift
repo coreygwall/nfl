@@ -209,7 +209,7 @@ private struct ActivePoolCard: View {
             }
             Spacer()
             // Only information when there is somewhere else to be.
-            if model.catalog.pools.count > 1 { Chip(text: "open", fill: .flag, size: 10) }
+            if model.catalog.pools.count > 1 { Chip(text: "open", fill: .flag, size: 10, label: .onAccent) }
         }
     }
 
