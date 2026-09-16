@@ -191,6 +191,37 @@ public struct PoolService: Sendable {
         try await client.delete("/push/activity/\(token)")
     }
 
+    /// What this install has asked to hear. Read rather than assumed, so a settings screen draws
+    /// the server's answer instead of its own guess about a device registered on another phone.
+    public func notificationPrefs(token: String) async throws -> NotifyPrefs {
+        let response: PrefsResponse = try await client.get("/push/prefs/\(token)")
+        return response.prefs
+    }
+
+    /**
+     Save the switches.
+
+     Its own call rather than a field on registration, which runs on every launch: a preference
+     that travelled with registration would be overwritten by whatever that build happened to send,
+     which is nothing, and quietly reset every week. The whole object is sent because the screen
+     holds the complete state — a merge would make an unticked box indistinguishable from a field
+     the client did not include.
+     */
+    @discardableResult
+    public func setNotificationPrefs(token: String, prefs: NotifyPrefs) async throws -> NotifyPrefs {
+        let response: PrefsResponse = try await client.patch("/push/prefs", body: SetPrefsBody(token: token, prefs: prefs))
+        return response.prefs
+    }
+
+    private struct PrefsResponse: Decodable {
+        let prefs: NotifyPrefs
+    }
+
+    private struct SetPrefsBody: Encodable {
+        let token: String
+        let prefs: NotifyPrefs
+    }
+
     private struct RegisterActivityBody: Encodable {
         let token: String
         let environment: String

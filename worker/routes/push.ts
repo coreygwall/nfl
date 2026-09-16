@@ -1,7 +1,8 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../env.ts";
 import { badRequest } from "../errors.ts";
-import { deletePushToken, endLiveActivity, saveLiveActivity, savePushToken } from "../db.ts";
+import { deletePushToken, endLiveActivity, getPushPrefs, saveLiveActivity, savePushPrefs, savePushToken } from "../db.ts";
+import { parsePrefs } from "../../shared/notify-prefs.ts";
 
 /**
  * Where the app says "you can reach me here".
@@ -19,7 +20,6 @@ const TOKEN = /^[0-9a-fA-F]{32,200}$/;
 interface RegisterBody {
   token?: unknown;
   environment?: unknown;
-  prefs?: unknown;
   appVersion?: unknown;
 }
 
@@ -34,11 +34,6 @@ pushRoutes.post("/", async (c) => {
   // A build signed for development can only be reached on Apple's sandbox host and a release build
   // only on the production one. The app knows which it is; we cannot tell from here.
   const environment = body.environment === "sandbox" ? "sandbox" : "production";
-  const prefs =
-    body.prefs && typeof body.prefs === "object" && !Array.isArray(body.prefs)
-      ? Object.fromEntries(Object.entries(body.prefs as Record<string, unknown>).map(([k, v]) => [k, v !== false]))
-      : {};
-
   await savePushToken(
     c.env.DB,
     {
@@ -48,12 +43,47 @@ pushRoutes.post("/", async (c) => {
       // With an account signed in, entries are resolved through it at send time, so that adding an
       // entry on the website starts notifying the phone without the app having to hear about it.
       playerId: account ? null : (player?.id ?? null),
-      prefs,
       appVersion: typeof body.appVersion === "string" ? body.appVersion.slice(0, 40) : null,
     },
     c.get("now"),
   );
-  return c.json({ ok: true });
+  // Registration says where to reach this install; it deliberately says nothing about what it
+  // wants to hear, because it runs on every launch and would reset the switches every time.
+  return c.json({ ok: true, prefs: (await getPushPrefs(c.env.DB, token)) ?? {} });
+});
+
+/**
+ * The switches.
+ *
+ * Its own endpoint rather than a field on registration, for the reason above: this is written when
+ * somebody moves a control, and never as a side effect of opening the app. The whole object is
+ * replaced rather than merged — the settings screen holds the complete state and a merge would
+ * make an unticked box indistinguishable from a field the client did not send.
+ */
+pushRoutes.patch("/prefs", async (c) => {
+  const player = c.get("player");
+  const account = c.get("account");
+  if (!player && !account) throw badRequest("NO_PLAYER", "Sign in first.");
+  const body = (await c.req.json().catch(() => ({}))) as { token?: unknown; prefs?: unknown };
+  const token = typeof body.token === "string" ? body.token.trim() : "";
+  if (!TOKEN.test(token)) throw badRequest("BAD_TOKEN", "That is not a device token.");
+
+  const prefs = parsePrefs(body.prefs);
+  const saved = await savePushPrefs(c.env.DB, token, prefs, c.get("now"));
+  if (!saved) throw badRequest("UNKNOWN_TOKEN", "This device is not registered for notifications.");
+  return c.json({ ok: true, prefs });
+});
+
+/** What this install has set, so a settings screen draws the truth rather than its own guess. */
+pushRoutes.get("/prefs/:token", async (c) => {
+  const player = c.get("player");
+  const account = c.get("account");
+  if (!player && !account) throw badRequest("NO_PLAYER", "Sign in first.");
+  const token = c.req.param("token").trim();
+  if (!TOKEN.test(token)) throw badRequest("BAD_TOKEN", "That is not a device token.");
+  const prefs = await getPushPrefs(c.env.DB, token);
+  if (!prefs) throw badRequest("UNKNOWN_TOKEN", "This device is not registered for notifications.");
+  return c.json({ prefs });
 });
 
 /**
