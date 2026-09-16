@@ -115,6 +115,12 @@ is the business. The order matters:
 3. **Year 3:** the group itself becomes the object — `/g/<slug>`, cross-season standings,
    a Group of the Year. Now churn means abandoning years of history, and it stops happening.
 
+A pool is only one of the three things a group of friends competes at, and the catalogue in step 2
+is only the first family. The other two — competitions the group *plays* and resolves itself
+(golf, poker), and predictions about anything at all — are named and sequenced in
+`09-competition-types.md`. They change nothing above. They are the reason step 3 is worth more
+than it looks: the group table gets deeper every time a family is added to it.
+
 The schema is already shaped for this (`pools`, `pool_commissioners`, players global to Tally with a
 `pool_players` join, `/g/<slug>` reserved). That is unusually good positioning for a product this
 young and it should be protected — **do not take a shortcut that re-couples a player to a single pool.**
@@ -125,7 +131,7 @@ young and it should be protected — **do not take a shortcut that re-couples a 
 
 | Risk | Severity | Read |
 |---|---|---|
-| **Seasonality** | High | A pure NFL regular-season product is dead for most of the year. The counter isn't waiting for one big spring launch — it's the playoffs pool (January) and a non-traditional March product, both shipped on the existing pool-type architecture in weeks, not months. Nothing else on the roadmap matters as much as proving that cadence. |
+| **Seasonality** | High | A pure NFL regular-season product is dead for most of the year. The counter isn't waiting for one big spring launch — it's the playoffs pool (January) and a non-traditional March product, both shipped on the existing pool-type architecture in weeks, not months. Nothing else on the roadmap matters as much as proving that cadence. The one structural answer is Calls (`09` § 5): no schedule, no feed, no season, and they work in July. |
 | **Commissioner churn** | High | The whole business rests on one person per pool returning next season. Unmeasured today. Instrument it *this season* — it is the only metric that decides whether to raise money. |
 | **Splash/Sleeper ship a free family tier** | Medium | Unlikely (cannibalization), but if Sleeper ever decouples identity, the moat narrows fast. Response: own the group-history layer, which they cannot retrofit. |
 | **Apple rejection** | Low | Only becomes a risk if Tally touches prize money. Don't. |

@@ -76,6 +76,7 @@ Aimed at the commissioner running a real pool they care about.
 | Feature | Why it converts |
 |---|---|
 | Up to **200 players** | The 21st person is the trigger. Hard paywall, unmissable, zero resentment. |
+| **The record book** — every card, every call, running standings | The trigger for groups that never reach 20 people. See below. |
 | **Multiple simultaneous pools** | Run High Five *and* Survivor off one link (see `06-engagement.md`). |
 | **The Weekly Recap** — AI-written, group-specific, names names | The single highest-delight feature. Costs ~$0.007/pool/week (`03`). |
 | **Season archive & history** | Last year's board, all-time records. Pure switching cost. |
@@ -83,6 +84,20 @@ Aimed at the commissioner running a real pool they care about.
 | **The kitty tracker** + split-the-ante | The #1 commissioner pain. |
 | **Custom pool branding** — name, colour, share card | Cheap to build, disproportionately loved. |
 | CSV export, pick history, backfill | Already built. Move behind the wall. |
+
+**The headcount wall only works for pools.** A golf foursome is four people forever and a poker
+table is six to nine, so *"the 21st person"* never arrives for the families in
+`09-competition-types.md`. Those need a second axis, and the ladder's own principle supplies it —
+nothing that makes a competition *work* is ever paid; what is paid is everything that makes it
+*persist*. A card works free: play the round, settle the skins, see the card. What costs money is
+the record book — every card this year, the running standings, the head-to-heads. Free keeps the
+current one and the last three.
+
+Two consequences worth stating plainly. **Cards and Calls sell on the annual plan only**, because
+"per season" means nothing to a group that plays in February and August alike — which pushes buyers
+toward the plan § 6 already prefers. And the arithmetic changes: $49 a year across a foursome is
+**$12.25 each**, not $1.93. Split-the-ante (§ 2) matters more for these groups, not less, because
+they already settle money every time they play.
 
 ### Tally Clubhouse — **$99 / year per group**
 

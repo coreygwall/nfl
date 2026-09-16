@@ -59,6 +59,9 @@ GTM pauses and only building happens. (See `05-gtm.md` § 1.)
 - [ ] Choose and budget a commercial data feed fallback for nflverse
 
 ### December 2026 — *Ship the playoffs pool*
+- [ ] When the **Prop of the Week** is built (`06` § 3 ②), build it so the question can come from a
+      commissioner and the answer from the group. That is the Calls engine, and it is the only
+      family with no season (`09` § 5)
 - [ ] **Playoffs pool live before Wild Card weekend.** The first real test of shipping a second
       pool type on the existing architecture, and the first proof that "days, not months" holds.
 - [ ] Push Campaign 2, "One More Pool" (`05` § 5) — in-app prompt to existing players, Reddit, SEO
@@ -79,9 +82,14 @@ GTM pauses and only building happens. (See `05-gtm.md` § 1.)
 - [ ] Paywall **on** — new pools only, and never retroactively on an existing pool mid-season
 - [ ] First cohort of paying commissioners, likely across three pool types by now
 
-### April–July 2027 — *The group*
+### April–July 2027 — *The group, and the golf moment*
 - [ ] **Majors** (golf) — small, delightful, proves multi-sport, only if it earns its place against
       what the playoffs and March pools actually taught about demand
+- [ ] **Cards** — the first participant-played family: skins, nassau, match play for your own
+      Saturday round (`09-competition-types.md` § 4). Same marketing moment as Majors and the same
+      audience in the same week, but a different product: a pool *about* the Masters and a card
+      *for your foursome*. Gated on the January decision log below — this is the one that needs
+      offline entry and a resolution authority that is not the league office
 - [ ] **Clubhouse tier**: `/g/<slug>`, cross-season standings, Group of the Year
 - [ ] Convert playoffs- and March-pool commissioners into groups
 - [ ] Slack / Discord bot
@@ -130,6 +138,8 @@ Writing these down so they stop being reconsidered every month:
 | Android | Not before 2028. The web app is good and works everywhere; iOS is where the design leverage and the featuring opportunity are. |
 | A second backend service | The single-Worker architecture is the 98% margin (`03` § 5). |
 | Virtual currency | `06` § 3 Tier 3. Casino grammar in a non-casino brand. |
+| Anything called a prediction market | `09` § 3. The mechanic is fine and the vocabulary is not. |
+| Play-and-feed formats (timed races, step challenges) | `09` § 1. A third data integration for a smaller audience. |
 
 ---
 
@@ -145,6 +155,12 @@ Open questions that should be settled with a season of data rather than argued a
 4. **Is Clubhouse a tier or the product?** If cross-season retention is dramatically better, the
    right move may be to make the *group* the primary object and demote the pool.
 5. **Does the Recap actually get forwarded?** It's the distribution bet. Measure shares, not opens.
+6. **Where does a contest's result come from?** Pools take it from a feed and the league office owns
+   it absolutely. Cards and Calls cannot (`09` § 7). Settling the resolution-authority model is the
+   one architectural decision that gets more expensive with every feed-based pool type shipped
+   before it.
+7. **What replaces the 20-player wall for a foursome?** `02` § 3 proposes the record book. It is
+   untested, and half the broadened product has no paywall until it is settled.
 
 ---
 

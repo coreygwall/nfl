@@ -66,12 +66,15 @@ replies, the AI recaps. It is more differentiated than the logo.
 | "Free to play" | "Free forever!*" |
 | Say the number | "Affordable pricing" |
 
-**Words Tally does not use:** *bet, wager, odds, action, lock (as a noun), degen, sweat, juice,
-cash out, deposit, parlay, book.* This is a hard list. The brand's entire premise is that it is not
-that thing, and one stray "lock of the week" undoes a lot of careful work.
+**Words Tally does not use:** *bet, wager, odds, odds-on, action, lock (as a noun), degen, sweat,
+juice, cash out, deposit, parlay, book, prediction market, market.* This is a hard list. The brand's
+entire premise is that it is not that thing, and one stray "lock of the week" undoes a lot of
+careful work. The last two were added with `09-competition-types.md`: *prediction market* describes
+the Calls mechanic accurately and is the exact frame `01-strategy.md` shows the industry running
+toward, so it stays an internal shorthand and never reaches a surface.
 
-**Words Tally owns:** *pool, pick, board, week, season, group, commissioner, tally, standings,
-the wall.*
+**Words Tally owns:** *pool, card, call, pick, board, week, season, group, commissioner, tally,
+standings, the wall.*
 
 ---
 
@@ -102,8 +105,9 @@ Already correct in the codebase — worth writing down so it stays that way:
 | Layer | Name | Example |
 |---|---|---|
 | The company / app | **Tally** | `playtally.app` |
-| A pool *type* | The game's name | High Five, Survivor, Brackets, Majors |
-| A pool *instance* | The group's own name | "Wall Street Bowl 2026" at `/p/wall-street-bowl` |
+| A *family* of competition | Pool · Card · Call | "start a card" — see `09-competition-types.md` |
+| A *type* within a family | The game's name | High Five, Survivor, Brackets, Majors, Skins, Nassau |
+| An *instance* | The group's own name | "Wall Street Bowl 2026" at `/p/wall-street-bowl` |
 | A group | The group's name | "The Walls" at `/g/the-walls` |
 
 The discipline that matters: **Tally is never the name of a game.** High Five is a game. Tally is
