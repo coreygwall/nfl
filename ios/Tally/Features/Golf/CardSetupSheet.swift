@@ -28,6 +28,7 @@ struct CardSetupSheet: View {
     @State private var holeCount = 18
     @State private var showPars = false
     @State private var loaded = false
+    @State private var confirmDelete = false
 
     /// Par 72 as most cards lay it out: four threes, four fives, ten fours.
     static let standardPars = [4, 4, 3, 5, 4, 4, 3, 4, 5, 4, 3, 4, 5, 4, 4, 3, 5, 4]
@@ -81,6 +82,19 @@ struct CardSetupSheet: View {
                 }
             }
             .onAppear { load() }
+            // The same guard the card menu puts on the same act. This one needs it more: it sits
+            // a thumb's width under the Save button somebody is aiming at.
+            .confirmationDialog("Delete this card?", isPresented: $confirmDelete, titleVisibility: .visible) {
+                Button("Delete the card", role: .destructive) {
+                    guard let editing else { return }
+                    golf.delete(editing.id)
+                    model.leaveCard()
+                    dismiss()
+                }
+                Button("Keep it", role: .cancel) {}
+            } message: {
+                Text("Every hole on it goes with it. There is no undo.")
+            }
         }
     }
 
@@ -186,12 +200,7 @@ struct CardSetupSheet: View {
     private var deleteRow: some View {
         VStack(alignment: .leading, spacing: 6) {
             DashedDivider()
-            LinkButton(title: "Delete this card", color: .danger) {
-                guard let editing else { return }
-                golf.delete(editing.id)
-                model.leaveCard()
-                dismiss()
-            }
+            LinkButton(title: "Delete this card", color: .danger) { confirmDelete = true }
             Text("Every hole on it goes with it. There is no undo.").sans(12).foregroundStyle(Color.ink3)
         }
         .padding(.top, 6)

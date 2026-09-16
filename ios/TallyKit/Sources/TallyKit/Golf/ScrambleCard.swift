@@ -149,6 +149,18 @@ public struct ScrambleCard: Codable, Hashable, Identifiable, Sendable {
     /// Over finished holes only: a hole with two strokes on it is not yet under par.
     public var toPar: Int { finishedHoles.reduce(0) { $0 + $1.score - par($1.hole) } }
 
+    /**
+     The hole most recently finished, by *when* rather than by number.
+
+     The round screen moves on the moment a hole is in, so the correction somebody makes three
+     seconds later — that last one was Dan's, not Pete's — is about a hole that is no longer on
+     screen. This is the one it was. By `updatedAt`, because holes can be played out of order and
+     the seventeenth finished can be hole 3.
+     */
+    public var lastFinished: HoleEntry? {
+        finishedHoles.max { ($0.updatedAt, $0.hole) < ($1.updatedAt, $1.hole) }
+    }
+
     /// The next hole still to play after `hole`, wrapping round to pick up one that was skipped.
     public func nextUnfinishedHole(after hole: Int) -> Int? {
         guard holeCount > 0 else { return nil }
@@ -207,6 +219,18 @@ public struct ScrambleCard: Codable, Hashable, Identifiable, Sendable {
     /// Move to the next hole still to play, if there is one.
     public mutating func advance() {
         if let next = nextUnfinishedHole(after: currentHole) { currentHole = next }
+    }
+
+    /**
+     Correct a hole's par.
+
+     Nobody knows their course's card from memory, so the setup sheet guesses par 72 and the truth
+     arrives one tee at a time. Clamped to 3...6 because a par 2 is not a thing and a par 7 is not
+     on this card; the control on the round screen offers 3, 4 and 5.
+     */
+    public mutating func setPar(_ par: Int, on hole: Int) {
+        guard holeNumbers.contains(hole), hole <= pars.count else { return }
+        pars[hole - 1] = min(max(par, 3), 6)
     }
 
     public mutating func go(to hole: Int) {

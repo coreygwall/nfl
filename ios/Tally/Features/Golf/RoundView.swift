@@ -22,6 +22,9 @@ struct RoundView: View {
             let entry = card.entry(card.currentHole) ?? HoleEntry(hole: card.currentHole)
             VStack(alignment: .leading, spacing: 14) {
                 if card.isComplete { RoundDoneCard(card: card) }
+                if entry.strokes.isEmpty, let last = card.lastFinished, last.hole != card.currentHole {
+                    LastHoleStrip(card: card, entry: last)
+                }
                 HoleHeader(card: card)
                 StrokeStrip(card: card, entry: entry)
                 if entry.finished {
@@ -53,7 +56,7 @@ private struct HoleHeader: View {
                     .font(TallyFont.display(28))
                     .contentTransition(.numericText())
                 HStack(spacing: 6) {
-                    Chip(text: "Par \(card.par(hole))", size: 11)
+                    ParChip(card: card, hole: hole)
                     if let entry = card.entry(hole), entry.finished {
                         Chip(text: ScrambleTally.label(score: entry.score, par: card.par(hole)), fill: .turfSoft, size: 11)
                     }
@@ -74,6 +77,93 @@ private struct HoleHeader: View {
         .padding(12)
         .frame(maxWidth: .infinity)
         .card()
+    }
+}
+
+/**
+ The hole's par, and the one tap that corrects it.
+
+ The setup sheet guesses par 72 laid out the usual way, because nobody fills in eighteen numbers on
+ the first tee. So the truth arrives one tee at a time, and this is where it arrives: tap to cycle
+ 3, 4, 5. It used to take the card menu, the edit sheet, *Set the pars*, finding the hole and
+ saving — five layers away from the screen you are looking at when you notice.
+ */
+private struct ParChip: View {
+    @Environment(GolfModel.self) private var golf
+    let card: ScrambleCard
+    let hole: Int
+
+    var body: some View {
+        let par = card.par(hole)
+        Button {
+            Haptics.tap()
+            golf.setPar(par >= 5 ? 3 : par + 1, card: card.id, hole: hole)
+        } label: {
+            HStack(spacing: 4) {
+                Text("Par \(par)")
+                    .font(TallyFont.sans(11, weight: .bold))
+                    .contentTransition(.numericText())
+                Image(systemName: "chevron.up.chevron.down")
+                    .font(.system(size: 8, weight: .black))
+                    .foregroundStyle(Color.ink3)
+            }
+            .foregroundStyle(Color.ink)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 4)
+            .background(Capsule().fill(Color.surface))
+            .overlay(Capsule().strokeBorder(Color.ink, lineWidth: 2))
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Par \(par). Change it")
+        .accessibilityHint("Cycles between par 3, 4 and 5")
+    }
+}
+
+/**
+ What the hole you just left came to, and the way back into it.
+
+ Finishing moves the screen to the next tee, which is right in a cart and wrong for the three
+ seconds afterwards, when somebody says that last one was Dan's. The toast has gone by then and
+ the Undo on this hole is about *this* hole. So the last hole keeps a line at the top of the next
+ one until a stroke is logged, and tapping it stands you back on it, where Reopen is waiting.
+ */
+private struct LastHoleStrip: View {
+    @Environment(GolfModel.self) private var golf
+    let card: ScrambleCard
+    let entry: HoleEntry
+
+    private var detail: String {
+        let word = ScrambleTally.label(score: entry.score, par: card.par(entry.hole))
+        if let who = card.player(entry.holedBy)?.name { return "\(entry.score), \(word) · \(who) holed it" }
+        return "\(entry.score), \(word)"
+    }
+
+    var body: some View {
+        Button {
+            Haptics.tap()
+            golf.go(card: card.id, to: entry.hole)
+        } label: {
+            HStack(spacing: 8) {
+                Image(systemName: "arrow.uturn.backward")
+                    .font(.system(size: 12, weight: .black))
+                    .foregroundStyle(Color.ink2)
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("Hole \(entry.hole) is in").font(TallyFont.display(13, weight: .bold))
+                    Text(detail).sans(11).foregroundStyle(Color.ink2).lineLimit(1)
+                }
+                Spacer(minLength: 4)
+                Text("Fix").font(TallyFont.display(12, weight: .bold)).foregroundStyle(Color.ink2)
+                Image(systemName: "chevron.right")
+                    .font(.system(size: 10, weight: .bold)).foregroundStyle(Color.ink3)
+            }
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .contentShape(Rectangle())
+        }
+        .buttonStyle(.plain)
+        .cardFlat(fill: .paper2)
+        .accessibilityLabel("Hole \(entry.hole) is in: \(detail). Go back to it")
     }
 }
 

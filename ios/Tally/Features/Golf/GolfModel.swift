@@ -76,4 +76,8 @@ final class GolfModel {
     func go(card id: String, to hole: Int) {
         mutate(id) { $0.go(to: hole) }
     }
+
+    func setPar(_ par: Int, card id: String, hole: Int) {
+        mutate(id) { $0.setPar(par, on: hole) }
+    }
 }

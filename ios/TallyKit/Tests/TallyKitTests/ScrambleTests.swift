@@ -251,3 +251,65 @@ final class ScrambleTests: XCTestCase {
         XCTAssertEqual(catalog.cards.count, 1)
     }
 }
+
+/**
+ The two things the round screen learned after somebody imagined a Saturday with it.
+
+ Par is guessed at setup and corrected on the tee, and the hole you just finished is the one you
+ need to reach when the screen has already moved on.
+ */
+final class RoundCorrectionTests: XCTestCase {
+    private let corey = GolfPlayer(id: "c", name: "Corey")
+    private let dan = GolfPlayer(id: "d", name: "Dan")
+
+    private func card() -> ScrambleCard {
+        ScrambleCard(name: "Saturday", players: [corey, dan], pars: Array(repeating: 4, count: 9))
+    }
+
+    func testCorrectingParChangesTheScoreItIsMeasuredAgainst() {
+        var c = card()
+        c.record(.shot(by: "c"), on: 1)
+        c.record(.shot(by: "d"), on: 1)
+        c.record(.shot(by: "c"), on: 1)
+        c.finish(hole: 1, tapIn: false)
+        XCTAssertEqual(c.toPar, -1, "three on the par four the setup sheet guessed")
+
+        c.setPar(3, on: 1)
+        XCTAssertEqual(c.par(1), 3)
+        XCTAssertEqual(c.toPar, 0, "the hole was always a par three; the card just said otherwise")
+        XCTAssertEqual(ScrambleTally.label(score: 3, par: c.par(1)), "par")
+        XCTAssertEqual(c.totalPar, 35)
+    }
+
+    func testParStaysInsideTheRangeAGolfCourseUses() {
+        var c = card()
+        c.setPar(1, on: 1)
+        XCTAssertEqual(c.par(1), 3)
+        c.setPar(9, on: 1)
+        XCTAssertEqual(c.par(1), 6)
+        c.setPar(5, on: 99)
+        XCTAssertEqual(c.pars.count, 9, "a hole off the card cannot grow one")
+    }
+
+    func testTheLastFinishedHoleIsTheLastOneFinishedRatherThanTheHighestNumbered() {
+        var c = card()
+        for hole in [1, 2, 3] {
+            c.record(.shot(by: "c"), on: hole)
+            c.finish(hole: hole, tapIn: true)
+        }
+        XCTAssertEqual(c.lastFinished?.hole, 3)
+
+        // The group skipped 4 for a group ahead, played 5, then came back to 4.
+        c.record(.shot(by: "d"), on: 5)
+        c.finish(hole: 5, tapIn: true)
+        c.record(.shot(by: "d"), on: 4)
+        c.finish(hole: 4, tapIn: true)
+        XCTAssertEqual(c.lastFinished?.hole, 4, "by when it was written, not by its number")
+    }
+
+    func testThereIsNoLastFinishedHoleBeforeAnythingIsIn() {
+        var c = card()
+        c.record(.shot(by: "c"), on: 1)
+        XCTAssertNil(c.lastFinished, "a hole in progress is not a hole that is in")
+    }
+}
