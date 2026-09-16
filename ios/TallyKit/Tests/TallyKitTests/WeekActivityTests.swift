@@ -217,4 +217,39 @@ final class WeekActivityTests: XCTestCase {
         XCTAssertEqual(state.slots.map(\.state), [.waiting])
         XCTAssertEqual(state.points, 0)
     }
+
+    /// One wording for the lock screen and the picks tab, so the two never disagree about a Sunday.
+    func testTheStatusLineAnswersEachPhase() {
+        let clock: (Date) -> String = { _ in "4:05 PM" }
+        let picks = [Pick(gameId: "a", team: "BUF", rank: 1), Pick(gameId: "b", team: "KC", rank: 2)]
+
+        let locked = WeekActivityAttributes.ContentState.from(
+            picks: picks, games: [game("a", "BUF", "HOU", kickoff: 3600), game("b", "KC", "DEN", kickoff: 7200)], now: now
+        )
+        XCTAssertEqual(locked.statusLine(clock: clock), "Picks are in — first game 4:05 PM.")
+
+        let live = WeekActivityAttributes.ContentState.from(
+            picks: picks, games: [game("a", "BUF", "HOU"), game("b", "KC", "DEN", kickoff: 7200)], now: now
+        )
+        XCTAssertEqual(live.statusLine(clock: clock), "1 game on now · 9 still to play for.")
+
+        let between = WeekActivityAttributes.ContentState.from(
+            picks: picks, games: [game("a", "BUF", "HOU", winner: "BUF"), game("b", "KC", "DEN", kickoff: 7200)], now: now
+        )
+        XCTAssertEqual(between.statusLine(clock: clock), "Back at 4:05 PM · 1 game left, worth 4.")
+
+        let watching = WeekActivityAttributes.ContentState.from(
+            picks: picks,
+            games: [game("a", "BUF", "HOU", winner: "BUF"), game("b", "KC", "DEN", winner: "DEN"), game("c", "NE", "CLE")],
+            now: now
+        )
+        XCTAssertEqual(watching.statusLine(clock: clock), "All five in. Your place can still move.")
+
+        let won = WeekActivityAttributes.ContentState.from(
+            picks: picks, games: [game("a", "BUF", "HOU", winner: "BUF"), game("b", "KC", "DEN", winner: "KC")],
+            now: now, place: 1, field: 12
+        )
+        XCTAssertEqual(won.statusLine(clock: clock), "You won the week on 9 points.")
+        XCTAssertEqual(won.statusLine(stale: true, clock: clock), "Scores may be behind.")
+    }
 }

@@ -175,6 +175,14 @@ struct PickTrayView: View {
     }
 }
 
+/**
+ The pick, and how its game is going.
+
+ Before kickoff the second line is the matchup and the time. Once there is a score it is the score,
+ from this pick's side — "Leading the Raiders 24–17" — because a row on a Sunday afternoon is read
+ for exactly that, and a time that has already passed says nothing. When it is over it says how it
+ ended. A live game whose score has not arrived yet keeps the matchup rather than inventing 0–0.
+ */
 struct MatchupText: View {
     @Environment(AppModel.self) private var model
     let pick: Pick
@@ -183,12 +191,33 @@ struct MatchupText: View {
 
     var body: some View {
         let team = model.sport.teamOrPlaceholder(pick.team)
-        let opp = game.map { model.sport.teamOrPlaceholder($0.opponent(of: pick.team)) }
         VStack(alignment: .leading, spacing: 2) {
             Text(team.nickname).font(TallyFont.display(15)).lineLimit(1)
-            Text([opp.map { compact ? "over \($0.display)" : "over the \($0.nickname)" }, game.map { Format.time($0.kickoffAt) }].compactMap { $0 }.joined(separator: " · "))
-                .sans(12).foregroundStyle(Color.ink2).lineLimit(1)
+            Text(detail).sans(12).foregroundStyle(Color.ink2).lineLimit(1)
         }
+    }
+
+    private var detail: String {
+        guard let game else { return "" }
+        let opp = model.sport.teamOrPlaceholder(game.opponent(of: pick.team))
+        let name = compact ? opp.display : "the \(opp.nickname)"
+        if let scores = scores(game) {
+            let line = "\(scores.mine)–\(scores.theirs)"
+            if let winner = game.winner {
+                if winner == "TIE" { return "Tied \(name) \(line)" }
+                return winner == pick.team ? "Won \(line) over \(name)" : "Lost \(line) to \(name)"
+            }
+            if scores.mine > scores.theirs { return "Leading \(name) \(line)" }
+            if scores.mine < scores.theirs { return "Trailing \(name) \(line)" }
+            return "Level with \(name) \(line)"
+        }
+        return "over \(name) · \(Format.time(game.kickoffAt))"
+    }
+
+    /// Both numbers, from this pick's side, once the game has one.
+    private func scores(_ game: Game) -> (mine: Int, theirs: Int)? {
+        guard let away = game.awayScore, let home = game.homeScore, game.status != .upcoming else { return nil }
+        return pick.team == game.home ? (home, away) : (away, home)
     }
 }
 

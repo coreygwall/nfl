@@ -173,12 +173,8 @@ private struct Standing: View {
     }
 }
 
-/**
- The line under the row, which is where the five phases actually differ.
-
- Each one answers the question that phase raises and nothing else: when does this start, what is
- still live, when is the next one, can my position still move, and how did it end.
- */
+/// The line under the row, which is where the five phases actually differ — see
+/// `ContentState.statusLine` for what each one says and why.
 private struct StatusLine: View {
     let state: WeekActivityAttributes.ContentState
     let stale: Bool
@@ -195,36 +191,8 @@ private struct StatusLine: View {
         }
     }
 
-    /// Staleness outranks everything: it is a statement about whether the rest can be believed.
-    private var text: String {
-        if stale { return "Scores may be behind." }
-        let left = state.outstanding
-        switch state.phase {
-        case .locked:
-            guard let kickoff = state.nextKickoff else { return "Picks are in." }
-            return "Picks are in — first game \(Clock.short(kickoff))."
-        case .live:
-            let live = state.slots.filter { $0.state == .live }.count
-            let onNow = live == 1 ? "1 game on now" : "\(live) games on now"
-            return "\(onNow) · \(left.points) still to play for."
-        case .between:
-            guard let kickoff = state.nextKickoff else {
-                return "\(Plural.games(left.games)) left, worth \(left.points)."
-            }
-            return "Back at \(Clock.short(kickoff)) · \(Plural.games(left.games)) left, worth \(left.points)."
-        case .watching:
-            // Their five are done and the week is not. Saying so is the only honest thing here:
-            // the number above has stopped moving and the position beside it has not.
-            return "All five in. Your place can still move."
-        case .final:
-            guard let place = state.place, let field = state.field, field > 1 else {
-                return "That is the week — \(Plural.points(state.points))."
-            }
-            return place == 1
-                ? "You won the week on \(Plural.points(state.points))."
-                : "\(Ordinal.of(place)) of \(field) on \(Plural.points(state.points))."
-        }
-    }
+    /// The words are the model's, shared with the picks tab, so the two never disagree.
+    private var text: String { state.statusLine(stale: stale, clock: Clock.short) }
 
     private var dot: Color? {
         if stale { return TallyPalette.ink3 }

@@ -152,7 +152,7 @@ Four places, on both surfaces:
 | | What it answers |
 | --- | --- |
 | **Home** | What does this pool want from me? The week, whose picks are missing, where you stand, who took last week. On iOS the other pools are a strip underneath, each saying whether it needs picks. |
-| **Picks** | This week's five. |
+| **Picks** | This week's five — and once they are in, how they are going: each game's score from your side, what is banked, what is still to play for, where that leaves you. The lock screen's Live Activity, drawn large. |
 | **Board** | Who is winning. |
 | **Account** | Grouped like Settings, in the order things get touched: your entries in this pool, the office doors for whoever holds one, notifications and appearance, the other-device link, and about Tally. |
 
