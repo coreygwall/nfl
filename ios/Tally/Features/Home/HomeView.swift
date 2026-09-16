@@ -21,9 +21,16 @@ struct HomeView: View {
     @State private var completed: Loadable<WeekBoardResponse> = .idle
 
     private var boot: BootstrapResponse? { model.boot.value }
-    /// Changes when the pool changes *or* when bootstrap finally says which week it is.
-    private var loadKey: String { "\(model.pool.host)/\(model.pool.slug)#\(boot?.currentWeek ?? 0)" }
     private var completedWeek: Int? { PoolHome.latestCompletedWeek(boot?.weeks ?? []) }
+    /// Changes when the pool changes, when bootstrap finally says which week it is, *and* when a
+    /// week finishes. That last one is its own trigger rather than a consequence of the first:
+    /// bootstrap re-polls every five minutes, and the last result of a week routinely lands after
+    /// the pick week has already rolled over — a Monday night game settling on Tuesday. Keyed on
+    /// the pick week alone, that poll would advance this card's heading and links to the newly
+    /// finished week while the rows underneath stayed on the week before.
+    private var loadKey: String {
+        "\(model.pool.host)/\(model.pool.slug)#\(boot?.currentWeek ?? 0)#\(completedWeek ?? 0)"
+    }
 
     var body: some View {
         VStack(alignment: .leading, spacing: 22) {
@@ -33,10 +40,8 @@ struct HomeView: View {
             moreSection
         }
         // One pass on arrival rather than a poll: nothing here changes between a tap and a glance,
-        // and the board tab is where a live week belongs. The key has to include the week rather
-        // than only the pool, because bootstrap is still idle at the moment the pool changes — on
-        // launch and again after a switch — and a task keyed on the pool alone would run once,
-        // find no week to ask about, and never run again.
+        // and the board tab is where a live week belongs. What the key is made of, and why each
+        // part of it has to be in there, is on `loadKey`.
         .task(id: loadKey) { await load() }
     }
 
@@ -147,10 +152,26 @@ private struct ActivePoolCard: View {
     private var boot: BootstrapResponse? { model.boot.value }
     private var entries: [Identity] { model.people }
 
+    /**
+     The board for the week this card is *naming*, and nothing else.
+
+     The heading comes from bootstrap and the picks come from the board, and they arrive on
+     different schedules: when the five-minute bootstrap poll rolls the pick week over, the heading
+     says Week 4 while the board in hand is still Week 3's. Answering "are your picks in" out of
+     that board would tell someone who picked last week and not this one that they are done — the
+     one sentence on this screen that can cost them their week, and the same sentence the failure
+     branch below already refuses to guess at. So a board only answers for its own week; until the
+     right one lands there is a skeleton, which is the honest thing to show.
+     */
+    private var boardForThisWeek: WeekBoardResponse? {
+        guard let week, let boot, week.week == boot.currentWeek else { return nil }
+        return week
+    }
+
     /// The entries of mine that have not saved a full five yet, in the order they appear.
     private var owing: [Identity] {
-        guard let week else { return [] }
-        let made = Dictionary(uniqueKeysWithValues: week.rows.map { ($0.playerId, $0.picksMade) })
+        guard let board = boardForThisWeek else { return [] }
+        let made = Dictionary(uniqueKeysWithValues: board.rows.map { ($0.playerId, $0.picksMade) })
         return entries.filter { (made[$0.id] ?? 0) < Scoring.maxPicks }
     }
 
@@ -198,7 +219,7 @@ private struct ActivePoolCard: View {
                     // Silence is the only safe thing to say. "Your picks are in" off a request
                     // that failed is the one sentence here that can cost someone their week.
                     Text("Couldn't check your picks.").sans(14, weight: .semibold).foregroundStyle(Color.ink2)
-                } else if week == nil {
+                } else if boardForThisWeek == nil {
                     SkeletonLine(width: 180)
                 } else if owing.isEmpty {
                     Label(entries.count > 1 ? "All \(entries.count) sets of picks are in." : "Your picks are in.", systemImage: "checkmark.circle.fill")
@@ -335,7 +356,10 @@ private struct LatestWeekCard: View {
         if let completedWeek {
             if board.error != nil {
                 Text("Couldn't load the latest results.").sans(13).foregroundStyle(Color.ink2)
-            } else if let loaded = board.value {
+            // The response says which week it is, so it can only ever draw under that week's
+            // heading. Re-keying the load above is what fetches the new week; this is what stops
+            // the old rows showing under the new title in the seconds before it lands.
+            } else if let loaded = board.value, loaded.week == completedWeek {
                 rows(loaded, week: completedWeek)
                 Button("See the full Week \(completedWeek) leaderboard") { openBoard(week: completedWeek) }
                     .buttonStyle(.tally(.plain, size: .small, fullWidth: true))
