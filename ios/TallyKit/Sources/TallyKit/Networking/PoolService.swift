@@ -163,6 +163,48 @@ public struct PoolService: Sendable {
         let appVersion: String?
     }
 
+    // MARK: Announcements
+
+    private struct MessageBody: Encodable { let body: String }
+    private struct EnabledBody: Encodable { let enabled: Bool }
+
+    /// One page of announcements, newest first. Pass the previous page's `nextCursor` as `before`
+    /// to walk backwards through the feed.
+    public func messages(before: String? = nil) async throws -> MessagesResponse {
+        let query = before.map { "?before=\($0.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? $0)" } ?? ""
+        return try await client.get("/messages\(query)")
+    }
+
+    /// Commissioner only, and only while the feed is on — the server refuses a post to a feed
+    /// nobody can read.
+    public func postMessage(_ body: String) async throws -> CreatedMessageResponse {
+        try await client.post("/messages", body: MessageBody(body: body))
+    }
+
+    public func editMessage(id: String, body: String) async throws -> OkResponse {
+        try await client.patch("/messages/\(id)", body: MessageBody(body: body))
+    }
+
+    public func deleteMessage(id: String) async throws -> OkResponse {
+        try await client.delete("/messages/\(id)")
+    }
+
+    /// Liking is a PUT and unliking a DELETE rather than one toggle, so a retry after a dropped
+    /// response lands on the reaction the reader asked for instead of undoing it.
+    public func likeMessage(id: String) async throws -> OkResponse {
+        try await client.put("/messages/\(id)/like")
+    }
+
+    public func unlikeMessage(id: String) async throws -> OkResponse {
+        try await client.delete("/messages/\(id)/like")
+    }
+
+    /// Turning the feed off hides it from members without deleting anything; commissioners can
+    /// still see what is there.
+    public func setMessagesEnabled(_ enabled: Bool) async throws -> OkResponse {
+        try await client.patch("/messages/settings", body: EnabledBody(enabled: enabled))
+    }
+
     // MARK: League office
     //
     // Results, the schedule and the feed. One authority for every pool on Tally.

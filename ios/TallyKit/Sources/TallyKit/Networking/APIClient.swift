@@ -85,6 +85,12 @@ public final class APIClient: @unchecked Sendable {
         try await request("PUT", path, body: body, options: options)
     }
 
+    /// For routes where the path *is* the request — liking an announcement says everything in its
+    /// verb and its URL, and has nothing left to put in a body.
+    public func put<T: Decodable>(_ path: String, options: Options = Options()) async throws -> T {
+        try await request("PUT", path, body: Empty(), options: options)
+    }
+
     public func patch<T: Decodable, B: Encodable>(_ path: String, body: B, options: Options = Options()) async throws -> T {
         try await request("PATCH", path, body: body, options: options)
     }

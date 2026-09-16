@@ -8,8 +8,17 @@ async function api(path: string, token = '', method = 'GET', body?: unknown, ent
   });
   return { status: response.status, body: await response.json() as any };
 }
+// A counter rather than a slice of a UUID. The name has to be new on each call — a name that
+// already exists comes back without a token — but a random hex suffix is eight characters drawn
+// from `0-9a-f`, and the signup door runs names past the profanity filter, which reads leetspeak:
+// `a55` is "ass". About one call in 2,300 was refused with a 400, and since the 400 carries no
+// token the failure surfaced two lines later as `/roles/claim` answering 401 to a request with no
+// account on it — nowhere near the name that caused it. A counter cannot spell anything.
+let hosts = 0;
 async function setup() {
-  const owner = (await api('/players', '', 'POST', { name: `Host ${crypto.randomUUID().slice(0, 8)}` })).body;
+  const owner = (await api('/players', '', 'POST', { name: `Host ${++hosts}` })).body;
+  // Say so here rather than letting a tokenless owner become an unexplained 401 on the next line.
+  expect(owner.token, `signing up Host ${hosts} should return a token, got ${JSON.stringify(owner)}`).toBeTruthy();
   const claimed = await SELF.fetch('http://pool.test/api/roles/claim', { method: 'POST', headers: { 'x-player-token': owner.token, 'x-admin-pin': '1234' } });
   expect(claimed.status).toBe(200);
   return owner;

@@ -186,3 +186,33 @@ final class PoolHomeTests: XCTestCase {
         XCTAssertNil(PoolHome.latestCompletedWeek([]))
     }
 }
+
+final class AnnouncementReadTests: XCTestCase {
+    private let ids = ["newest", "middle", "oldest"]
+
+    func testEverythingIsNewBeforeTheFeedHasBeenViewed() {
+        XCTAssertEqual(AnnouncementRead.countUnread(ids: ids, seenId: nil), 3)
+    }
+
+    func testCountsOnlyMessagesNewerThanTheLastViewed() {
+        XCTAssertEqual(AnnouncementRead.countUnread(ids: ids, seenId: "middle"), 1)
+        XCTAssertEqual(AnnouncementRead.countUnread(ids: ids, seenId: "newest"), 0)
+    }
+
+    /// A commissioner deleting the post you last read must not silently hide what came after it.
+    func testRecoversWhenTheSeenMessageIsGone() {
+        XCTAssertEqual(AnnouncementRead.countUnread(ids: ids, seenId: "missing"), 3)
+    }
+
+    func testAnEmptyFeedHasNothingUnread() {
+        XCTAssertEqual(AnnouncementRead.countUnread(ids: [], seenId: nil), 0)
+        XCTAssertEqual(AnnouncementRead.countUnread(ids: [], seenId: "newest"), 0)
+    }
+
+    func testBadgeStopsCountingAtNine() {
+        XCTAssertNil(AnnouncementRead.badgeText(unread: 0))
+        XCTAssertEqual(AnnouncementRead.badgeText(unread: 1), "1")
+        XCTAssertEqual(AnnouncementRead.badgeText(unread: 9), "9")
+        XCTAssertEqual(AnnouncementRead.badgeText(unread: 10), "9+")
+    }
+}

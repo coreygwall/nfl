@@ -20,12 +20,29 @@ web-only decision is made, and remove an item only after the native implementati
 
 ## Announcements
 
-- [ ] Build the native announcement feed and account-level likes using the existing shared API.
-- [ ] Put announcements below the weekly and season standings previews on native home.
-- [ ] Add a megaphone control to the native header with a new-message count badge. Opening it should
-  move to the announcements section and mark the newest visible announcement as read.
-- [ ] Persist announcement read state per pool on-device so switching managed family entries does not
-  make the same post appear new again.
+- [x] Build the native announcement feed and account-level likes using the existing shared API.
+  `AnnouncementsFeedSheet` is a sheet rather than a fifth tab or a push, because it has to open
+  from any tab *and* from the megaphone's peek, and a sheet is the one presentation that works the
+  same from both.
+- [x] Put announcements below the weekly and season standings previews on native home.
+- [x] Add a megaphone control to the native header with a new-message count badge. On Home it
+  scrolls to the section, as on web. Off Home it opens a medium-detent peek with the unread
+  previews and a way through to the feed — the web's floating menu, in the native idiom. Reading a
+  notice never costs you your place in a pick flow.
+- [x] Persist announcement read state per pool on-device so switching managed family entries does not
+  make the same post appear new again. `AnnouncementSeen`, in `UserDefaults`, keyed per pool.
+- [x] Commissioner posting, editing, deleting and the on/off switch. The composer lives in the feed
+  (writing a message to the pool without the last one in front of you is how the same thing gets
+  said twice); the switch is in the commissioner's office next to the pool's name and invite, since
+  whether the pool has announcements at all is a setting.
+
+### Deliberately not matched
+
+- The web marks the feed read when the section scrolls half into view. Native marks it read when
+  the feed sheet opens, and the peek never does — the peek exists to show what is *new*, and
+  clearing the badge out from under someone who is still reading the previews is worse than a badge
+  that clears one tap later.
+- Delete is a native confirmation alert rather than the web's inline red box.
 
 ## Web-side follow-ups this parity work turned up
 
