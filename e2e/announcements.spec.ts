@@ -74,79 +74,89 @@ test('off Home, the announcement icon previews instead of pulling the reader awa
   await page.getByRole('button', { name: 'Take the keys' }).click();
   const feed = page.getByRole('region', { name: 'Announcements' });
   await feed.getByRole('switch').click();
-  // Four posts: enough to prove the preview caps at three rather than pushing "View all" off
-  // whatever screen it's opened on, with the oldest one the reader has to click through for.
+  await expect(feed.getByRole('switch')).toHaveAttribute('aria-checked', 'true');
+
+  // Four posts: enough to prove the preview caps at three. They go over the API rather than
+  // through the compose form — the test above already drives that form, and this one only needs
+  // the messages to exist. Typing them in instead meant racing a textarea and a button that
+  // disable themselves while each save is in flight, which is what made this test hang. The API
+  // also dates them by the real clock rather than the frozen `?now=`, so they no longer tie on
+  // `created_at` and "the newest three" is a fact instead of a coin toss between message ids.
   const posts = [
     'Standings are locked — good luck this week!',
     'Reminder: lock in picks before Thursday kickoff.',
     'Scoring page updated with tiebreaker rules.',
     'Heads up — Thursday game moved to 8:20pm ET.',
   ];
-  const draft = feed.getByLabel('Message to the pool');
-  for (const body of posts) {
-    await expect(draft).toHaveValue('');
-    await draft.fill(body);
-    await feed.getByRole('button', { name: 'Post announcement' }).click();
-    await expect(feed.getByText(body)).toBeVisible();
-  }
 
-  // A guest who has never opened the feed, so the unread badge starts fresh for it.
-  const guestContext = await browser.newContext();
-  const guest = await guestContext.newPage();
+  // Everything from here has to be undone even if an assertion throws: this suite shares one pool
+  // with the smoke tests, and those count the roster exactly ("2 of 2 have picked"). A host left
+  // behind by a failure here fails a test three files away, which is a miserable thing to debug.
   try {
-    await guest.goto(new URL('/p/high-five/board', page.url()).href);
-    const shortcut = guest.getByRole('button', { name: 'Announcements, 4 new' });
-    await expect(shortcut).toBeVisible();
-
-    await shortcut.click();
-    const popover = guest.getByRole('dialog', { name: 'Announcements' });
-    await expect(popover).toBeVisible();
-    // The four posts share one frozen test clock, so which one lands outside the top three is
-    // arbitrary (the tiebreak is the message id, not post order) — assert the cap and the
-    // overflow count structurally rather than by picking a text out ahead of time.
-    const previewItems = popover.getByRole('listitem');
-    await expect(previewItems).toHaveCount(3);
     for (const body of posts) {
-      const shown = await previewItems.filter({ hasText: body }).count();
-      expect(shown, `"${body}" should render at most once in the capped preview`).toBeLessThanOrEqual(1);
+      const created = await page.request.post('/api/messages', { data: { body } });
+      expect(created.ok(), `posting "${body}" should succeed`).toBe(true);
     }
-    await expect(popover.getByText('+1 more unread')).toBeVisible();
-    const viewAll = popover.getByRole('link', { name: 'View all announcements' });
-    await expect(viewAll).toBeVisible();
-    await expect(viewAll).toHaveAttribute('href', '/p/high-five/announcements');
-    // Board, not the announcements page — the point of a preview is not leaving.
-    await expect(guest).toHaveURL(/\/board\/week\/\d+$/);
 
-    await guest.keyboard.press('Escape');
-    await expect(popover).toBeHidden();
-    await expect(shortcut).toBeFocused();
+    // A guest who has never opened the feed, so the unread badge starts fresh for it.
+    const guestContext = await browser.newContext();
+    const guest = await guestContext.newPage();
+    try {
+      await guest.goto(new URL('/p/high-five/board', page.url()).href);
+      const shortcut = guest.getByRole('button', { name: 'Announcements, 4 new' });
+      await expect(shortcut).toBeVisible();
 
-    // Tapping the preview itself, rather than "View all", goes straight to that one message —
-    // whichever it is, so grab its text instead of assuming which of the four survived the cap.
-    await shortcut.click();
-    const firstPreview = popover.getByRole('link').first();
-    const previewBody = (await firstPreview.locator('p').nth(1).textContent())!.trim();
-    await firstPreview.click();
-    await expect(guest).toHaveURL(/\/announcements#message-/);
-    await expect(guest.getByText(previewBody, { exact: true })).toBeInViewport();
+      await shortcut.click();
+      const popover = guest.getByRole('dialog', { name: 'Announcements' });
+      await expect(popover).toBeVisible();
+      // Newest first, capped at three — so the three most recent show and the first one posted is
+      // represented only by the overflow count.
+      await expect(popover.getByRole('listitem')).toHaveCount(3);
+      for (const body of posts.slice(1)) {
+        await expect(popover.getByText(body)).toBeVisible();
+      }
+      await expect(popover.getByText(posts[0]!)).toHaveCount(0);
+      await expect(popover.getByText('+1 more unread')).toBeVisible();
+      const viewAll = popover.getByRole('link', { name: 'View all announcements' });
+      await expect(viewAll).toBeVisible();
+      await expect(viewAll).toHaveAttribute('href', '/p/high-five/announcements');
+      // Board, not the announcements page — the point of a preview is not leaving.
+      await expect(guest).toHaveURL(/\/board\/week\/\d+$/);
 
-    // Reading it marked the whole feed seen — a reopened preview off Home says so rather than
-    // repeating any of the four.
-    await guest.goto(new URL('/p/high-five/board', page.url()).href);
-    await guest.getByRole('button', { name: 'Announcements', exact: true }).click();
-    await expect(guest.getByRole('dialog', { name: 'Announcements' }).getByText("You're all caught up")).toBeVisible();
+      await guest.keyboard.press('Escape');
+      await expect(popover).toBeHidden();
+      await expect(shortcut).toBeFocused();
+
+      // Tapping a preview, rather than "View all", goes straight to that one message.
+      await shortcut.click();
+      await popover.getByRole('link', { name: new RegExp(posts[3]!.slice(0, 20)) }).click();
+      await expect(guest).toHaveURL(/\/announcements#message-/);
+      await expect(guest.getByText(posts[3]!, { exact: true })).toBeInViewport();
+
+      // Reading it marked the whole feed seen — a reopened preview off Home says so rather than
+      // repeating any of the four.
+      await guest.goto(new URL('/p/high-five/board', page.url()).href);
+      await guest.getByRole('button', { name: 'Announcements', exact: true }).click();
+      await expect(guest.getByRole('dialog', { name: 'Announcements' }).getByText("You're all caught up")).toBeVisible();
+    } finally {
+      await guestContext.close();
+    }
   } finally {
-    await guestContext.close();
+    // Best effort, and deliberately silent: a cleanup that throws would mask whatever real failure
+    // sent us here.
+    try {
+      const listed = await page.request.get('/api/messages');
+      if (listed.ok()) {
+        for (const message of (await listed.json()).messages ?? []) {
+          await page.request.delete(`/api/messages/${message.id}`);
+        }
+      }
+      await page.request.patch('/api/messages/settings', { data: { enabled: false } });
+      const boot = await page.request.get('/api/bootstrap');
+      const accountId = (await boot.json()).account?.id;
+      if (accountId) await page.request.delete(`/api/commissioner/players/${accountId}`);
+    } catch {
+      /* The next run gets a fresh database either way; a failed tidy-up is not this test's verdict. */
+    }
   }
-
-  for (let i = 0; i < posts.length; i++) {
-    await page.getByRole('button', { name: 'Delete', exact: true }).first().click();
-    await page.getByRole('button', { name: 'Confirm delete' }).click();
-  }
-  // Leave announcements off, matching the state every other test in this suite expects to find.
-  await feed.getByRole('switch').click();
-  await expect(feed.getByRole('switch')).toHaveAttribute('aria-checked', 'false');
-  const boot = await page.request.get('/api/bootstrap');
-  const accountId = (await boot.json()).account.id;
-  expect((await page.request.delete(`/api/commissioner/players/${accountId}`)).ok()).toBe(true);
 });

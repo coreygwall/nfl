@@ -5,15 +5,18 @@ web-only decision is made, and remove an item only after the native implementati
 
 ## Pool home and navigation
 
-- [ ] Make the native pool home the default destination for an old/shared pool link. It should let
+- [x] Make the native pool home the default destination for an old/shared pool link. It should let
   participants browse without making picks and provide direct routes to upcoming picks, the latest
   weekly results, season standings, and older weeks.
-- [ ] Add the compact latest-completed-week leaderboard to native home: top three names and points,
+- [x] Add the compact latest-completed-week leaderboard to native home: top three names and points,
   expandable revealed team picks, a full-week leaderboard link, and links to earlier completed weeks.
-- [ ] Add the season leaderboard preview to native home: top three after scoring begins, a full-board
+- [x] Add the season leaderboard preview to native home: top three after scoring begins, a full-board
   link, and explicit “starts Week 2” copy before then.
-- [ ] Add the time-boxed “The pool is still open” invite card through Sunday of Week 2 at 1 p.m. ET,
-  using the native iOS share sheet. Supporting copy should use the full card width.
+- [ ] ~~Add the time-boxed “The pool is still open” invite card~~ — **dropped, not deferred.** The
+  card was hard-coded to expire at Sunday of Week 2, 1 p.m. ET; by the time native home shipped
+  there were days left on it. Sharing a pool from the phone already exists in three other places
+  (the pick flow, the commissioner screen, and the account screen). If an invite prompt belongs on
+  home permanently, that is a new design rather than a port of this one.
 
 ## Announcements
 
@@ -23,6 +26,12 @@ web-only decision is made, and remove an item only after the native implementati
   move to the announcements section and mark the newest visible announcement as read.
 - [ ] Persist announcement read state per pool on-device so switching managed family entries does not
   make the same post appear new again.
+
+## Web-side follow-ups this parity work turned up
+
+- The season preview button on web home reads “Season standings · starts Week 2” at all times,
+  including mid-season when the race is weeks old. Native says “Full season standings” once
+  `throughWeek > 0` and keeps the “starts Week N” wording only before then; web should match.
 
 ## Web behavior to preserve when matching native
 

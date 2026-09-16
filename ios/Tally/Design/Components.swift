@@ -32,11 +32,11 @@ struct TallyCard: ViewModifier {
 }
 
 extension View {
-    func card(hard: Bool = true, fill: Color = .surface, border: Color = .ink, radius: CGFloat = TallyRadius.card, dashed: Bool = false) -> some View {
+    func card(hard: Bool = true, fill: Color = .surface, border: Color = .cardBorder, radius: CGFloat = TallyRadius.card, dashed: Bool = false) -> some View {
         modifier(TallyCard(hard: hard, fill: fill, border: border, radius: radius, dashed: dashed))
     }
 
-    func cardFlat(fill: Color = .surface, border: Color = .ink, radius: CGFloat = TallyRadius.card, dashed: Bool = false) -> some View {
+    func cardFlat(fill: Color = .surface, border: Color = .cardBorder, radius: CGFloat = TallyRadius.card, dashed: Bool = false) -> some View {
         modifier(TallyCard(hard: false, fill: fill, border: border, radius: radius, dashed: dashed))
     }
 }
@@ -325,7 +325,7 @@ struct EmptyState<Action: View>: View {
         .padding(.horizontal, 20)
         .padding(.vertical, 28)
         .frame(maxWidth: .infinity)
-        .cardFlat(fill: Color.paper2.opacity(0.6), border: .ink, dashed: true)
+        .cardFlat(fill: Color.paper2.opacity(0.6), border: .cardBorder, dashed: true)
     }
 }
 
@@ -404,7 +404,9 @@ struct TallyFieldStyle: ViewModifier {
             .padding(.horizontal, 16)
             .padding(.vertical, 13)
             .background(RoundedRectangle(cornerRadius: TallyRadius.inner, style: .continuous).fill(Color.surface))
-            .overlay(RoundedRectangle(cornerRadius: TallyRadius.inner, style: .continuous).strokeBorder(Color.ink, lineWidth: 2))
+            // A field is a card you type into — on the web it literally wears `.card-flat` — so it
+            // takes the card outline rather than the ink one buttons use.
+            .overlay(RoundedRectangle(cornerRadius: TallyRadius.inner, style: .continuous).strokeBorder(Color.cardBorder, lineWidth: 2))
     }
 }
 
@@ -436,5 +438,68 @@ extension View {
 extension View {
     func readable(_ width: CGFloat = 760) -> some View {
         frame(maxWidth: width).frame(maxWidth: .infinity)
+    }
+}
+
+/**
+ `flex-wrap`, as a layout.
+
+ SwiftUI has no wrapping stack, and the usual workaround — chunking the items into fixed rows of
+ four — guesses at a width it cannot know, so it leaves a gap on a big phone and clips on a small
+ one. This measures instead: items go along the row until the next one would not fit, then start a
+ new one. Used for the past-week chips on Home, where by December there are seventeen.
+ */
+struct FlowRow: Layout {
+    var spacing: CGFloat = 8
+    var rowSpacing: CGFloat = 8
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        let rows = layout(width: proposal.width ?? .infinity, subviews: subviews)
+        let height = rows.reduce(0) { $0 + $1.height } + rowSpacing * CGFloat(max(rows.count - 1, 0))
+        return CGSize(width: proposal.width ?? rows.map(\.width).max() ?? 0, height: height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        var y = bounds.minY
+        for row in layout(width: bounds.width, subviews: subviews) {
+            var x = bounds.minX
+            for index in row.indices {
+                let size = subviews[index].sizeThatFits(.unspecified)
+                subviews[index].place(
+                    at: CGPoint(x: x, y: y + (row.height - size.height) / 2),
+                    proposal: ProposedViewSize(size)
+                )
+                x += size.width + spacing
+            }
+            y += row.height + rowSpacing
+        }
+    }
+
+    private struct Row {
+        var indices: [Int] = []
+        var width: CGFloat = 0
+        var height: CGFloat = 0
+    }
+
+    private func layout(width: CGFloat, subviews: Subviews) -> [Row] {
+        var rows: [Row] = []
+        var row = Row()
+        for index in subviews.indices {
+            let size = subviews[index].sizeThatFits(.unspecified)
+            let needs = row.indices.isEmpty ? size.width : row.width + spacing + size.width
+            if !row.indices.isEmpty, needs > width {
+                rows.append(row)
+                row = Row()
+                row.indices = [index]
+                row.width = size.width
+                row.height = size.height
+            } else {
+                row.indices.append(index)
+                row.width = needs
+                row.height = max(row.height, size.height)
+            }
+        }
+        if !row.indices.isEmpty { rows.append(row) }
+        return rows
     }
 }

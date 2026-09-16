@@ -405,7 +405,10 @@ final class AppModel {
         case "home", "":
             tab = .home
         default:
-            tab = .picks
+            // A path this build does not know — an older link, or a newer one. Home is the honest
+            // landing for it: it says which pool you are in and what it wants, which is what
+            // somebody following an unfamiliar link needs. The web's catch-all route goes there too.
+            tab = .home
         }
     }
 

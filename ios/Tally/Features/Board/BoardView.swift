@@ -352,7 +352,7 @@ struct BoardRowCard<Detail: View>: View {
         }
         // No .clipped() here: the card's own offset shadow lives outside its bounds, and clipping
         // sliced it off on the highlighted row.
-        .modifier(TallyCard(hard: isMe || crowned, fill: isMe || crowned ? .flagSoft : .surface, border: .ink, radius: TallyRadius.card, dashed: false))
+        .modifier(TallyCard(hard: isMe || crowned, fill: isMe || crowned ? .flagSoft : .surface, border: .cardBorder, radius: TallyRadius.card, dashed: false))
     }
 }
 
