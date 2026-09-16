@@ -154,12 +154,31 @@ export async function send(
 }
 
 /** Reads the APNs settings out of the environment, or nothing if the key has not been set yet. */
-export function configFrom(env: {
+export interface ApnsEnv {
   APNS_KEY?: string;
   APNS_KEY_ID?: string;
   APPLE_TEAM_ID?: string;
   APPLE_BUNDLE_ID?: string;
-}): ApnsConfig | null {
+}
+
+/**
+ * Which of the four things a push needs are missing, in the order somebody sets them up.
+ *
+ * It returns the *names* rather than a boolean because of the way this gets configured: the hard
+ * part is minting the `.p8` and pasting it into a secret, and the easy part — a ten-character Key
+ * ID into `wrangler.jsonc` — is the one that gets forgotten. Reporting "no APNs key configured" to
+ * somebody who has just spent ten minutes putting the key in is how an afternoon disappears.
+ */
+export function missingApnsConfig(env: ApnsEnv): string[] {
+  const missing: string[] = [];
+  if (!env.APNS_KEY) missing.push("APNS_KEY (secret: npx wrangler secret put APNS_KEY)");
+  if (!env.APNS_KEY_ID) missing.push("APNS_KEY_ID (wrangler.jsonc, the key's 10-character id)");
+  if (!env.APPLE_TEAM_ID) missing.push("APPLE_TEAM_ID (wrangler.jsonc)");
+  if (!env.APPLE_BUNDLE_ID) missing.push("APPLE_BUNDLE_ID (wrangler.jsonc)");
+  return missing;
+}
+
+export function configFrom(env: ApnsEnv): ApnsConfig | null {
   const { APNS_KEY, APNS_KEY_ID, APPLE_TEAM_ID, APPLE_BUNDLE_ID } = env;
   if (!APNS_KEY || !APNS_KEY_ID || !APPLE_TEAM_ID || !APPLE_BUNDLE_ID) return null;
   return { key: APNS_KEY, keyId: APNS_KEY_ID, teamId: APPLE_TEAM_ID, bundleId: APPLE_BUNDLE_ID };
