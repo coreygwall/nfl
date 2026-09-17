@@ -3,8 +3,9 @@ import Observation
 import TallyKit
 
 enum GolfTab: Hashable {
-    /// Round is first and is where a card lands: the tee you are standing on, and the four names.
-    case round, tally, scorecard, account
+    /// Home is the app's — the same tab the pool shell puts first — and Round is where a card
+    /// lands: the tee you are standing on, and the four names.
+    case home, round, tally, scorecard, account
 }
 
 /**

@@ -2,22 +2,28 @@ import SwiftUI
 import TallyKit
 
 /**
- A golf card's frame: the same chip as the pool's, and the card's own tabs under it.
+ A golf card's frame: the app's home first, then the card's own tabs.
 
  This is the second shell the root view can draw, and the rule that lets there be two is in
- `docs/navigation.md`: *the chip is global, the tabs are the contest's.* A pool is a season and
- needs Home, Picks, Board; a scramble card is an afternoon and needs the tee you are standing on,
- the tally, and the card. Account is the one tab both have, because it is the person's rather than
- the contest's. Nothing here reaches into the pool's screens, and nothing there reaches in here —
- the chip's menu (`PoolMenu`) is the only shared piece, and it is shared on purpose.
+ `docs/navigation.md`: *the first tab is everywhere you can stand, the rest are the contest's.* A
+ pool is a season and needs its page, Picks, Board; a scramble card is an afternoon and needs the
+ tee you are standing on, the tally, and the card. Home and Account are the two tabs both have —
+ the first because it is the app's, the last because it is the person's. Nothing here reaches into
+ the pool's screens, and nothing there reaches in here; `HubView` and `AccountView` are the shared
+ pieces, and they are shared on purpose.
  */
 struct GolfShellView: View {
     @Environment(GolfModel.self) private var golf
+    @Environment(HubModel.self) private var hub
     let cardId: String
 
     var body: some View {
         @Bindable var golf = golf
         TabView(selection: $golf.tab) {
+            Tab("Home", systemImage: "house.fill", value: GolfTab.home) {
+                GolfScreen(cardId: cardId, hub: true) { HubView() }
+            }
+            .badge(hub.needsYou > 0 ? Text("\(hub.needsYou)") : nil)
             Tab("Round", systemImage: "figure.golf", value: GolfTab.round) {
                 GolfScreen(cardId: cardId) { RoundView(cardId: cardId) }
             }
@@ -37,6 +43,8 @@ struct GolfShellView: View {
 /// One tab's page: the paper, the scrolling content, the chip and the card's menu in the bar.
 struct GolfScreen<Content: View>: View {
     let cardId: String
+    /// The app's home wears the Tally lockup and none of this card's controls.
+    var hub = false
     @ViewBuilder let content: Content
 
     var body: some View {
@@ -53,39 +61,40 @@ struct GolfScreen<Content: View>: View {
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) { CardChip(cardId: cardId) }
-                ToolbarItem(placement: .topBarTrailing) { CardMenu(cardId: cardId) }
+                ToolbarItem(placement: .topBarLeading) {
+                    if hub { TallyLockup() } else { CardChip(cardId: cardId) }
+                }
+                if !hub {
+                    ToolbarItem(placement: .topBarTrailing) { CardMenu(cardId: cardId) }
+                }
             }
             .toolbarTitleDisplayMode(.inline)
         }
     }
 }
 
-/// The card you are in, top-left of every tab, opening the same menu the pool chip opens.
+/// The card you are in, top-left of every one of its tabs. A label, like the pool's chip: the
+/// home tab is where you go to stand somewhere else.
 struct CardChip: View {
     @Environment(GolfModel.self) private var golf
     let cardId: String
 
     var body: some View {
         let name = golf.card(cardId)?.name ?? "Golf"
-        PoolMenu {
-            HStack(spacing: 6) {
-                Image("GolfMark")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 22, height: 22)
-                Text(name)
-                    .font(TallyFont.display(15, weight: .bold))
-                    .foregroundStyle(Color.ink)
-                    .lineLimit(1)
-                    .truncationMode(.tail)
-                Image(systemName: "chevron.up.chevron.down")
-                    .font(.system(size: 9, weight: .black))
-                    .foregroundStyle(Color.ink3)
-            }
-            .frame(maxWidth: 150)
+        HStack(spacing: 6) {
+            Image("GolfMark")
+                .resizable()
+                .scaledToFit()
+                .frame(width: 22, height: 22)
+            Text(name)
+                .font(TallyFont.display(15, weight: .bold))
+                .foregroundStyle(Color.ink)
+                .lineLimit(1)
+                .truncationMode(.tail)
         }
-        .accessibilityLabel("\(name). Switch pool or card")
+        .frame(maxWidth: 170)
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("On \(name)")
     }
 }
 

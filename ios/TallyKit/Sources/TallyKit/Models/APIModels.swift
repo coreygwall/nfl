@@ -191,6 +191,10 @@ public struct ScoredPick: Codable, Hashable, Sendable, Identifiable {
     public let points: Int
     public let outcome: Outcome
     public var id: String { gameId }
+
+    public init(gameId: String, team: String, rank: Int, points: Int, outcome: Outcome) {
+        self.gameId = gameId; self.team = team; self.rank = rank; self.points = points; self.outcome = outcome
+    }
 }
 
 public protocol BoardRow: Identifiable {

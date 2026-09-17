@@ -7,19 +7,22 @@ import WidgetKit
 import UIKit
 
 enum AppTab: Hashable {
-    /// Home is first and is where a launch lands: it is the only screen that can say *which* pool
-    /// and *what needs doing* before you have picked a tab. Rules stopped being one — it is a
-    /// document you read once, not a place you go, so it opens over whatever you were looking at.
-    case home, picks, board, account
+    /// Home is the app's, not the pool's: every pool and card on the phone, and which of them
+    /// wants something. It is first, and it is deliberately *not* where a launch lands — `tab`
+    /// starts on the pool, because a phone that was in a pool last night is still in it this
+    /// morning. Pool is that pool's own page: what week it is, who still owes picks, who took last
+    /// week. Rules is not a tab — it is a document you read once, so it opens over whatever you
+    /// were looking at.
+    case home, pool, picks, board, account
 }
 
 /**
  What the app is standing in: the pool, or one golf card.
 
- The chip in the navigation bar is the only global control, and this is what it switches. A pool
- and a card are different families of contest with different tabs (`docs/navigation.md`), so the
- root view swaps the whole shell on it rather than any tab trying to draw both. `.pool` is not
- "no card" — it is the pool this model already holds, which is why it carries no reference.
+ The home tab is the only global control, and this is what it switches. A pool and a card are
+ different families of contest with different tabs (`docs/navigation.md`), so the root view swaps
+ the whole shell on it rather than any tab trying to draw both. `.pool` is not "no card" — it is
+ the pool this model already holds, which is why it carries no reference.
  */
 enum ContestContext: Hashable {
     case pool
@@ -172,7 +175,7 @@ final class AppModel {
 
     // MARK: Navigation
 
-    var tab: AppTab = .home
+    var tab: AppTab = .pool
     var pickWeek: Int?
     var boardWeek: Int?
     var boardScope: BoardScope = .week
@@ -680,12 +683,13 @@ final class AppModel {
         case "league":
             showLeagueOffice = true
         case "home", "":
-            tab = .home
+            tab = .pool
         default:
-            // A path this build does not know — an older link, or a newer one. Home is the honest
-            // landing for it: it says which pool you are in and what it wants, which is what
-            // somebody following an unfamiliar link needs. The web's catch-all route goes there too.
-            tab = .home
+            // A path this build does not know — an older link, or a newer one. The pool's page is
+            // the honest landing for it: it says which pool you are in and what it wants, which is
+            // what somebody following an unfamiliar link needs. The web's catch-all route goes
+            // there too.
+            tab = .pool
         }
     }
 
