@@ -123,19 +123,33 @@ the group: a Keychain lookup is scoped by access group, so re-homing the existin
 from the app that wrote it and sign every install out on update. If it is missing the widget still
 draws from the snapshot and simply does not refresh.
 
-## Two families of contest, and one chip between them
+## Two families of contest, and one home between them
 
-The app holds a **pool** (a season, Home · Picks · Board) and, behind a Labs switch, a **golf card**
+The app holds a **pool** (a season, Pool · Picks · Board) and, behind a Labs switch, a **golf card**
 (an afternoon, Round · Tally · Scorecard). `docs/navigation.md` is the reasoning; the rule is three
-sentences: **the switcher is global, the tabs are the contest's, Account is always last.** So the
-chip top-left never moves and lists everywhere you can stand, while the tab bar under it belongs to
-the family you are in — no Board on a card, no Round in a pool.
+sentences: **the first tab is everywhere you can stand, the rest are the contest's, Account is
+always last.** Home — the app's, not the pool's — is the first tab of both shells and the only
+switcher: every pool and card on the phone as one card each, the ones that want something first and
+dressed to say so, with the count on the tab. The tab bar after it belongs to the family you are in
+— no Board on a card, no Round in a pool. The chip top-left of a contest's own tabs names where you
+are and opens nothing; it was the switcher once, and a second switcher two taps from the first is
+how apps grow eleven tabs.
 
 `AppModel.context` holds the one fact (pool, or card *X*), `RootView` is the only place that reads
 it to choose a shell, and `PoolShellView` / `GolfShellView` do not import each other. The shared
-surface is exactly three things: the design system, `PoolMenu`, and `AccountView(inPool:)`. **A
+surface is exactly three things: the design system, `HubView`, and `AccountView(inPool:)`. **A
 third family is a new shell plus a case on `ContestContext`** — if it needs an edit to
 `PoolShellView`, the seam has been crossed and the blast radius is no longer zero.
+
+Home draws every pool from the widgets' own projection: `HubModel` asks each pool with its own
+Keychain session and runs the answer through `WidgetRefresh`, so a card on the tab and a widget on
+the home screen cannot disagree about whose picks are in, and the roster is the server's
+`myEntries` rather than the device's cache. `Hub` in TallyKit is the one rule for what a card wants
+(`HubAttention`: needs you › live › waiting › done) and how it says so — "picks due tonight ·
+8:15 PM" is a tested sentence, not a view's guess. **A launch does not land on Home**: `tab`
+starts on the pool, because a phone that was in a pool last night is still in it this morning, and
+Home is one tap left with a badge if anything is owed. None of this is the web's; a pool *is* an
+address there.
 
 Golf is off by default (Account ▸ Settings ▸ Labs). Off means the menu draws exactly as it did and
 the golf shell is unreachable; off is not a reset, so the cards stay on the phone. `TallyKit/Golf/`
@@ -154,6 +168,15 @@ body**; `ScrambleTally.summary` survives only as the fallback for a render that 
 footer's `playtally.app` is the seam for the link that belongs there once there is a recap to point
 at or an App Store listing.
 
+**One badge, and the ball inside it says which contest.** `GolfMark` is `TallyMark` with a ball on
+a tee where the football sits — same yellow ground, same ink, same border — so the golf chip and
+the poster read as Tally without wearing the pool's game; a card that three people just played
+should not be selling football to them. Both are rasterised at 1x/2x/3x from SVG
+(`public/icon.svg`, `public/golf.svg`) by `scripts/build-ios-assets.ts`, which is why they are
+**app-target assets and so invisible to the widget extension** — a lock screen that ever wants a
+mark has to draw one, per the rule above. The tee is what makes it legible at 22pt: a bare ball is
+a circle with specks on it, and the football's silhouette is the thing that survives being small.
+
 The round's Live Activity is the one lock screen in the app that **needs no APNs key**: a scramble
 has no feed, so every change is a tap in this app and `RoundActivityService` updates the activity
 itself with `pushType` left nil. Do not give it a token it would never use. It starts on the first
@@ -166,18 +189,17 @@ forces `.pool` context on anything it accepts, so a round's link is caught in `T
 
 ## Four tabs in a pool, and what is deliberately not one
 
-Home · Picks · Board · Account, on both surfaces. Home is the landing and is about the pool you are
-standing in: what week it is, whose picks are missing, where you stand. (A golf card has its own
-three; see above.)
+Pool · Picks · Board · Account on iOS, after the app's Home; Home · Picks · Board · Account on the
+web, where the pool's page *is* the home because a pool is an address there. The pool's page is
+about the pool you are standing in: what week it is, whose picks are missing, where you stand, who
+took last week. (A golf card has its own three; see above.)
 
-- **Switching pools is not a tab, and on iOS it is not a sheet either.** `AppModel` holds one pool,
-  one session, one service; switching swaps the whole app and keeps the tab you were on. The
-  control is `PoolChip` — the mark and the pool name, top-left of *every* tab, Home included (Home
-  wears the fuller lockup in the same spot) — and it is a native `Menu` with the pools ticked, so it
-  reads as a switch. `PoolsView` is only join / start / the catalogue, behind the menu's last item.
-  Home lists the *other* pools as a strip under its card, each with one line from its own session
-  (`PoolPeek`) saying whether anything over there needs picks; that strip is the one cross-pool
-  fact the chip cannot say.
+- **Switching pools is the Home tab on iOS, and nothing else.** `AppModel` holds one pool, one
+  session, one service; a tap on a card there swaps the whole app — onto the picks if any are
+  owed, as the entry that owes them, otherwise onto the pool's page. The chip top-left of the
+  pool's own tabs (`PoolChip`) is the mark and the pool name, and it is a label rather than a menu.
+  `PoolsView` is only join / start / the catalogue, the way in at the bottom of Home. The pool's
+  page does not list the other pools; Home says everything that strip used to.
 - **The web has no switcher, and stopped pretending to.** A pool *is* an address there: the Worker
   serving a page serves exactly one, so a second pool is a second host, and browser storage is per
   origin — a catalogue of them is not something a tab can hold. `PoolSheet` off the lockup names

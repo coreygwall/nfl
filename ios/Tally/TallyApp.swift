@@ -17,12 +17,16 @@ struct TallyApp: App {
     /// week — see `GolfModel`. It is here rather than inside the app model so the pool's object
     /// never has to know the other family exists.
     @State private var golf: GolfModel
+    /// Every pool on the phone at once, for the home tab. Separate for the same reason: the app
+    /// model is one pool, and this is all of them.
+    @State private var hub: HubModel
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     init() {
         FontRegistrar.registerBundledFonts()
         _model = State(initialValue: AppModel())
         _golf = State(initialValue: GolfModel())
+        _hub = State(initialValue: HubModel())
     }
 
     var body: some Scene {
@@ -30,6 +34,7 @@ struct TallyApp: App {
             RootView()
                 .environment(model)
                 .environment(golf)
+                .environment(hub)
                 .tint(.ink)
                 // The whole app, in one place. Every colour in Theme.swift resolves against the
                 // trait collection, so this one modifier re-lights every screen.

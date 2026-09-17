@@ -123,21 +123,22 @@ Account-owned entries (a parent picking for the family) ride on the account's to
 ## Two kinds of contest, and one way between them
 
 The app holds a **pool** (a season) and, behind a Labs switch, a **golf card** (an afternoon). They
-are different shapes, so they get different tabs: Home · Picks · Board · Account in a pool, Round ·
-Tally · Scorecard · Account in a card. What never changes is the way in — the chip top-left of every
-screen, which lists both and ticks where you are standing.
+are different shapes, so they get different tabs: Pool · Picks · Board in a pool, Round · Tally ·
+Scorecard in a card. What never changes is the first tab and the last — **Home**, every pool and
+card on the phone as one card each with the ones that want you first, and **Account**.
 
-`docs/navigation.md` is the reasoning and the rule (*the switcher is global, the tabs are the
-contest's, Account is always last*). In code it is four pieces: `AppModel.context` holds the one
-fact, `RootView` picks the shell from it, `PoolShellView` and `GolfShellView` are one per family and
-neither imports the other, and `PoolMenu` is the shared switcher. A third family is a new shell plus
-a case on `ContestContext`; if it needs an edit to `PoolShellView`, the seam has been crossed.
+`docs/navigation.md` is the reasoning and the rule (*the first tab is everywhere you can stand, the
+rest are the contest's, Account is always last*). In code it is four pieces: `AppModel.context`
+holds the one fact, `RootView` picks the shell from it, `PoolShellView` and `GolfShellView` are one
+per family and neither imports the other, and `HubView` is the shared switcher. A third family is a
+new shell plus a case on `ContestContext`; if it needs an edit to `PoolShellView`, the seam has been
+crossed.
 
 ### Golf cards (Labs, off by default)
 
-Account ▸ Settings ▸ Labs ▸ *Golf cards*. Off, nothing about the pool changes: the menu draws as it
-always did and the golf shell is unreachable. On, the menu grows a **Golf** section and *New golf
-card*.
+Account ▸ Settings ▸ Labs ▸ *Golf cards*. Off, nothing about the pool changes: Home lists the pools
+alone and the golf shell is unreachable. On, Home lists the cards under the pools and offers *New
+golf card*.
 
 A scramble is four people playing one ball, and what the group argues about afterwards is whose shot
 got picked. So the card is a list of strokes with a name on each, and the score is the count:

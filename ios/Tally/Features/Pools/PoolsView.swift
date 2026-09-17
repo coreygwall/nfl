@@ -6,8 +6,8 @@ import TallyKit
 
  This used to be the switcher as well, which is why it never felt like one: a list to switch with,
  a form to join with and a catalogue to read were three jobs on one sheet, and the one people
- came for was buried under the other two. Switching is the pool chip's menu now — the one in the
- navigation bar of every tab — and this sheet is the last item on it.
+ came for was buried under the other two. Switching is the home tab now, and this sheet is the
+ way in at the bottom of it.
  */
 struct PoolsView: View {
     @Environment(AppModel.self) private var model

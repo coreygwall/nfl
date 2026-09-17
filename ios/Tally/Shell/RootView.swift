@@ -4,15 +4,16 @@ import TallyKit
 /**
  Welcome until this device has a name; after that, the shell of whatever the app is standing in.
 
- Two shells, chosen here and nowhere else: the pool's four tabs, or a golf card's. The chip in the
- navigation bar of either is the one control that moves between them (`docs/navigation.md`), and
- `AppModel.context` is what it moves. The pool shell does not know the other exists — it is drawn
- exactly as it was before there were cards — and the golf shell is only ever drawn behind the Labs
- switch, for a card that is still on the phone. Toasts float over all of it.
+ Two shells, chosen here and nowhere else: the pool's tabs, or a golf card's. The home tab that
+ both put first is the one control that moves between them (`docs/navigation.md`), and
+ `AppModel.context` is what it moves. The pool shell does not know the other exists, and the golf
+ shell is only ever drawn behind the Labs switch, for a card that is still on the phone. Toasts
+ float over all of it.
  */
 struct RootView: View {
     @Environment(AppModel.self) private var model
     @Environment(GolfModel.self) private var golf
+    @Environment(HubModel.self) private var hub
     @Environment(\.scenePhase) private var scenePhase
 
     /// The card the app is standing in, if the switch is on and the card still exists.
@@ -47,6 +48,9 @@ struct RootView: View {
                 Task { await model.refreshBootstrap() }
                 // And whether anything was said while the phone was in a pocket.
                 Task { await model.refreshMessages(quiet: true) }
+                // And what every other pool wants, which is what puts the badge on the home tab
+                // before anyone has opened it.
+                Task { await hub.refresh(model: model, force: true) }
             }
             // On the way out is the right moment to leave the home screen current: the app has
             // just been used, so everything is fresh, and the widgets are what the next glance
@@ -67,7 +71,7 @@ struct RootView: View {
             NotificationSettingsSheet()
         }
         // The card sheets live here rather than in the golf shell because "New golf card" is on
-        // the chip's menu, which is in the pool's navigation bar too.
+        // the home tab, which both shells draw.
         .sheet(isPresented: $golf.showNewCard) {
             CardSetupSheet(editing: nil)
         }

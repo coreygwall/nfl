@@ -13,18 +13,26 @@ the third one has a rule to follow.
 
 ## The rule
 
-> **The switcher is global. The tabs are the contest's. Account is always the last one.**
+> **The first tab is everywhere you can stand. The rest are the contest's. Account is always the
+> last one.**
 
 Three sentences, and each is load-bearing.
 
-**The switcher is global.** One control, top-left of every screen of every contest, naming where you
-are standing and listing everywhere else you could stand. It is `PoolMenu`, it is already the pool
-chip, and golf cards are a second section inside it. You never have to leave a contest to change
-contests, and you never have to learn a second way to do it.
+**The first tab is everywhere you can stand.** Home, in both shells, at the same index with the
+same icon: every pool and every card on the phone as one card each, sorted by what each one wants
+from you and dressed to say so, with the count on the tab. It is the switcher. It used to be a menu
+behind the chip in the navigation bar, and a menu can list names and nothing else — a phone with
+three pools had to open each to learn that Thursday's picks were still owed in one. A card can say
+that. The chip top-left of a contest's own tabs still names where you are; it just no longer opens
+anything, because a second switcher two taps from the first is how apps grow eleven tabs.
 
-**The tabs are the contest's.** A pool draws Home · Picks · Board. A card draws Round · Tally ·
-Scorecard. The tab bar is a property of the family you are in, not of the app, so neither family
-carries a tab that is dead weight for it — no Board on a card, no Round in a pool.
+Home is *not* where a launch lands. The pool you were in last night is the pool you are in this
+morning, on the tab you left. Home is one tap to the left, and if nothing is owed you never need
+to visit it.
+
+**The tabs are the contest's.** A pool draws Pool · Picks · Board. A card draws Round · Tally ·
+Scorecard. The tab bar after Home is a property of the family you are in, not of the app, so
+neither family carries a tab that is dead weight for it — no Board on a card, no Round in a pool.
 
 **Account is always the last tab.** It is the one thing that is the *person's* rather than the
 contest's: the same name, the same passkey, the same appearance and notification settings, whichever
@@ -40,7 +48,7 @@ Four other shapes were on the table. Each is wrong in an instructive way.
 | **A fifth tab, "Golf"** | It makes golf a room inside the pool. The pool's chip would still be in the bar while you were on a green, and a card would live one level deeper than a pool forever. The families are siblings, not parent and child. |
 | **A tray or sheet over the pool** | What the user vetoed, and rightly: "I don't want it to be just like a tray that opens." A sheet cannot hold three tabs and four hours. It also gives the pool a permanence golf does not get, which is a statement about the product we do not mean. |
 | **One tab set that changes labels** | Home/Picks/Board renamed to Round/Tally/Scorecard is the same four boxes wearing different words. It breaks the moment a family needs two tabs or five, and it makes muscle memory lie: the third tab means a different thing depending on a state you cannot see from the tab bar. |
-| **A global "everything" home above both** | The honest version of this is a real product — one screen that says what needs doing across every pool and every card. It is also a screen nobody needs while there is one pool and one card. Home already lists the *other* pools as a strip (`PoolPeek`), which is the cross-contest fact worth having today. Revisit when somebody genuinely holds four contests at once. |
+| **A global "everything" home above both** | This one was built, and it is the first tab rather than a level above the shells: a root that the contests are pushed onto puts a tab bar inside a pushed view, which iOS does not want to draw. As a first tab it costs nothing while there is one pool — the card is still useful, it says whose picks are in — and it is the only shape that scales past three. The pool's own page keeps its name-sized job (Pool); the two may yet merge once the card carries everything the page does. |
 
 ## What other apps do, and which half applies
 
@@ -66,16 +74,17 @@ it is to keep the **way in** identical and let the inside differ.
 |---|---|
 | `AppModel.context` (`ContestContext`) | The one fact: standing in the pool, or in card *X*. Persisted, so the phone reopens on the ninth tee. |
 | `RootView` | Picks the shell from that one fact. The only place the choice is made. |
-| `PoolShellView` / `GolfShellView` | One per family. Neither knows the other exists. |
-| `PoolMenu` | The shared switcher, wrapped by `PoolChip` in a pool and `CardChip` in a card. |
-| `AppModel` vs `GolfModel` | The pool's object owns a session, a bootstrap and a week. A card has none of those, so it gets its own object rather than three optional properties on the pool's. |
-| `AccountView(inPool:)` | The one screen both families draw. |
+| `PoolShellView` / `GolfShellView` | One per family. Neither knows the other exists. Both put `HubView` first. |
+| `HubView` / `HubModel` | The switcher: every pool and card as a card. The model asks each pool with its own Keychain session and keeps the widgets' snapshot of it; `Hub` in TallyKit is the rule for what a card wants and how it says so. |
+| `PoolChip` / `CardChip` | The label top-left of a contest's own tabs. Where you are, not where else you could be. |
+| `AppModel` vs `GolfModel` vs `HubModel` | The pool's object owns a session, a bootstrap and a week. A card has none of those, and the home tab is about every pool at once, so each gets its own object rather than optional properties on the pool's. |
+| `AccountView(inPool:)` | The one screen both families draw besides Home. |
 
 Two rules fall out of this and should be enforced by review, because they are what keeps the blast
 radius at zero:
 
 1. **Nothing in `Features/Golf` imports the pool's screens, and nothing in the pool's screens imports
-   golf.** The shared surface is the design system, `PoolMenu`, and `AccountView`. That is why a
+   golf.** The shared surface is the design system, `HubView`, and `AccountView`. That is why a
    broken card cannot break a Sunday.
 2. **A new family is a new shell plus a case on `ContestContext`.** If adding one requires editing
    `PoolShellView`, the seam has been crossed.
@@ -86,8 +95,12 @@ radius at zero:
   already shaped for the fix — every card has an id, every hole carries `updatedAt`, and the
   catalogue is plain JSON with ISO dates — so shared cards are a Worker endpoint and a merge rule
   (last write wins per *hole*), not a rewrite.
-- **There is no cross-contest home.** See the table above. The trigger to build one is somebody
-  holding more than about three live contests, not the second family shipping.
+- **Home and the pool's page are two screens, for now.** Once the pool's card on Home carries
+  picks-in, who owes and where you stand, the Pool tab has about two things left — the last
+  finished week and the season race — that belong on Board anyway. The additive version shipped
+  first on purpose: a new navigation idea and the dismantling of an old page in one change is twice
+  the blast radius. If the Pool tab turns out to be a page nobody opens, it goes and Home takes its
+  place at four tabs.
 - **Golf is behind a Labs switch, off by default** (Account ▸ Settings ▸ Labs). Nothing about the
   pool changes until it is switched on: the menu draws exactly as it did, and the golf shell is
   unreachable. Turning it off is not a reset — the cards stay on the phone.

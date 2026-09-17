@@ -10,7 +10,7 @@ import TallyKit
  this feature will ever do — three other people see a Tally card land in the group chat and ask
  what it is.
 
- Four decisions are baked in here rather than left to the call site:
+ Five decisions are baked in here rather than left to the call site:
 
  - **4:5 portrait**, which is the shape a thread and a story both give the most room to.
  - **Always the light palette.** `ShareCardRenderer` pins the colour scheme, so the card looks the
@@ -20,6 +20,10 @@ import TallyKit
    that reflows is a layout that can surprise you at render time. Scale happens at render.
  - **No live data.** Everything is read once from the card handed in, so the same input always
    draws the same poster.
+ - **The golf badge, not the football one.** `GolfMark` is the same yellow badge in the same ink as
+   `TallyMark` with a ball on a tee inside it instead of a football: the badge is what says Tally,
+   and the ball says which game this was. A poster wearing the football would be selling the wrong
+   contest to the three people who just played this one.
 
  The footer carries the domain and nothing else. When there is something to link *to* — a recap for
  the people who played it, an App Store page for everyone else — that is where it goes.
@@ -63,7 +67,7 @@ struct ShareCardView: View {
 
     private var header: some View {
         HStack(spacing: 8) {
-            Image("TallyMark")
+            Image("GolfMark")
                 .resizable()
                 .scaledToFit()
                 .frame(width: 26, height: 26)
