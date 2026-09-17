@@ -124,6 +124,13 @@ public struct PoolService: Sendable {
         try await client.post("/commissioner/players/\(playerId)/reset-access")
     }
 
+    /// Attaches a player who already exists onto the calling commissioner's own account — the
+    /// other half of `POST /entries`, for a name that joined the pool on its own rather than
+    /// being added from inside an account.
+    public func attachEntry(playerId: String) async throws -> AttachEntryResponse {
+        try await client.post("/commissioner/players/\(playerId)/attach")
+    }
+
     private struct CommissionerBody: Encodable { let playerId: String }
 
     public func addCommissioner(playerId: String) async throws -> CommissionersResponse {

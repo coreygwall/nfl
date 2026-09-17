@@ -88,3 +88,34 @@ describe("account-owned entries", () => {
     expect((await late.json() as any).picks).toHaveLength(5);
   });
 });
+
+describe("attaching a player who already joined on their own", () => {
+  it("brings them into the calling commissioner's account, never a third party's, and only once", async () => {
+    const independent = (await api("/players", { body: { name: name() } })).body.player;
+    // The PIN alone opens the office; attaching still needs an account to attach onto.
+    const anonymous = await api(`/commissioner/players/${independent.id}/attach`, { body: {}, pin: "1234" });
+    expect(anonymous.status).toBe(401);
+
+    const commissioner = (await api("/players", { body: { name: name() } })).body;
+    const attach = await api(`/commissioner/players/${independent.id}/attach`, { body: {}, token: commissioner.token, pin: "1234" });
+    expect(attach.status).toBe(200);
+    expect(attach.body.ownerId).toBe(commissioner.player.id);
+
+    const boot = (await api("/bootstrap", { token: commissioner.token })).body;
+    expect(boot.myEntries.map((p: any) => p.id).sort()).toEqual([commissioner.player.id, independent.id].sort());
+    const roster = (await api("/commissioner/players", { pin: "1234" })).body.players;
+    expect(roster.find((p: any) => p.id === independent.id).owner).toEqual({ id: commissioner.player.id, name: commissioner.player.name });
+
+    // Nobody attaches their own row, and nobody attaches one that already has an owner — not
+    // even the account that already holds it.
+    const self = await api(`/commissioner/players/${commissioner.player.id}/attach`, { body: {}, token: commissioner.token, pin: "1234" });
+    expect(self.status).toBe(400);
+    const again = await api(`/commissioner/players/${independent.id}/attach`, { body: {}, token: commissioner.token, pin: "1234" });
+    expect(again.status).toBe(409);
+    expect(again.body.error.code).toBe("MANAGED_ENTRY");
+
+    const other = (await api("/players", { body: { name: name() } })).body;
+    const stolen = await api(`/commissioner/players/${independent.id}/attach`, { body: {}, token: other.token, pin: "1234" });
+    expect(stolen.status).toBe(409);
+  });
+});

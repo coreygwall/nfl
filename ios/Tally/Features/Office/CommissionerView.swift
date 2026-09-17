@@ -289,6 +289,7 @@ private struct RosterView: View {
     @State private var newName = ""
     @State private var confirmDelete: CommissionerPlayer?
     @State private var confirmReset: CommissionerPlayer?
+    @State private var confirmAttach: CommissionerPlayer?
 
     enum Filter: Hashable { case all, ready, waiting }
 
@@ -304,6 +305,10 @@ private struct RosterView: View {
                     .sans(12).foregroundStyle(Color.ink2)
                 ForEach(rows) { p in
                     RosterRow(player: p,
+                              // Attaching only ever targets your own account, and never your own
+                              // row — the server rejects both, but there is no reason to offer
+                              // either from here.
+                              onAttach: (p.owner == nil && p.id != model.boot.value?.account?.id) ? { confirmAttach = p } : nil,
                               onReady: { Task { await setReady(p, !p.ready) } },
                               onRename: { renaming = p; newName = p.name },
                               onReset: { confirmReset = p },
@@ -332,6 +337,12 @@ private struct RosterView: View {
         } message: {
             Text("They will be signed out everywhere and will need the new code to get back in. It is copied for you to send them.")
         }
+        .confirmationDialog("Add \(confirmAttach?.name ?? "") to your account?", isPresented: Binding(get: { confirmAttach != nil }, set: { if !$0 { confirmAttach = nil } }), titleVisibility: .visible) {
+            Button("Add to my account") { if let p = confirmAttach { Task { await attach(p) } } }
+            Button("Cancel", role: .cancel) { confirmAttach = nil }
+        } message: {
+            Text("Their picks move under your account and they can no longer sign in as themselves on a new device — only from inside yours. This is meant for a name that is really yours to run, like a kid's.")
+        }
     }
 
     private func load() async {
@@ -342,6 +353,16 @@ private struct RosterView: View {
     private func setReady(_ p: CommissionerPlayer, _ ready: Bool) async {
         do { _ = try await model.service.setReady(playerId: p.id, ready: ready); await load() }
         catch { model.toast(error.asAPIError.message, kind: .error) }
+    }
+
+    private func attach(_ p: CommissionerPlayer) async {
+        confirmAttach = nil
+        do {
+            _ = try await model.service.attachEntry(playerId: p.id)
+            model.toast("\(p.name) is now one of your entries.", kind: .success)
+            await load()
+            await model.refreshBootstrap()
+        } catch { model.toast(error.asAPIError.message, kind: .error) }
     }
 
     private func rename(_ p: CommissionerPlayer, _ name: String) async {
@@ -383,6 +404,10 @@ private struct RosterView: View {
 
 private struct RosterRow: View {
     let player: CommissionerPlayer
+    /// Non-nil only for a player with no owner who is not the calling account itself — see
+    /// `RosterView`. Its presence, not a label on the row, is what says this one can be attached:
+    /// an unowned name is the ordinary case for most of the roster, not a fact worth flagging.
+    let onAttach: (() -> Void)?
     let onReady: () -> Void
     let onRename: () -> Void
     let onReset: () -> Void
@@ -402,10 +427,18 @@ private struct RosterRow: View {
                 Text(player.name).font(TallyFont.display(16))
                 Text("\(Format.plural(player.picksCount, "pick")) · \(Format.plural(player.weeksPlayed, "week")) · \(Format.plural(player.devices, "device")) · seen \(Format.relative(player.lastSeenAt))")
                     .sans(11).foregroundStyle(Color.ink2).lineLimit(2)
-                if let code = player.code { Text("Code \(Codes.format(code))").sans(11, weight: .semibold).foregroundStyle(Color.ink3) }
+                if let owner = player.owner {
+                    Text("Managed by \(owner.name)").sans(11, weight: .semibold).foregroundStyle(Color.ink3)
+                } else if let code = player.code {
+                    Text("Code \(Codes.format(code))").sans(11, weight: .semibold).foregroundStyle(Color.ink3)
+                }
             }
             Spacer()
             Menu {
+                if let onAttach {
+                    Button("Add to my account", systemImage: "person.badge.plus", action: onAttach)
+                    Divider()
+                }
                 Button("Copy sign-in link", systemImage: "link", action: onCopyLink)
                 Button("Rename", systemImage: "pencil", action: onRename)
                 Button("Reset access (new code)", systemImage: "arrow.counterclockwise", action: onReset)

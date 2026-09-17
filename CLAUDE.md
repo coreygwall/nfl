@@ -159,6 +159,11 @@ has no feed, so every change is a tap in this app and `RoundActivityService` upd
 itself with `pushType` left nil. Do not give it a token it would never use. It starts on the first
 stroke rather than when the card is made, because a card set up the night before is not a round.
 
+It also carries its own `widgetURL` (`RoundActivityAttributes.deepLink`/`cardId(in:)`), which
+`AppModel.open(_:)` cannot handle: that function is built entirely around `PoolRef.parse` and
+forces `.pool` context on anything it accepts, so a round's link is caught in `TallyApp`'s
+`onOpenURL` — the one place that holds both models — before it ever reaches `open(_:)`.
+
 ## Four tabs in a pool, and what is deliberately not one
 
 Home · Picks · Board · Account, on both surfaces. Home is the landing and is about the pool you are
@@ -227,6 +232,18 @@ Because the list can name an entry this device has never cached, **`switchTo` ad
 name that is not in the store saves it there first, with the *account's* token, since a managed
 entry has none of its own. Without that the tap would move the highlight and change nothing else.
 `SessionStoreTests.swift` pins both halves.
+
+**None of that helps a player who was never linked in the database.** `entries` and `myEntries`
+both read `entry_owners`, and that table only ever gained a row from `POST /entries` — creating a
+managed entry and owning it happen in the same transaction, and there was no other way in. A name
+that joined the pool on its own, the way most of the roster does (`POST /players` then
+`/players/:id/claim`), has no owner and never will unless someone gives it one, however correct the
+client gets about reading `myEntries`. `POST /commissioner/players/:id/attach` is the other half:
+it takes a player who already exists — already picking, already with a history — and attaches them
+to the *calling* commissioner's own account, never a third party's, since reassigning somebody's
+picks under a login they never chose is not this office's call. Both surfaces confirm before
+calling it, the same as reset-access and remove, because it is at least as consequential as either:
+unlike those two, it also switches off the player's own `/players/:id/claim` path for good.
 
 ## One Sunday, one set of words
 

@@ -495,3 +495,27 @@ final class HighlightTests: XCTestCase {
         XCTAssertNil(h.holed)
     }
 }
+
+/// The lock screen's tap target, and that tapping it lands back on the round it came from.
+final class RoundDeepLinkTests: XCTestCase {
+    func testTheLinkCarriesTheCardIdAndNothingElse() {
+        let url = RoundActivityAttributes.deepLink(cardId: "abc-123")
+        XCTAssertEqual(url?.absoluteString, "https://playtally.app/golf/abc-123")
+        XCTAssertEqual(RoundActivityAttributes.cardId(in: url!), "abc-123")
+    }
+
+    func testAPoolLinkIsNotMistakenForACardLink() {
+        let pool = URL(string: "https://playtally.app/p/high-five/board/week/3")!
+        XCTAssertNil(RoundActivityAttributes.cardId(in: pool))
+    }
+
+    func testAnUnrelatedHostIsNeverTrusted() {
+        let spoofed = URL(string: "https://not-playtally.app/golf/abc-123")!
+        XCTAssertNil(RoundActivityAttributes.cardId(in: spoofed))
+    }
+
+    func testTheBareDomainIsNotACardLink() {
+        let bare = URL(string: "https://playtally.app/golf")!
+        XCTAssertNil(RoundActivityAttributes.cardId(in: bare))
+    }
+}

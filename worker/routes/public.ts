@@ -59,7 +59,7 @@ export function parseWeek(raw: string | undefined): number {
 
 const MAX_PLAYERS = 200;
 /** One account picking for its household, not a way to fill the roster from one phone. */
-const MAX_ENTRIES = 12;
+export const MAX_ENTRIES = 12;
 /**
  * The pool's link gets texted around and posted, so the signup form is open to anyone holding it.
  * The number sits between the two cases that matter: a room full of friends joining over one wifi

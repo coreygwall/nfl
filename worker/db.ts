@@ -361,6 +361,28 @@ export async function ownerOfEntry(db: D1Database, playerId: string): Promise<Pl
   return row ? toPlayer(row) : null;
 }
 
+/** The reverse of `ownerOfEntry`, for every managed player at once — the roster needs to know
+ *  which names are already spoken for without a query per row. */
+export async function ownersByEntry(db: D1Database): Promise<Map<string, { id: string; name: string }>> {
+  const { results } = await db
+    .prepare("SELECT e.player_id, o.id AS owner_id, o.name AS owner_name FROM entry_owners e JOIN players o ON o.id = e.owner_id")
+    .all<{ player_id: string; owner_id: string; owner_name: string }>();
+  const byEntry = new Map<string, { id: string; name: string }>();
+  for (const r of results) byEntry.set(r.player_id, { id: r.owner_id, name: r.owner_name });
+  return byEntry;
+}
+
+/**
+ * The other half of `POST /entries`. That route creates the player and the ownership row
+ * together, which is the only way a player has ever gained an owner — until now. This attaches
+ * one that already exists: joined the pool under its own name, already picking, already with a
+ * history, and simply never linked to anyone's account because the account model did not create
+ * it. The caller has already checked it is unowned and under the limit; this just writes the row.
+ */
+export async function attachEntry(db: D1Database, playerId: string, ownerId: string): Promise<void> {
+  await db.prepare("INSERT INTO entry_owners (player_id, owner_id) VALUES (?, ?)").bind(playerId, ownerId).run();
+}
+
 export interface PlayerStats {
   playerId: string;
   picksCount: number;

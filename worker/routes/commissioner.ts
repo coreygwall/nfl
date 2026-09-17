@@ -4,6 +4,7 @@ import { ApiError, badRequest, notFound } from "../errors.ts";
 import { nameKey, validateName } from "../../shared/names.ts";
 import { validatePicks } from "../../shared/picks.ts";
 import type {
+  AttachEntryResponse,
   CommissionerOverview,
   CommissionerPlayersResponse,
   CommissionerResetAccessResponse,
@@ -11,6 +12,7 @@ import type {
 } from "../../shared/api.ts";
 import { generateCode } from "../../shared/codes.ts";
 import {
+  attachEntry,
   commissionerWrittenPickKeys,
   deletePlayer,
   deviceCounts,
@@ -25,6 +27,7 @@ import {
   listWeekGames,
   listWeekPicks,
   ownerOfEntry,
+  ownersByEntry,
   pickHistory,
   playerStats,
   publicPlayer,
@@ -38,7 +41,7 @@ import {
 } from "../db.ts";
 import { SEASON } from "../ready.ts";
 import { currentPool, requireCommissioner } from "../roles.ts";
-import { parseWeek, toGameDTO } from "./public.ts";
+import { MAX_ENTRIES, parseWeek, toGameDTO } from "./public.ts";
 
 /**
  * The commissioner's office: this pool's roster, its name, its invite, its stragglers. What is
@@ -80,10 +83,11 @@ commissionerRoutes.patch("/pool", async (c) => {
 });
 
 commissionerRoutes.get("/players", async (c) => {
-  const [players, stats, devices] = await Promise.all([
+  const [players, stats, devices, owners] = await Promise.all([
     listPlayers(c.env.DB),
     playerStats(c.env.DB),
     deviceCounts(c.env.DB),
+    ownersByEntry(c.env.DB),
   ]);
   const body: CommissionerPlayersResponse = {
     players: players.map((p) => ({
@@ -96,9 +100,45 @@ commissionerRoutes.get("/players", async (c) => {
       devices: devices.get(p.id) ?? 0,
       code: p.claimCode,
       ready: p.ready,
+      owner: owners.get(p.id) ?? null,
     })),
   };
   return c.json(body);
+});
+
+/**
+ * The other way a player gains an owner. "Add an entry" creates the player and the ownership row
+ * in the same breath, which used to be the only path there was — fine for a name added from
+ * inside an account, useless for one that already joined on its own. A pool fills up mostly by
+ * people typing their own name into the link, and nothing about that ever asked whether the name
+ * belonged to somebody who was about to sign up themselves or to somebody's kid borrowing their
+ * phone. This is how that gets corrected after the fact: onto the calling commissioner's own
+ * account, never a third party's, because moving somebody's picks under a login they never chose
+ * is not a call this office gets to make on their behalf.
+ */
+commissionerRoutes.post("/players/:id/attach", async (c) => {
+  const account = c.get("account");
+  if (!account) throw new ApiError(401, "NO_PLAYER", "Sign in to attach an entry to your account.");
+  const player = await getPlayer(c.env.DB, c.req.param("id"));
+  if (!player) throw notFound("NO_PLAYER", "No such player");
+  if (player.id === account.id) throw badRequest("SELF", "That's already your own entry.");
+  const owner = await ownerOfEntry(c.env.DB, player.id);
+  if (owner) {
+    throw new ApiError(
+      409,
+      "MANAGED_ENTRY",
+      owner.id === account.id ? `${player.name} is already one of your entries.` : `${player.name} is already managed through ${owner.name}'s account.`,
+    );
+  }
+  const owned = await c.env.DB.prepare("SELECT count(*) AS n FROM entry_owners WHERE owner_id = ?")
+    .bind(account.id)
+    .first<{ n: number }>();
+  if ((owned?.n ?? 0) >= MAX_ENTRIES) {
+    throw new ApiError(403, "TOO_MANY_ENTRIES", `One account can manage ${MAX_ENTRIES} entries. Ask the commissioner if you need more.`);
+  }
+  await attachEntry(c.env.DB, player.id, account.id);
+  const res: AttachEntryResponse = { player: publicPlayer(player), ownerId: account.id };
+  return c.json(res);
 });
 
 /** The commissioner's checkmark against a name. Nothing a player can see. */

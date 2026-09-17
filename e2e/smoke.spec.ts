@@ -224,14 +224,18 @@ test.describe.serial("pool flow", () => {
     await expect(page.getByRole("menuitem", { name: "Remove from pool" })).toBeVisible();
 
     // A `menu` role is a promise about the keyboard: opening hands focus to the first item, and
-    // the arrows walk the list rather than scrolling the page behind it.
+    // the arrows walk the list rather than scrolling the page behind it. Corey is nobody's entry
+    // and isn't the commissioner here (Alex is), so "Add to my account" leads — the one row this
+    // suite's Corey happens to share the shape of every ordinary independent player.
+    await expect(page.getByRole("menuitem", { name: "Add to my account" })).toBeFocused();
+    await page.keyboard.press("ArrowDown");
     await expect(page.getByRole("menuitem", { name: "Rename" })).toBeFocused();
     await page.keyboard.press("ArrowDown");
     await expect(page.getByRole("menuitem", { name: "Reset access" })).toBeFocused();
     await page.keyboard.press("End");
     await expect(page.getByRole("menuitem", { name: "Remove from pool" })).toBeFocused();
     await page.keyboard.press("ArrowDown");
-    await expect(page.getByRole("menuitem", { name: "Rename" })).toBeFocused();
+    await expect(page.getByRole("menuitem", { name: "Add to my account" })).toBeFocused();
 
     // Escape closes it and puts focus back where it was, rather than at the top of the page.
     await page.keyboard.press("Escape");

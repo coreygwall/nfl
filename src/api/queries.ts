@@ -1,5 +1,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
+  AttachEntryResponse,
   ClaimResponse,
   ClaimRolesResponse,
   CommissionerOverview,
@@ -184,6 +185,19 @@ export function useResetAccess() {
   return useMutation({
     mutationFn: (id: string) => api<CommissionerResetAccessResponse>(`/commissioner/players/${id}/reset-access`, { method: "POST", body: {} }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["commissioner"] }),
+  });
+}
+
+/** The other half of `POST /entries` — attaches a player who already exists onto the calling
+ *  commissioner's own account, for a name that joined the pool on its own. */
+export function useAttachEntry() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => api<AttachEntryResponse>(`/commissioner/players/${id}/attach`, { method: "POST", body: {} }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["commissioner"] });
+      void qc.invalidateQueries({ queryKey: ["bootstrap"] });
+    },
   });
 }
 
