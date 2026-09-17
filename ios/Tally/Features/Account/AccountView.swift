@@ -23,6 +23,7 @@ struct AccountView: View {
     @Environment(\.openURL) private var openURL
     @State private var showCode = false
     @State private var adding = false
+    @State private var attaching = false
     /// Drawn from the pool's shell, or from a golf card's. The account is the same person either
     /// way; the entries and the offices are the pool's, so from a card they are not on the page.
     let inPool: Bool
@@ -104,10 +105,19 @@ struct AccountView: View {
                     model.setPlayer(identity)
                     model.tab = .picks
                 }, onCancel: { adding = false })
+            } else if attaching {
+                AttachEntryForm(onDone: { identity in
+                    attaching = false
+                    model.setPlayer(identity)
+                }, onCancel: { attaching = false })
             } else {
-                Button("Add an entry") { adding = true }
-                    .buttonStyle(.tally(.plain, size: .small))
-                Text("For your kids, a partner, a friend who won't install anything. Each gets its own picks and its own row on the board; none of them needs a sign-in of its own.")
+                HStack(spacing: 14) {
+                    Button("Add an entry") { adding = true }
+                        .buttonStyle(.tally(.plain, size: .small))
+                    Button("Attach an existing one") { attaching = true }
+                        .buttonStyle(.tally(.plain, size: .small))
+                }
+                Text("Add: for your kids, a partner, a friend who won't install anything. Attach: for a name that already joined the pool on its own — type it and its code, and it becomes one of your entries. Either way it gets its own picks and its own row on the board.")
                     .sans(12).foregroundStyle(Color.ink2)
             }
         }
@@ -360,6 +370,73 @@ struct AddEntryForm: View {
         do {
             let r = try await model.service.addEntry(name: name)
             model.toast("\(r.player.name)'s entry is ready. Let's make their picks!", kind: .success)
+            onDone(Identity(player: r.player, token: player.token, accountId: player.accountId ?? player.id, managed: true))
+        } catch {
+            self.error = error.asAPIError.message
+            busy = false
+        }
+    }
+}
+
+/**
+ The other way an entry joins an account: it already exists.
+
+ "Add an entry" only ever covers a name created from inside the account. Most of a pool joins the
+ other way — typing a name straight into the shared link — and a name that got there first never
+ had an owner to give it one, on this account or any other. This is how that gets corrected
+ without a commissioner in the loop: the same proof `/players/:id/claim` already accepts for a
+ fresh device, since if that code is enough to sign in as somebody, it is enough to say they are
+ yours to manage.
+ */
+struct AttachEntryForm: View {
+    @Environment(AppModel.self) private var model
+    let onDone: (Identity) -> Void
+    let onCancel: () -> Void
+    @State private var name = ""
+    @State private var code = ""
+    @State private var busy = false
+    @State private var error: String?
+    @FocusState private var nameFocused: Bool
+
+    private var ready: Bool {
+        !name.trimmingCharacters(in: .whitespaces).isEmpty && Codes.normalize(code).count == Codes.length
+    }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            DashedDivider()
+            Text("Attach an existing entry").display(15)
+            Text("The name they already play under, and the code that came with it — the same one that signs a second phone in as them.")
+                .sans(14).foregroundStyle(Color.ink2)
+            TextField("Their name", text: $name)
+                .tallyField()
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .focused($nameFocused)
+                .disabled(busy)
+            TextField("Their code", text: $code)
+                .tallyField(centered: true, font: TallyFont.display(20))
+                .textInputAutocapitalization(.characters)
+                .autocorrectionDisabled()
+                .disabled(busy)
+            if let error { Text(error).sans(14, weight: .semibold).foregroundStyle(Color.danger) }
+            HStack(spacing: 10) {
+                Button(busy ? "Attaching…" : "Attach") { Task { await submit() } }
+                    .buttonStyle(.tally(.primary, size: .small))
+                    .disabled(busy || !ready)
+                Button("Cancel", action: onCancel).buttonStyle(.tally(.plain, size: .small)).disabled(busy)
+            }
+        }
+        .onAppear { nameFocused = true }
+    }
+
+    private func submit() async {
+        guard let player = model.player else { return }
+        busy = true
+        error = nil
+        do {
+            let r = try await model.service.attachEntry(name: name, code: Codes.normalize(code))
+            model.toast("\(r.player.name) is now one of your entries.", kind: .success)
             onDone(Identity(player: r.player, token: player.token, accountId: player.accountId ?? player.id, managed: true))
         } catch {
             self.error = error.asAPIError.message

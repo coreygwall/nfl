@@ -1,15 +1,20 @@
-import { SELF } from "cloudflare:test";
+import { env, SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
+import { MAX_CLAIM_ATTEMPTS } from "../../worker/auth.ts";
 
 const BEFORE = "2026-09-09T12:00:00.000Z";
 let seq = 0;
 const name = () => `Family ${Date.now().toString(36)}${seq++}`;
-async function api(path: string, options: { token?: string; entry?: string; body?: unknown; method?: string; cookie?: string; pin?: string } = {}) {
+async function api(path: string, options: { token?: string; entry?: string; body?: unknown; method?: string; cookie?: string; pin?: string; ip?: string } = {}) {
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (options.token) headers["x-player-token"] = options.token;
   if (options.entry) headers["x-entry-id"] = options.entry;
   if (options.cookie) headers.cookie = options.cookie;
   if (options.pin) headers["x-admin-pin"] = options.pin;
+  // Signups are counted per caller, and this file's older tests all share the default address —
+  // a new describe block that joins several people of its own needs its own, or it eats into a
+  // budget the rest of the suite is quietly relying on staying low.
+  if (options.ip) headers["cf-connecting-ip"] = options.ip;
   const response = await SELF.fetch(`http://pool.test/api${path}?now=${BEFORE}`, {
     headers, method: options.method ?? (options.body !== undefined ? "POST" : "GET"),
     body: options.body === undefined ? undefined : JSON.stringify(options.body),
@@ -91,12 +96,12 @@ describe("account-owned entries", () => {
 
 describe("attaching a player who already joined on their own", () => {
   it("brings them into the calling commissioner's account, never a third party's, and only once", async () => {
-    const independent = (await api("/players", { body: { name: name() } })).body.player;
+    const independent = (await api("/players", { body: { name: name() }, ip: "10.0.9.1" })).body.player;
     // The PIN alone opens the office; attaching still needs an account to attach onto.
     const anonymous = await api(`/commissioner/players/${independent.id}/attach`, { body: {}, pin: "1234" });
     expect(anonymous.status).toBe(401);
 
-    const commissioner = (await api("/players", { body: { name: name() } })).body;
+    const commissioner = (await api("/players", { body: { name: name() }, ip: "10.0.9.1" })).body;
     const attach = await api(`/commissioner/players/${independent.id}/attach`, { body: {}, token: commissioner.token, pin: "1234" });
     expect(attach.status).toBe(200);
     expect(attach.body.ownerId).toBe(commissioner.player.id);
@@ -114,8 +119,67 @@ describe("attaching a player who already joined on their own", () => {
     expect(again.status).toBe(409);
     expect(again.body.error.code).toBe("MANAGED_ENTRY");
 
-    const other = (await api("/players", { body: { name: name() } })).body;
+    const other = (await api("/players", { body: { name: name() }, ip: "10.0.9.1" })).body;
     const stolen = await api(`/commissioner/players/${independent.id}/attach`, { body: {}, token: other.token, pin: "1234" });
     expect(stolen.status).toBe(409);
+  });
+});
+
+describe("attaching that same kind of player without a commissioner", () => {
+  it("takes any signed-in account's word for it, on the strength of the same code a fresh device would need", async () => {
+    const joined = (await api("/players", { body: { name: name() }, ip: "10.0.9.2" })).body;
+    const parent = (await api("/players", { body: { name: name() }, ip: "10.0.9.2" })).body;
+
+    // Not signed in: there is nobody to attach onto.
+    expect((await api("/entries/attach", { body: { name: joined.player.name, code: joined.code } })).status).toBe(401);
+    // The right name, the wrong code.
+    const wrong = await api("/entries/attach", { token: parent.token, body: { name: joined.player.name, code: "AAAA-2222" } });
+    expect(wrong.status).toBe(401);
+    expect(wrong.body.error.code).toBe("BAD_CODE");
+
+    const attach = await api("/entries/attach", { token: parent.token, body: { name: joined.player.name, code: joined.code } });
+    expect(attach.status).toBe(200);
+    expect(attach.body.ownerId).toBe(parent.player.id);
+    const boot = (await api("/bootstrap", { token: parent.token })).body;
+    expect(boot.myEntries.map((p: any) => p.id).sort()).toEqual([parent.player.id, joined.player.id].sort());
+
+    // Nobody attaches their own row, and a second account cannot take it once it is spoken for —
+    // not even with the right code, since the code no longer proves anything once there is an
+    // owner to ask instead.
+    expect((await api("/entries/attach", { token: parent.token, body: { name: parent.player.name, code: "AAAA-2222" } })).status).toBe(400);
+    const again = await api("/entries/attach", { token: parent.token, body: { name: joined.player.name, code: joined.code } });
+    expect(again.status).toBe(409);
+    const other = (await api("/players", { body: { name: name() }, ip: "10.0.9.2" })).body;
+    const stolen = await api("/entries/attach", { token: other.token, body: { name: joined.player.name, code: joined.code } });
+    expect(stolen.status).toBe(409);
+  });
+
+  it("locks out repeated guesses the same way a fresh device claim does", async () => {
+    const joined = (await api("/players", { body: { name: name() }, ip: "10.0.9.3" })).body;
+    const parent = (await api("/players", { body: { name: name() }, ip: "10.0.9.3" })).body;
+    for (let i = 0; i < MAX_CLAIM_ATTEMPTS; i++) {
+      expect((await api("/entries/attach", { token: parent.token, body: { name: joined.player.name, code: "AAAA-2222" } })).status).toBe(401);
+    }
+    const locked = await api("/entries/attach", { token: parent.token, body: { name: joined.player.name, code: joined.code } });
+    expect(locked.status).toBe(429);
+    expect(locked.body.error.code).toBe("CLAIM_LOCKED");
+  });
+
+  it("sends a name with no code yet to the commissioner instead of a dead end", async () => {
+    // The shape production actually has: a name that predates codes, already with a device, that
+    // nothing here can hand a fresh code to on its own.
+    const id = crypto.randomUUID();
+    const legacyName = `Legacy ${id.slice(0, 8)}`;
+    await env.DB.prepare("INSERT INTO players (id, name, name_key, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?)")
+      .bind(id, legacyName, legacyName.toLowerCase(), BEFORE, BEFORE)
+      .run();
+    const parent = (await api("/players", { body: { name: name() }, ip: "10.0.9.4" })).body;
+    const attempt = await api("/entries/attach", { token: parent.token, body: { name: legacyName, code: "AAAA-2222" } });
+    expect(attempt.status).toBe(409);
+    expect(attempt.body.error.code).toBe("NO_CODE");
+
+    // The commissioner's override needs no code at all.
+    const rescue = await api(`/commissioner/players/${id}/attach`, { body: {}, token: parent.token, pin: "1234" });
+    expect(rescue.status).toBe(200);
   });
 });

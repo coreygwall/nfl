@@ -238,12 +238,21 @@ both read `entry_owners`, and that table only ever gained a row from `POST /entr
 managed entry and owning it happen in the same transaction, and there was no other way in. A name
 that joined the pool on its own, the way most of the roster does (`POST /players` then
 `/players/:id/claim`), has no owner and never will unless someone gives it one, however correct the
-client gets about reading `myEntries`. `POST /commissioner/players/:id/attach` is the other half:
-it takes a player who already exists — already picking, already with a history — and attaches them
-to the *calling* commissioner's own account, never a third party's, since reassigning somebody's
-picks under a login they never chose is not this office's call. Both surfaces confirm before
-calling it, the same as reset-access and remove, because it is at least as consequential as either:
-unlike those two, it also switches off the player's own `/players/:id/claim` path for good.
+client gets about reading `myEntries`. Two routes attach one after the fact, both landing on the
+same `entry_owners` insert and both confirmed on the client before calling it, the same as
+reset-access and remove — at least as consequential as either, since unlike them it also switches
+off the player's own `/players/:id/claim` path for good:
+
+- **`POST /entries/attach`** — self-service, for any signed-in account. Proved with the same code
+  `/players/:id/claim` already accepts for a fresh device: if that is enough to sign in as
+  somebody, it is enough to say they are yours to manage. Shares that route's brute-force lockout
+  (`isLockedOut`/`noteClaimFailure`/`MAX_CLAIM_ATTEMPTS`) rather than opening a second unguarded
+  way to guess a code. Surfaced next to "Add an entry" on Account, both surfaces.
+- **`POST /commissioner/players/:id/attach`** — the recovery path, for exactly the name a code
+  cannot rescue: one created before codes existed (`claimCode` null — a real state in production,
+  not a hypothetical) or one whose owner has simply forgotten it. Needs no code at all, because
+  commissioner authority already substitutes for one, but — like the self-service route — only
+  ever attaches onto the *calling* account, never a third party's.
 
 ## One Sunday, one set of words
 

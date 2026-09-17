@@ -11,7 +11,7 @@ import { ThemePicker } from "../components/ThemeControl.tsx";
 import { Bank, Cards, Check, ChevronRight, CircleHelp, Device, Key, Palette } from "../components/Icons.tsx";
 import { useToast } from "../components/Toast.tsx";
 import { addPasskey, passkeysSupported, wasCancelled } from "../lib/passkey.ts";
-import { formatCode } from "../../shared/codes.ts";
+import { CODE_LENGTH, formatCode, normalizeCode } from "../../shared/codes.ts";
 import { poolUrl } from "../lib/basename.ts";
 import { isVulgar, VULGAR_MESSAGE } from "../../shared/profanity.ts";
 import type { Identity } from "../lib/identity.ts";
@@ -39,6 +39,7 @@ export function Account() {
   const nav = useNavigate();
   const [showCode, setShowCode] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [attaching, setAttaching] = useState(false);
   const [plays, setPlays] = useState(false);
 
   const accountName = boot.data?.account?.name ?? player?.name ?? "";
@@ -76,14 +77,29 @@ export function Account() {
             }}
             onCancel={() => setAdding(false)}
           />
+        ) : attaching ? (
+          <AttachEntry
+            player={player}
+            onDone={(p) => {
+              setAttaching(false);
+              setPlayer(p);
+            }}
+            onCancel={() => setAttaching(false)}
+          />
         ) : (
           <>
-            <button className="btn btn-sm mt-2" onClick={() => setAdding(true)}>
-              Add an entry
-            </button>
+            <div className="mt-2 flex flex-wrap gap-3">
+              <button className="btn btn-sm" onClick={() => setAdding(true)}>
+                Add an entry
+              </button>
+              <button className="btn btn-sm" onClick={() => setAttaching(true)}>
+                Attach an existing one
+              </button>
+            </div>
             <p className="mt-1.5 text-xs text-ink-2">
-              For your kids, a partner, a friend who won't install anything. Each gets its own picks and its own row on
-              the board; none of them needs a sign-in of its own. Switch between them above the picks.
+              Add: for your kids, a partner, a friend who won't install anything. Attach: for a name that already
+              joined the pool on its own — type it and its code, and it becomes one of your entries. Either way it
+              gets its own picks and its own row on the board. Switch between them above the picks.
             </p>
           </>
         )}
@@ -310,6 +326,106 @@ function AddEntry({
       <div className="flex flex-wrap gap-3">
         <button type="submit" className="btn btn-primary min-h-11" disabled={busy || !name.trim()}>
           {busy ? "Adding…" : "Add entry & make picks"}
+        </button>
+        <button type="button" className="btn min-h-11" disabled={busy} onClick={onCancel}>
+          Cancel
+        </button>
+      </div>
+    </form>
+  );
+}
+
+/**
+ * The other way an entry joins an account: it already exists.
+ *
+ * `AddEntry` only ever covers a name created from inside the account. Most of a pool joins the
+ * other way — typing a name straight into the shared link — and a name that got there first never
+ * had an owner to give it one, on this account or any other. This is how that gets corrected
+ * without a commissioner in the loop: the same proof `/players/:id/claim` already accepts for a
+ * fresh device, since if that code is enough to sign in as somebody, it is enough to say they are
+ * yours to manage.
+ */
+function AttachEntry({
+  player,
+  onDone,
+  onCancel,
+}: {
+  player: Identity | null;
+  onDone: (p: Identity) => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState("");
+  const [code, setCode] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
+  const qc = useQueryClient();
+  const ready = name.trim() !== "" && normalizeCode(code).length === CODE_LENGTH;
+
+  return (
+    <form
+      className="mt-3 border-t-2 border-dashed border-line pt-4"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (busy || !player || !ready) return;
+        setBusy(true);
+        setError(null);
+        try {
+          const r = await api<{ player: Identity; ownerId: string }>("/entries/attach", {
+            body: { name, code: normalizeCode(code) },
+          });
+          void qc.invalidateQueries({ queryKey: ["bootstrap"] });
+          toast(`${r.player.name} is now one of your entries.`, "success");
+          onDone({ ...r.player, accountId: player.accountId ?? player.id, token: player.token });
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Couldn't attach that entry.");
+          setBusy(false);
+        }
+      }}
+    >
+      <h3 className="font-display text-sm font-extrabold">Attach an existing entry</h3>
+      <p className="mb-3 mt-1 text-sm text-ink-2">
+        The name they already play under, and the code that came with it — the same one that signs a second phone in
+        as them.
+      </p>
+      <label htmlFor="attach-name" className="text-sm font-bold">
+        Their name
+      </label>
+      <input
+        id="attach-name"
+        autoFocus
+        autoComplete="off"
+        maxLength={24}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        placeholder="e.g. Parker"
+        disabled={busy}
+        className="card-flat mb-3 mt-1 w-full px-3 py-3 outline-none focus:shadow-hard"
+      />
+      <label htmlFor="attach-code" className="text-sm font-bold">
+        Their code
+      </label>
+      <input
+        id="attach-code"
+        value={code}
+        onChange={(e) => setCode(formatCode(e.target.value))}
+        placeholder="QRT4-9MKP"
+        inputMode="text"
+        autoCapitalize="characters"
+        autoComplete="one-time-code"
+        spellCheck={false}
+        disabled={busy}
+        aria-describedby={error ? "attach-error" : undefined}
+        className="card-flat font-display mb-3 mt-1 w-full px-4 py-3 text-center text-2xl font-extrabold tracking-[0.15em] outline-none focus:shadow-hard"
+      />
+      {error && (
+        <p id="attach-error" role="alert" className="mb-3 text-sm font-semibold text-danger">
+          {error}
+        </p>
+      )}
+      <div className="flex flex-wrap gap-3">
+        <button type="submit" className="btn btn-primary min-h-11" disabled={busy || !ready}>
+          {busy ? "Attaching…" : "Attach"}
         </button>
         <button type="button" className="btn min-h-11" disabled={busy} onClick={onCancel}>
           Cancel
