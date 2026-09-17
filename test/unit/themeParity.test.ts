@@ -39,7 +39,7 @@ function swiftFiles(dir: string): { path: string; source: string }[] {
 const appRoot = new URL("../../ios/Tally", import.meta.url).pathname;
 const appSwift = swiftFiles(appRoot);
 
-const widgets = ["WeekLiveActivity.swift", "TallyWidgetsBundle.swift"]
+const widgets = ["WeekLiveActivity.swift", "RoundLiveActivity.swift", "TallyWidgetsBundle.swift"]
   .map((f) => {
     try {
       return readFileSync(new URL(`../../ios/TallyWidgets/${f}`, import.meta.url), "utf8");

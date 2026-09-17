@@ -30,10 +30,11 @@ score across every season of the year, and to charge the one person with the pai
 | 6 | [Engagement](06-engagement.md) | Games on top, the incentive model, the Weekly Recap, retention moments |
 | 7 | [Partnerships & Investment](07-partnerships-investors.md) | Partner tiers, the case against raising, the acquisition path |
 | 8 | [Roadmap](08-roadmap.md) | Sequencing, AI agent autonomy, what's explicitly not being built |
+| 9 | [The Three Kinds of Competition](09-competition-types.md) | Pools, Cards and Calls: the taxonomy, the naming, what golf costs the architecture, where it lands in the sequence |
 
 ---
 
-## The eight conclusions
+## The ten conclusions
 
 1. **Don't touch prize money — ever.** It triggers money-transmitter licensing and Apple Guideline
    5.3, and it destroys the only differentiated position available. Build a kitty *tracker* that
@@ -50,8 +51,8 @@ score across every season of the year, and to charge the one person with the pai
 4. **Cost is not a variable in this business.** Gross margin is ~98% at every scale from 20 players
    to 3 million. Stop optimising it; spend every hour on distribution. → `03`
 5. **The Weekly Recap is the highest-value unbuilt feature.** It costs ~$0.002/pool/week, it's the
-   most natural paywall in the product, and it's *distribution* — it's the thing a commissioner
-   forwards to the group chat. → `06` § 2
+   one thing in the product there is an honest reason to charge for, and it's *distribution* — it's
+   the thing a commissioner forwards to the group chat. → `06` § 2
 6. **Side games run on standing, not money.** Being named, streak loss-aversion, and social debt.
    Not one of them needs a prize. → `06` § 4
 7. **Don't raise.** There's nothing to spend it on at $60/year of infrastructure, the metric that
@@ -60,6 +61,16 @@ score across every season of the year, and to charge the one person with the pai
 8. **Measure one number above all others: what percentage of commissioners run a second season.**
    Below ~35%, this is a novelty. Above 50%, it's a business. Nothing else is decidable until it's
    known. → `05` § 6
+9. **Price what costs, never price what counts.** Compute, atoms and time have a marginal cost and
+   can be sold. Players, pools, cards, seasons and years of history do not, and pricing any of them
+   taxes exactly what you want more of. So the record book is free forever, the 20-player cap is not
+   being built, and ~0.1% of commissioners at $29 a year covers the bill at every scale in the
+   model. → `02` § 3
+10. **There are three kinds of competition here, not one.** A **pool** is you predicting something a
+   feed decides. A **card** is you playing something the group decides — golf, poker. A **call** is
+   you predicting anything at all, resolved by the group. The roster of people is what makes them
+   one product rather than three, and Calls are the only thing on any roadmap that works in July.
+   → `09`
 
 ---
 
@@ -77,6 +88,9 @@ Most of the hard engineering is done. The commercial significance is easy to mis
 | `pools` / `pool_commissioners`, players global to Tally | **Multi-pool and Clubhouse are a migration, not a rewrite.** |
 | Native iOS app, SwiftUI / iOS 26 | The App Store featuring pitch — the best free channel available. |
 | Single Worker + D1 | The 98% gross margin. |
+
+**Where the product goes after the pool:** three families, one group — see `09`. The pool is the
+only one built; the other two are named, sequenced and costed there.
 
 **The three things blocking revenue right now:** the APNs key (push is built and silent), the App
 Store listing, and a paywall that doesn't exist yet. None of them is hard. → `08` § 2

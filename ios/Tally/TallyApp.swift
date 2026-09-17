@@ -13,17 +13,23 @@ import TallyKit
 @main
 struct TallyApp: App {
     @State private var model: AppModel
+    /// The golf cards. Separate from `AppModel` because a card has no session, no bootstrap and no
+    /// week — see `GolfModel`. It is here rather than inside the app model so the pool's object
+    /// never has to know the other family exists.
+    @State private var golf: GolfModel
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var delegate
 
     init() {
         FontRegistrar.registerBundledFonts()
         _model = State(initialValue: AppModel())
+        _golf = State(initialValue: GolfModel())
     }
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environment(model)
+                .environment(golf)
                 .tint(.ink)
                 // The whole app, in one place. Every colour in Theme.swift resolves against the
                 // trait collection, so this one modifier re-lights every screen.

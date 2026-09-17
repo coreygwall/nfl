@@ -6,6 +6,21 @@ public enum Names {
     public static let min = 2
     public static let max = 24
 
+    /**
+     "Corey", "Corey and Sam", "Corey, Sam and Parker".
+
+     Here rather than beside the other formatters in the app target because the widget extension
+     cannot see the app, and a lock screen has ties to read out too. The app's `Format.list` calls
+     this, so there is one version of the comma.
+     */
+    public static func list(_ items: [String]) -> String {
+        switch items.count {
+        case 0: return ""
+        case 1: return items[0]
+        default: return "\(items.dropLast().joined(separator: ", ")) and \(items[items.count - 1])"
+        }
+    }
+
     public static func normalize(_ raw: String) -> String {
         let folded = raw.precomposedStringWithCompatibilityMapping.trimmingCharacters(in: .whitespacesAndNewlines)
         return folded.split(whereSeparator: { $0.isWhitespace }).joined(separator: " ")

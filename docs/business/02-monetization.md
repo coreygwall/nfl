@@ -49,16 +49,66 @@ and should lift conversion materially. It costs nothing to build on top of the k
 
 ---
 
-## 3. The freemium ladder
+## 3. What is paid, and what is never paid
 
-The paywall's job is to be **invisible to a first-time commissioner and obvious to a returning one.**
-Nothing that makes a pool *work* is ever paid. What is paid is everything that makes a pool
-*persist, multiply, and be fun to run.*
+**Price what costs. Never price what counts.**
+
+That is the whole rule, and it is sharper than the one it replaces (*"what makes a pool persist,
+multiply and be fun to run"*), which turned out to justify charging for almost anything.
+
+- **What costs**: compute that runs per use (anything generative), atoms (something printed and
+  posted), and time (support, setup, custom work). These have a marginal cost and it is honest to
+  price them. A person can be told *why*.
+- **What counts**: players, entries, pools, cards, rounds, seasons, years of history. Every one of
+  these is a number that goes up, costs a fraction of a cent, and is either growth or retention.
+  Pricing any of them taxes the thing you most want to happen.
+
+Two rules follow, and both are absolute:
+
+1. **No feature is ever made worse to create a reason to pay.** If something is good and cheap, it
+   ships free and stays free. A product that is deliberately worse than it could be is a product
+   that deserves the churn it gets.
+2. **A group's own history is never paid.** More on this below, because it is the one the plan got
+   most wrong.
+
+### Why history has to be free
+
+`02` used to put the record book — every card, the running standings, the four-year head-to-head —
+behind the wall, as the conversion trigger for groups too small to hit a headcount cap. That is
+wrong three times over.
+
+It costs a query. Under the rule above that ends the argument on its own.
+
+It is the moat, and the plan says so: *"A group four years into a Clubhouse has a trophy case it
+cannot export. That, and not the game design, is the moat."* A trophy case you have to pay to look
+into is not a switching cost. It is a fence, and the lesson it teaches is *don't put four years of
+your group's results somewhere that can be taken away.* The moat only works if people keep looking
+in, and they only keep looking in if it is always there.
+
+And it taxes exactly the wrong group. The four-year head-to-head is what makes somebody open the app
+in March, when nothing is running. Charging for it means the groups who have been here longest hit
+the most friction, which is backwards in every direction.
+
+**Decision: the record book, the archive and all cross-season history are free, permanently, at
+every tier.**
+
+### And the headcount wall goes with it
+
+Consistency demands it. The 21st player costs a fraction of a cent, and one more person in a pool is
+the single best thing that can happen to it. § 2 already says per-player pricing *"makes the
+commissioner do arithmetic about whether to invite the eleventh person, which is precisely the
+behaviour that must never occur"* — a 20-player cap is that same arithmetic with one big step in it
+instead of twenty small ones.
+
+This is expensive to admit, because the cap was the plan's primary conversion trigger and there is
+no drop-in replacement. What replaces it is not another gate. See *What is actually left to sell*,
+below.
 
 ### Free — forever, and genuinely good
 
-- One active pool, up to **20 players**
+- Pools, cards and calls, with **as many people in them as you like**
 - The full game: picks, ranks, locking, hidden picks, weekly + season boards
+- **Every season you have ever played**: the archive, the record book, the head-to-heads
 - The share link, the welcome page, the rules page
 - Face ID / passkeys, device codes, managed entries (up to 12)
 - The iOS app, push notifications, Live Activities
@@ -69,34 +119,68 @@ Nothing that makes a pool *work* is ever paid. What is paid is everything that m
 being shown the product by someone they trust. A stingy free tier at a $0.0002/player/month cost
 structure is a strategic error.
 
-### Tally Plus — **$29 / season** or **$49 / year**
+### What is actually left to sell
 
-Aimed at the commissioner running a real pool they care about.
+Four things, in descending order of how well they survive contact with the rule.
 
-| Feature | Why it converts |
-|---|---|
-| Up to **200 players** | The 21st person is the trigger. Hard paywall, unmissable, zero resentment. |
-| **Multiple simultaneous pools** | Run High Five *and* Survivor off one link (see `06-engagement.md`). |
-| **The Weekly Recap** — AI-written, group-specific, names names | The single highest-delight feature. Costs ~$0.007/pool/week (`03`). |
-| **Season archive & history** | Last year's board, all-time records. Pure switching cost. |
-| **Side games** — props, dares, rivalries | The engagement engine. |
-| **The kitty tracker** + split-the-ante | The #1 commissioner pain. |
-| **Custom pool branding** — name, colour, share card | Cheap to build, disproportionately loved. |
-| CSV export, pick history, backfill | Already built. Move behind the wall. |
+**1. Compute, at cost-plus.** The Weekly Recap and every generative feature after it. This is the
+one line in `03-unit-economics.md` that genuinely scales with use — at Scenario E the recaps cost
+**$11,800 of a $16,900 bill**, more than everything else combined. Charging for it is honest,
+explicable in one sentence (*"this one costs us money every time it runs"*), and self-limiting.
 
-### Tally Clubhouse — **$99 / year per group**
+**2. Atoms.** The end-of-season record book, printed and posted. A trophy with the winner's name on
+it. Stickers. A real scorecard for a golf group's season. Higher margin than software, no recurring
+obligation, and emotionally a *gift* rather than a toll — which is the right register for a product
+people are already sentimental about. This is also the honest answer to *"what do we sell a
+foursome?"*: nothing recurring. We sell them an object in December.
 
-For the group that plays all year. This is the **retention product**, and the real long-term business.
+**3. Support, not features.** An optional paid tier with no gate behind it — or a cosmetic one
+(a badge, a colour, a custom share card) — that carries the recaps and says plainly what it funds.
+This works precisely *because* the free product is complete. It is also the only model that fits the
+actual numbers; see below.
 
-- Everything in Plus, across **unlimited pools**
-- A group home at `/g/<slug>` — one place, every season
-- **Cross-season, cross-sport standings**: *Group of the Year*
-- Multiple commissioners / co-commissioners
-- All-time record book: most weekly wins, longest streak, biggest collapse
-- Group chat surface or a Slack/Discord bridge
+**4. Partnerships.** § 4 ranks them. The two that fit are a club, league or company running its own
+pools (already #4 there), and local sponsorship of a large community pool (#3). Cards make the first
+one materially better, because a member-guest *is* a Card and a golf club is a buyer that already has
+a budget line for it. Sportsbook affiliate money remains a no (#5), at any price.
 
-> A group four years into a Clubhouse has a trophy case it cannot export. That, and not the game
-> design, is the moat.
+### The arithmetic that makes this work
+
+Strip the recaps out of `03` and the free product costs almost nothing to run:
+
+| Scale | Infra without recaps | Supporters at $25 net to break even | As a share of commissioners |
+|---|---|---|---|
+| **C** — 10,000 pools | ~$173/yr | **7** | 0.07% |
+| **D** — 50,000 pools | ~$1,584/yr | **64** | 0.13% |
+| **E** — 200,000 pools | ~$5,100/yr | **204** | 0.10% |
+
+**About one commissioner in a thousand, at $25 a year, funds a free product for everyone else** — and
+the ratio barely moves across three orders of magnitude, because the cost is flat and the base is
+not. That is not a SaaS conversion problem. It is a public-radio problem, and it is a much easier
+one.
+
+So the goal is stated plainly rather than modelled optimistically: **cover the cost of running it,
+then whatever is above that is a business if it wants to be.** Objects, partnerships and B2B are the
+upside, and none of them is load-bearing.
+
+### Tally Club — **$29 / year**, and nothing is behind it
+
+One paid tier, annual only (*"per season"* means nothing to a golf group that plays in February and
+August alike). What it carries:
+
+- **The Weekly Recap** and everything generative after it — the things that cost per use
+- Custom branding: pool colour, share card, the group's name on things
+- A supporter mark, if they want one shown
+- First access to whatever is in Labs
+- The kitty tracker + split-the-ante, if it turns out to cost support time rather than compute
+
+What it does **not** carry: player counts, pool counts, history, export, the archive, the record
+book, or any part of the game. Cancelling loses the recaps and the paint. It never loses the group's
+own record.
+
+> The old ladder's Clubhouse tier promised *"a trophy case it cannot export"*. The trophy case is now
+> free and exportable, and the moat is that nobody wants to leave the place their group's whole
+> history already lives. That is a better moat. It is built on affection rather than on hostage-taking.
 
 ---
 
@@ -104,10 +188,10 @@ For the group that plays all year. This is the **retention product**, and the re
 
 | # | Stream | Realistic? | Notes |
 |---|---|---|---|
-| 1 | **Commissioner subscriptions** | ✅ The business | 90%+ of revenue for the foreseeable future. Focus here. |
-| 2 | **Group/Clubhouse subscriptions** | ✅ Year 2+ | Higher ARPU, far better retention. The compounding one. |
+| 1 | **Tally Club (§ 3)** | ✅ Covers the bill | Funds the free product at ~0.1% take-up. Not a growth engine, and not meant to be. |
+| 2 | **Objects** — printed record books, trophies, stickers | 🟢 Seasonal | Real margin, no recurring obligation, and the one thing a four-person golf group will genuinely buy. December business. Needs a print partner, not a platform. |
 | 3 | **Sponsored pools (local)** | 🟡 Year 2–3 | A brewery or a realtor sponsors a 200-person community pool. $250–1,000/season. Genuine, but it is a *sales* business — it doesn't scale with two part-time people until there's self-serve. |
-| 4 | **White-label / B2B** | 🟡 Year 2–3 | A golf club, a youth league, a company running a 500-person pool under its own brand. $500–2,500/yr. High ACV, low volume, real support burden. Splash already runs a "Partner Solutions" division here, which validates demand. |
+| 4 | **White-label / B2B** | 🟡 Year 2–3 | A golf club, a youth league, a company running a 500-person pool under its own brand. $500–2,500/yr. High ACV, low volume, real support burden. Splash already runs a "Partner Solutions" division here, which validates demand. **Cards raise this**: a member-guest is a Card, and a club has a budget line for it. |
 | 5 | **Affiliate / referral** | 🟠 Careful | Sportsbook affiliate revenue is the easiest money in this category and it **detonates the brand**. Do not take it. If affiliate revenue is ever needed, take it from ticketing, merch, or streaming — not books. |
 | 6 | **Prize handling / rake** | ❌ Never | See §1. |
 | 7 | **Data / API licensing** | ❌ No | Nothing proprietary; nflverse is the source. |
@@ -127,6 +211,12 @@ For the group that plays all year. This is the **retention product**, and the re
 | Annual paid-commissioner churn | 35% | Assumption; **this is the number to go measure** |
 
 ### Scenarios
+
+> **These scenarios predate § 3 and no longer follow from it.** They assume 8% conversion driven by a
+> headcount gate that no longer exists. Read the *cost* column, which is measured and still true, and
+> treat the *revenue* column as the ceiling of a model that has been deliberately abandoned. The
+> replacement target is in § 3: cover the bill, then decide. Redo this table when there is one real
+> season of take-up to put in it rather than a benchmark.
 
 | Scenario | Pools | Players | Paying | Gross revenue | Infra cost | Margin |
 |---|---|---|---|---|---|---|
@@ -176,15 +266,16 @@ the off-season.
 
 ## 7. What to build first (monetization only)
 
-1. **The 20-player wall.** One number in config, one upgrade sheet. Ship before the paywall exists,
-   set to a very high limit, and watch the pool-size distribution for a season before choosing where
-   it really lands. Guessing the cap is the most expensive mistake available here.
-2. **Stripe Checkout on web, IAP on iOS.** Apple takes 15% under the Small Business Program — budget
+1. **The Weekly Recap.** It is both the feature people describe to a friend *and* the only thing
+   there is to charge for. It was fourth on this list when a wall was doing the converting; with no
+   wall it is first by a distance.
+2. **The record book, free and good.** Every season, every head-to-head, exportable. It is the moat,
+   it costs a query, and under § 3 it can now be built without arguing about which half is paid.
+3. **Stripe Checkout on web, IAP on iOS.** Apple takes 15% under the Small Business Program — budget
    for it. Steer commissioners to the web where legitimate, but never make the iOS path feel broken.
-3. **The kitty tracker.** Highest pain-to-effort ratio on the board and it unlocks split-the-ante.
-4. **The Weekly Recap.** The feature people will actually describe to a friend.
+4. **The kitty tracker.** Highest pain-to-effort ratio on the board and it unlocks split-the-ante.
 
-Everything else can wait a season.
+Everything else can wait a season. The headcount cap, previously first here, is **not being built**.
 
 ---
 

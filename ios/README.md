@@ -14,6 +14,7 @@ ios/
     Design/            the design system ported from src/index.css: paper, ink, hard shadows, fonts
     Shell/             tabs, header, account sheet, toasts
     Features/          Welcome · Home · Picks · Board · Rules · Office · Pools — one folder per screen
+      Golf/            the second contest family: a scramble card's shell and its three screens
     Resources/Fonts/   Bricolage Grotesque + Inter as static TTFs (scripts/build-ios-fonts.py)
     Assets.xcassets/   32 team stickers, the mark and the icon (scripts/build-ios-assets.ts)
   TallyKit/            a Swift package with everything that is not a screen
@@ -118,6 +119,78 @@ association file is served at the path Apple reads.
 
 Account-owned entries (a parent picking for the family) ride on the account's token with the
 `x-entry-id` header, exactly as the site does; switching is one tap in the account sheet.
+
+## Two kinds of contest, and one way between them
+
+The app holds a **pool** (a season) and, behind a Labs switch, a **golf card** (an afternoon). They
+are different shapes, so they get different tabs: Home · Picks · Board · Account in a pool, Round ·
+Tally · Scorecard · Account in a card. What never changes is the way in — the chip top-left of every
+screen, which lists both and ticks where you are standing.
+
+`docs/navigation.md` is the reasoning and the rule (*the switcher is global, the tabs are the
+contest's, Account is always last*). In code it is four pieces: `AppModel.context` holds the one
+fact, `RootView` picks the shell from it, `PoolShellView` and `GolfShellView` are one per family and
+neither imports the other, and `PoolMenu` is the shared switcher. A third family is a new shell plus
+a case on `ContestContext`; if it needs an edit to `PoolShellView`, the seam has been crossed.
+
+### Golf cards (Labs, off by default)
+
+Account ▸ Settings ▸ Labs ▸ *Golf cards*. Off, nothing about the pool changes: the menu draws as it
+always did and the golf shell is unreachable. On, the menu grows a **Golf** section and *New golf
+card*.
+
+A scramble is four people playing one ball, and what the group argues about afterwards is whose shot
+got picked. So the card is a list of strokes with a name on each, and the score is the count:
+
+- **Tap a name** each time the team plays that person's ball. A par four is four taps.
+- **Holed it** — the last shot went in, and whoever hit it gets the mark.
+- **Tap-in** — one more stroke on the card, credited to nobody. A gimme is not an achievement; a
+  fifty-footer is just a shot with a name on it, like the drive.
+- **+1 stroke** — the two kinds nobody is credited with: a *penalty stroke* the rules added, and
+  *nobody's ball* for a provisional or one that went unlogged. They used to be one control called
+  "+1 penalty", which put that word on the card for strokes that were nothing of the sort.
+- **Undo** is one step back, whatever the step was. A finished hole ignores a stray tap until it is
+  reopened, so nothing can quietly turn a birdie into a par.
+- **The par chip on the header is a control.** Setup guesses par 72 laid out the usual way, because
+  nobody fills in eighteen numbers on the first tee, so the truth arrives one tee at a time. Tap to
+  cycle 3, 4, 5.
+- **The hole you just finished keeps a line at the top of the next one.** Finishing advances, which
+  is right in a cart and wrong for the three seconds afterwards when somebody says that last one was
+  Dan's. Tapping it stands you back on that hole, where *Reopen* is waiting.
+
+`TallyKit/Golf/` holds all of it and none of it draws: `ScrambleCard` (the record and every
+mutation), `ScrambleTally` (the leaderboard, initials, the word for a score, the shareable
+summary), `CardCatalog` (`UserDefaults`, plain JSON, ISO dates) and `RoundActivity` (what the lock
+screen shows). `ScrambleTests.swift` pins every rule above.
+
+**The round has a lock screen, and it needs no key.** `RoundLiveActivity` draws the hole, the team's
+score to par and the tally, and `RoundActivityService` starts it on the first stroke and ends it
+when the round does. Unlike the week's activity there is no feed behind a scramble, so nothing is
+pushed and `Activity.request` asks for no token — which means the golf lock screen works today, on
+a phone with no APNs key configured. See *Notifications and the lock screen* for the pool's, which
+does need one.
+
+**The card leaves the phone as a poster.** `ShareCardView` draws the round at 4:5 in the app's own
+paper and ink — the score to par, the tally with the leader on the flag, and the two brags the group
+actually argues about (off the tee, and putts that went in). `ShareCardRenderer` renders it with
+`ImageRenderer` at 3x to a PNG in the temporary directory, and `ShareCardSheet` shows the card
+before it goes so nobody sends blind.
+
+Three things are pinned rather than left to the call site: the **light palette**, so the card looks
+the same to everybody whatever the sender's phone was doing; **scale 3**, which makes 1080 × 1350;
+and a **file URL**, which Messages and Mail handle better than an image value.
+
+**The message carries no text.** The picture is the message. `ScrambleTally.summary` still exists and
+is the fallback for the one case that would otherwise be a dead end — `ImageRenderer` may return nil,
+and a share button that does nothing is worse than one that sends the words.
+
+The footer says `playtally.app` and nothing more. That is the seam for the link that belongs there
+eventually: a recap for the people who played the round, or the App Store for everyone else once
+there is a listing. Neither exists yet, so neither is pretended at.
+
+**One phone keeps the card, for now.** The shape is already right for sharing — every card has an
+id, every hole carries `updatedAt`, and the catalogue is JSON a Worker could take unchanged — so
+two people logging different holes is an endpoint and a per-hole merge rule, not a rewrite.
 
 ## Built to grow
 
@@ -293,7 +366,7 @@ nudge is the first message a week sends.
 ## Tests
 
 `cd ios/TallyKit && swift test` runs on a Mac without a simulator: the rules, URL parsing, the
-Keychain-free identity store, and decoding of the Worker's actual JSON shapes (the fixtures in
+Keychain-free identity store, the scramble card's rules, and decoding of the Worker's actual JSON shapes (the fixtures in
 `DecodingTests.swift` are copies of real responses — if a field changes shape on the server,
 this is what should go red first). `.github/workflows/ios.yml` runs the same and builds the app
 for the simulator on every push that touches `ios/`.

@@ -1,4 +1,7 @@
 import Foundation
+// `list` calls through to Names in TallyKit, so that the widget extension and the app say a
+// tie the same way.
+import TallyKit
 
 /// Date and time the way the site writes them, in the phone's own zone.
 enum Format {
@@ -56,12 +59,7 @@ enum Format {
     }
 
     /// "Corey", "Corey and Sam", "Corey, Sam and Parker" — for the handful of places a tie has to
-    /// be read out loud.
-    static func list(_ items: [String]) -> String {
-        switch items.count {
-        case 0: return ""
-        case 1: return items[0]
-        default: return "\(items.dropLast().joined(separator: ", ")) and \(items[items.count - 1])"
-        }
-    }
+    /// be read out loud. The rule itself is in TallyKit, because the widget extension has ties to
+    /// read out too and cannot see this file.
+    static func list(_ items: [String]) -> String { Names.list(items) }
 }

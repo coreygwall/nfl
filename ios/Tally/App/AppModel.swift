@@ -14,6 +14,24 @@ enum AppTab: Hashable {
 }
 
 /**
+ What the app is standing in: the pool, or one golf card.
+
+ The chip in the navigation bar is the only global control, and this is what it switches. A pool
+ and a card are different families of contest with different tabs (`docs/navigation.md`), so the
+ root view swaps the whole shell on it rather than any tab trying to draw both. `.pool` is not
+ "no card" — it is the pool this model already holds, which is why it carries no reference.
+ */
+enum ContestContext: Hashable {
+    case pool
+    case card(String)
+
+    var cardId: String? {
+        if case .card(let id) = self { return id }
+        return nil
+    }
+}
+
+/**
  Light, dark, or whatever the phone is doing.
 
  "Auto" is the user-facing default and is stored as the absence of a choice, so a phone that turns dark at
@@ -216,6 +234,53 @@ final class AppModel {
         }
     }
 
+    // MARK: Contests
+
+    private static let contextKey = "tally.context"
+    private static let golfKey = "tally.labs.golf"
+
+    /// The pool, or a golf card. Persisted, so a phone put down on the ninth tee reopens on it.
+    private(set) var context: ContestContext = .pool
+
+    /**
+     Golf cards, behind a switch in Account ▸ Settings ▸ Labs. Off by default: nothing in the pool
+     changes until somebody turns it on, and turning it off puts the app back in the pool with the
+     cards kept on disk for when it comes back. Nothing in `Features/Golf` is reachable while this
+     is false — the menu does not list cards and the root view does not draw the golf shell.
+     */
+    var golfCards: Bool = false {
+        didSet {
+            guard golfCards != oldValue else { return }
+            UserDefaults.standard.set(golfCards, forKey: AppModel.golfKey)
+            if !golfCards { setContext(.pool) }
+        }
+    }
+
+    private func setContext(_ next: ContestContext) {
+        guard next != context else { return }
+        context = next
+        switch next {
+        case .pool: UserDefaults.standard.removeObject(forKey: AppModel.contextKey)
+        case .card(let id): UserDefaults.standard.set("card:\(id)", forKey: AppModel.contextKey)
+        }
+    }
+
+    private static func loadContext() -> ContestContext {
+        guard let raw = UserDefaults.standard.string(forKey: contextKey), raw.hasPrefix("card:") else { return .pool }
+        return .card(String(raw.dropFirst("card:".count)))
+    }
+
+    /// Stand in a card. The card's own model draws it; this only says which one.
+    func switchToCard(_ id: String) {
+        guard golfCards else { return }
+        setContext(.card(id))
+    }
+
+    /// Back to the pool this model holds, on the tab it was on.
+    func leaveCard() {
+        setContext(.pool)
+    }
+
     private let monitor = NWPathMonitor()
     private var refreshTask: Task<Void, Never>?
 
@@ -240,6 +305,8 @@ final class AppModel {
         }
         monitor.start(queue: DispatchQueue(label: "tally.network"))
         theme = UserDefaults.standard.string(forKey: AppModel.themeKey).flatMap(ThemeChoice.init(rawValue:)) ?? .system
+        golfCards = UserDefaults.standard.bool(forKey: AppModel.golfKey)
+        context = golfCards ? AppModel.loadContext() : .pool
         loadLegacyPin()
         announcementsSeenId = AnnouncementSeen.load(pool: pool)
         connectPush()
@@ -543,6 +610,8 @@ final class AppModel {
     // MARK: Pools
 
     func switchPool(_ ref: PoolRef) {
+        // Choosing a pool from inside a card is a switch even when it is the pool already held.
+        setContext(.pool)
         guard ref != pool else { return }
         catalog.open(ref)
         catalog.save()
@@ -582,6 +651,7 @@ final class AppModel {
     func open(_ url: URL) {
         guard let link = PoolRef.parse(url) else { return }
         let query = link.query
+        setContext(.pool)
         if link.pool != pool { switchPool(link.pool) }
         let parts = link.path.split(separator: "/").map(String.init)
         switch parts.first ?? "" {

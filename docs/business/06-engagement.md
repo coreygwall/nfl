@@ -96,6 +96,10 @@ anyone score a safety?"* *"Over/under 4 lead changes on Sunday night?"*
   precisely who you're trying to keep. Cheap, funny, weekly.
 - **Incentive:** a separate tiny leaderboard — *Prop King* — that has nothing to do with the main
   standings. Someone will care about it specifically *because* it's silly.
+- **Build it knowing what it grows into.** A prop is a question, a window, a resolution and a tally.
+  Let the commissioner write the question and the group resolve it, and the same engine is **Calls**
+  — the third family in `09-competition-types.md`, and the only thing on any roadmap that works in
+  July. Build the prop first; do not build it in a way that assumes the question came from a feed.
 
 **③ Streaks, surfaced aggressively.**
 Not a badge cabinet. Three or four streaks that are visible on the board and in push:

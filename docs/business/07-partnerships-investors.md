@@ -55,7 +55,7 @@ land there good enough to be forwarded. Higher return than any formal partnershi
 | Partner | Verdict |
 |---|---|
 | **Sportsbooks (DraftKings, FanDuel, ESPN Bet)** | **No.** The most available money in this category and the fastest way to become the thing Tally exists in opposition to. Decline in advance, in writing, so it isn't decided under revenue pressure. |
-| **Prediction markets (Polymarket, Kalshi)** | **No.** Splash has taken this road (a $21M guaranteed survivor contest, June 2026). That road is now taken and it isn't Tally's. |
+| **Prediction markets (Polymarket, Kalshi)** | **No.** Splash has taken this road (a $21M guaranteed survivor contest, June 2026). That road is now taken and it isn't Tally's. *This declines a partnership, not a product: Calls (`09-competition-types.md` § 5) are a group of friends predicting things with no money, no liquidity, no strangers and no market-making. The word is never used on a surface (`04-brand.md` § 4); the distinction is the point.* |
 | **Fantasy platforms (Sleeper, Underdog)** | Not as partners — as **acquirers** (Part Two § 4). |
 | **Media (Barstool, The Athletic, local radio)** | **Later.** Genuine reach into exactly the right audience, but they will want revenue share or equity and there's nothing to share yet. Revisit at 50,000 pools. |
 | **Team / league licensing** | **No.** Expensive, slow, and Tally's value has nothing to do with official marks. |
