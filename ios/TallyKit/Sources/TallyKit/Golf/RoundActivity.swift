@@ -118,6 +118,27 @@ public struct RoundActivityAttributes: Codable, Hashable, Sendable {
     }
 }
 
+/**
+ The lock screen's tap target, and the way back from it.
+
+ A real, resolvable URL under the pool's own domain — like every other link Tally hands out —
+ rather than a private scheme, so it also works if the association file ever serves a page at
+ that path. `cardId(in:)` is the inverse, and the two are tested together: whatever one builds,
+ the other has to recognise, or a relaunch from the lock screen lands nowhere in particular.
+ */
+extension RoundActivityAttributes {
+    public static func deepLink(cardId: String) -> URL? {
+        URL(string: "https://playtally.app/golf/\(cardId)")
+    }
+
+    public static func cardId(in url: URL) -> String? {
+        guard url.host == "playtally.app" else { return nil }
+        let parts = url.pathComponents.filter { $0 != "/" }
+        guard parts.count == 2, parts[0] == "golf" else { return nil }
+        return parts[1]
+    }
+}
+
 // ActivityKit imports on the Mac, where `swift test` runs this package, but every type in it is
 // marked unavailable there — so the guard has to be the platform, not `canImport`. Everything above
 // is a plain Codable struct and compiles either way; only the conformance is conditional.

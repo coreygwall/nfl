@@ -22,6 +22,10 @@ struct RoundLiveActivity: Widget {
             RoundLockScreen(attributes: context.attributes, state: context.state)
                 .activityBackgroundTint(TallyPalette.paper)
                 .activitySystemActionForegroundColor(TallyPalette.ink)
+                // Without this, tapping the lock screen just foregrounds the app wherever it
+                // last was — the pool, most of the time, since that is the default context. The
+                // whole point of a lock screen for a four-hour round is to get back to the hole.
+                .widgetURL(RoundActivityAttributes.deepLink(cardId: context.attributes.cardId))
         } dynamicIsland: { context in
             DynamicIsland {
                 DynamicIslandExpandedRegion(.leading) {
@@ -63,6 +67,7 @@ struct RoundLiveActivity: Widget {
                     .monospacedDigit()
                     .foregroundStyle(TallyPalette.ink)
             }
+            .widgetURL(RoundActivityAttributes.deepLink(cardId: context.attributes.cardId))
         }
     }
 }

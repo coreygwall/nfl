@@ -77,10 +77,25 @@ public struct CommissionerPlayer: Codable, Hashable, Sendable, Identifiable {
     public let code: String?
     /// The commissioner's checkmark — squared away for the season.
     public let ready: Bool
+    /// Who already manages this entry, if anyone. Nil is the ordinary case — most players are
+    /// independent people playing under their own name — not a defect to flag on every such row.
+    public let owner: EntryOwner?
+}
+
+public struct EntryOwner: Codable, Hashable, Sendable {
+    public let id: String
+    public let name: String
 }
 
 public struct CommissionerPlayersResponse: Codable, Sendable {
     public let players: [CommissionerPlayer]
+}
+
+/// Brings a player who already exists — already picking, already with a history — under an
+/// account that did not create them. See `PoolService.attachEntry`.
+public struct AttachEntryResponse: Codable, Sendable {
+    public let player: Player
+    public let ownerId: String
 }
 
 public struct ResetAccessResponse: Codable, Sendable {

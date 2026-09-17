@@ -159,6 +159,11 @@ has no feed, so every change is a tap in this app and `RoundActivityService` upd
 itself with `pushType` left nil. Do not give it a token it would never use. It starts on the first
 stroke rather than when the card is made, because a card set up the night before is not a round.
 
+It also carries its own `widgetURL` (`RoundActivityAttributes.deepLink`/`cardId(in:)`), which
+`AppModel.open(_:)` cannot handle: that function is built entirely around `PoolRef.parse` and
+forces `.pool` context on anything it accepts, so a round's link is caught in `TallyApp`'s
+`onOpenURL` — the one place that holds both models — before it ever reaches `open(_:)`.
+
 ## Four tabs in a pool, and what is deliberately not one
 
 Home · Picks · Board · Account, on both surfaces. Home is the landing and is about the pool you are
@@ -227,6 +232,27 @@ Because the list can name an entry this device has never cached, **`switchTo` ad
 name that is not in the store saves it there first, with the *account's* token, since a managed
 entry has none of its own. Without that the tap would move the highlight and change nothing else.
 `SessionStoreTests.swift` pins both halves.
+
+**None of that helps a player who was never linked in the database.** `entries` and `myEntries`
+both read `entry_owners`, and that table only ever gained a row from `POST /entries` — creating a
+managed entry and owning it happen in the same transaction, and there was no other way in. A name
+that joined the pool on its own, the way most of the roster does (`POST /players` then
+`/players/:id/claim`), has no owner and never will unless someone gives it one, however correct the
+client gets about reading `myEntries`. Two routes attach one after the fact, both landing on the
+same `entry_owners` insert and both confirmed on the client before calling it, the same as
+reset-access and remove — at least as consequential as either, since unlike them it also switches
+off the player's own `/players/:id/claim` path for good:
+
+- **`POST /entries/attach`** — self-service, for any signed-in account. Proved with the same code
+  `/players/:id/claim` already accepts for a fresh device: if that is enough to sign in as
+  somebody, it is enough to say they are yours to manage. Shares that route's brute-force lockout
+  (`isLockedOut`/`noteClaimFailure`/`MAX_CLAIM_ATTEMPTS`) rather than opening a second unguarded
+  way to guess a code. Surfaced next to "Add an entry" on Account, both surfaces.
+- **`POST /commissioner/players/:id/attach`** — the recovery path, for exactly the name a code
+  cannot rescue: one created before codes existed (`claimCode` null — a real state in production,
+  not a hypothetical) or one whose owner has simply forgotten it. Needs no code at all, because
+  commissioner authority already substitutes for one, but — like the self-service route — only
+  ever attaches onto the *calling* account, never a third party's.
 
 ## One Sunday, one set of words
 

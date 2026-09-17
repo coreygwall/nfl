@@ -182,6 +182,24 @@ export interface CommissionerPlayerDTO extends Player {
   code: string | null;
   /** The commissioner's checkmark — squared away for the season. Commissioner API only. */
   ready: boolean;
+  /**
+   * Who already manages this entry, if anyone. Null is the ordinary case — most players are
+   * independent people playing under their own name — not a sign that something is wrong, so a
+   * client should not read it as a defect to flag on every such row.
+   */
+  owner: { id: string; name: string } | null;
+}
+
+/**
+ * Brings a player who already exists — already picking, already with a history — under an
+ * account that did not create them. The only other way a player gets an owner is `POST
+ * /entries`, which creates the player and the ownership in the same breath; this is the path for
+ * one that predates that, typically because they joined by typing their own name into the pool's
+ * link rather than being added from someone else's account.
+ */
+export interface AttachEntryResponse {
+  player: Player;
+  ownerId: string;
 }
 
 export interface CommissionerResetAccessResponse {

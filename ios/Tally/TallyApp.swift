@@ -34,7 +34,18 @@ struct TallyApp: App {
                 // The whole app, in one place. Every colour in Theme.swift resolves against the
                 // trait collection, so this one modifier re-lights every screen.
                 .preferredColorScheme(model.theme.scheme)
-                .onOpenURL { url in model.open(url) }
+                // A golf card's lock screen carries its own kind of link — `AppModel.open` is
+                // built entirely around pool links (`PoolRef.parse`) and would force `.pool`
+                // context on anything, so a round's URL is caught here, before that, by the one
+                // place that holds both models.
+                .onOpenURL { url in
+                    if let cardId = RoundActivityAttributes.cardId(in: url) {
+                        golf.tab = .round
+                        model.switchToCard(cardId)
+                    } else {
+                        model.open(url)
+                    }
+                }
                 // A notification tapped while the app was shut arrives before any view exists, so
                 // the path waits on the service and is picked up here instead of being lost.
                 .onChange(of: model.push.pendingPath) { _, _ in model.consumeNotificationTap() }

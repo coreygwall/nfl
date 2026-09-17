@@ -3,6 +3,7 @@ import { motion } from "motion/react";
 import { Link } from "react-router";
 import { authHeaders, ApiClientError } from "../api/client.ts";
 import {
+  useAttachEntry,
   useBootstrap,
   useClaimRoles,
   useCommissionerOverview,
@@ -345,10 +346,12 @@ const VIEW_KEY = "tally.roster.view";
  * pool rather than work through it.
  */
 function Players() {
+  const boot = useBootstrap();
   const data = useCommissionerPlayers(true);
   const mut = useCommissionerPlayerMutation();
   const reset = useResetAccess();
   const setReady = useSetReady();
+  const attach = useAttachEntry();
   const [filter, setFilter] = useState<ReadyFilter>("all");
   const [view, setView] = useState<RosterView>(() => {
     try {
@@ -389,6 +392,20 @@ function Players() {
     }
   };
 
+  /** The other way a player gains an owner — see `AttachEntryResponse`. Only ever onto this
+   *  account, never a third party's — but it still moves somebody's picks under a different
+   *  login and turns off their own way back in, which is exactly the shape of the other
+   *  confirmed actions here, so it gets the same guard. */
+  const attachToMe = async (p: CommissionerPlayerDTO) => {
+    if (!window.confirm(`Add ${p.name} to your account? Their picks move under it, and they can no longer sign in as themselves on a new device — only from inside yours.`)) return;
+    try {
+      await attach.mutateAsync(p.id);
+      toast(`${p.name} is now one of your entries.`, "success");
+    } catch (err) {
+      toast(err instanceof Error ? err.message : "Couldn't attach", "error");
+    }
+  };
+
   const toggleReady = async (id: string, name: string, ready: boolean) => {
     try {
       await setReady.mutateAsync({ id, ready });
@@ -425,10 +442,15 @@ function Players() {
   const readyCount = all.filter((p) => p.ready).length;
   const shown = filter === "all" ? all : all.filter((p) => (filter === "ready" ? p.ready : !p.ready));
 
+  // Attaching only ever targets this account and never the account's own row, so an entry
+  // offers it exactly when it is unowned and is not already the signed-in player.
+  const attachable = (p: CommissionerPlayerDTO) => p.owner === null && p.id !== boot.data?.account?.id;
+
   const actions = (p: CommissionerPlayerDTO) => (
     <Menu
       label={`More for ${p.name}`}
       items={[
+        ...(attachable(p) ? [{ label: "Add to my account", onSelect: () => void attachToMe(p), disabled: attach.isPending }] : []),
         { label: "Rename", onSelect: () => rename(p), disabled: mut.isPending },
         // Each reset mints a new code and revokes the devices, so a second one in flight means two
         // "here is the new code" toasts and only the last of them still opens anything.

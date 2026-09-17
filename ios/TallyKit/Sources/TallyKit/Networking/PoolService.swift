@@ -53,6 +53,15 @@ public struct PoolService: Sendable {
         try await client.post("/entries", body: NameBody(name: name))
     }
 
+    private struct AttachEntryBody: Encodable { let name: String; let code: String }
+
+    /// Brings a name that already joined the pool on its own into this account — the self-service
+    /// side of `attachEntry` on the commissioner service, proved with the same code that already
+    /// claims a device.
+    public func attachEntry(name: String, code: String) async throws -> AttachEntryResponse {
+        try await client.post("/entries/attach", body: AttachEntryBody(name: name, code: code))
+    }
+
     /// Tells the server which identity this device is picking as; the header still rules.
     public func touchSession(token: String) async throws -> SessionResponse {
         try await client.post("/session", options: .init(token: token))
@@ -122,6 +131,13 @@ public struct PoolService: Sendable {
 
     public func resetAccess(playerId: String) async throws -> ResetAccessResponse {
         try await client.post("/commissioner/players/\(playerId)/reset-access")
+    }
+
+    /// Attaches a player who already exists onto the calling commissioner's own account — the
+    /// other half of `POST /entries`, for a name that joined the pool on its own rather than
+    /// being added from inside an account.
+    public func attachEntry(playerId: String) async throws -> AttachEntryResponse {
+        try await client.post("/commissioner/players/\(playerId)/attach")
     }
 
     private struct CommissionerBody: Encodable { let playerId: String }

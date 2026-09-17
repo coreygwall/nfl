@@ -12,6 +12,7 @@ import { boardWeek, gameStatus, isLocked, pickWeek, SEASON_START_WEEK, weekSumma
 import type { Game, Player } from "../../shared/types.ts";
 import type { PlayerPick } from "../../shared/scoring.ts";
 import type {
+  AttachEntryResponse,
   BootstrapResponse,
   ClaimResponse,
   CreatePlayerResponse,
@@ -23,6 +24,7 @@ import type {
 } from "../../shared/api.ts";
 import {
   addDevice,
+  attachEntry,
   clearClaimFailures,
   countPasskeys,
   countDevices,
@@ -32,6 +34,7 @@ import {
   findPlayerByKey,
   getPlayer,
   noteClaimFailure,
+  ownerOfEntry,
   setClaimCode,
   listAllPicks,
   listGames,
@@ -59,7 +62,7 @@ export function parseWeek(raw: string | undefined): number {
 
 const MAX_PLAYERS = 200;
 /** One account picking for its household, not a way to fill the roster from one phone. */
-const MAX_ENTRIES = 12;
+export const MAX_ENTRIES = 12;
 /**
  * The pool's link gets texted around and posted, so the signup form is open to anyone holding it.
  * The number sits between the two cases that matter: a room full of friends joining over one wifi
@@ -144,6 +147,57 @@ publicRoutes.post("/entries", async (c) => {
     c.env.DB.prepare("INSERT INTO entry_owners (player_id, owner_id) VALUES (?, ?)").bind(player.id, account.id),
   ]);
   return c.json({ player }, 201);
+});
+
+/**
+ * The self-service side of `attach`. `POST /entries` only ever covers a name created from inside
+ * an account; most of a pool joins the other way — typing a name straight into the link — and
+ * that path has never had an owner to give it one. Anyone signed in can bring such a name into
+ * their own account, on exactly the proof `/players/:id/claim` already accepts for a fresh
+ * device: the code. Nothing here reaches for a name still guarded by someone else's account, or
+ * for one with no code to prove — those go through the commissioner instead, the same as
+ * recovering a lost device does.
+ */
+publicRoutes.post("/entries/attach", async (c) => {
+  const account = c.get("account");
+  if (!account) throw new ApiError(401, "NO_PLAYER", "Sign in to attach an entry to your account.");
+  const body = (await c.req.json().catch(() => ({}))) as { name?: unknown; code?: unknown };
+  const check = validateName(body.name);
+  if (!check.ok) throw badRequest("INVALID_NAME", check.message);
+  const player = await findPlayerByKey(c.env.DB, nameKey(check.name));
+  if (!player) throw notFound("NO_PLAYER", "That name is not in the pool.");
+  if (player.id === account.id) throw badRequest("SELF", "That's already your own entry.");
+  const owner = await ownerOfEntry(c.env.DB, player.id);
+  if (owner) {
+    throw new ApiError(
+      409,
+      "MANAGED_ENTRY",
+      owner.id === account.id ? `${player.name} is already one of your entries.` : `${player.name} is managed through ${owner.name}'s account. Ask them, or the commissioner.`,
+    );
+  }
+  const now = c.get("now");
+  if (isLockedOut(player.claimLockedUntil, now)) {
+    throw new ApiError(429, "CLAIM_LOCKED", "Too many tries. Wait a few minutes or ask the commissioner for a new code.");
+  }
+  if (!player.claimCode) {
+    throw new ApiError(409, "NO_CODE", `${player.name} has no code yet. Ask the commissioner to reset it.`);
+  }
+  if (!codesMatch(String(body.code ?? ""), player.claimCode)) {
+    const attempts = player.claimAttempts + 1;
+    const locked = attempts >= MAX_CLAIM_ATTEMPTS ? lockUntil(now) : null;
+    await noteClaimFailure(c.env.DB, player.id, locked ? 0 : attempts, locked);
+    throw new ApiError(401, "BAD_CODE", "That code doesn't match.");
+  }
+  await clearClaimFailures(c.env.DB, player.id);
+  const owned = await c.env.DB.prepare("SELECT count(*) AS n FROM entry_owners WHERE owner_id = ?")
+    .bind(account.id)
+    .first<{ n: number }>();
+  if ((owned?.n ?? 0) >= MAX_ENTRIES) {
+    throw new ApiError(403, "TOO_MANY_ENTRIES", `One account can manage ${MAX_ENTRIES} entries. Ask the commissioner if you need more.`);
+  }
+  await attachEntry(c.env.DB, player.id, account.id);
+  const res: AttachEntryResponse = { player: publicPlayer(player), ownerId: account.id };
+  return c.json(res);
 });
 
 publicRoutes.post("/players", async (c) => {
