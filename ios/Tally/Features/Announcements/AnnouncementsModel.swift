@@ -38,11 +38,6 @@ extension AppModel {
 
     var unreadAnnouncementBadge: String? { AnnouncementRead.badgeText(unread: unreadAnnouncements) }
 
-    /// The unread ones, newest first — what the megaphone sheet previews.
-    var unreadAnnouncementList: [PoolMessage] {
-        Array(messages.prefix(unreadAnnouncements))
-    }
-
     var canPostAnnouncements: Bool { messageFeed.value?.canManage ?? false }
     var canReactToAnnouncements: Bool { messageFeed.value?.canReact ?? false }
     var announcementsEnabled: Bool { messageFeed.value?.enabled ?? false }
@@ -91,9 +86,10 @@ extension AppModel {
 
      It used to scroll on Home and peek everywhere else, which made one button do two things
      depending on where you happened to be standing. Now the feed is not on Home at all, and the
-     megaphone is the one door to it: a medium sheet of what is new, over whatever you were doing,
-     and going any further is a second, deliberate tap. The web keeps its section on the pool
-     home and scrolls to it, because a page can afford a section; a tab cannot.
+     megaphone is the one door to it: a medium sheet of the announcements, whole, over whatever
+     you were doing. The full feed is a second tap only when there is something a sheet cannot
+     hold — older pages, or the composer. The web keeps its section on the pool home and scrolls
+     to it, because a page can afford a section; a tab cannot.
      */
     func tapMegaphone() {
         showAnnouncementsSheet = true
