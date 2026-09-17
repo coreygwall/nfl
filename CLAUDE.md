@@ -154,6 +154,15 @@ body**; `ScrambleTally.summary` survives only as the fallback for a render that 
 footer's `playtally.app` is the seam for the link that belongs there once there is a recap to point
 at or an App Store listing.
 
+**One badge, and the ball inside it says which contest.** `GolfMark` is `TallyMark` with a ball on
+a tee where the football sits — same yellow ground, same ink, same border — so the golf chip and
+the poster read as Tally without wearing the pool's game; a card that three people just played
+should not be selling football to them. Both are rasterised at 1x/2x/3x from SVG
+(`public/icon.svg`, `public/golf.svg`) by `scripts/build-ios-assets.ts`, which is why they are
+**app-target assets and so invisible to the widget extension** — a lock screen that ever wants a
+mark has to draw one, per the rule above. The tee is what makes it legible at 22pt: a bare ball is
+a circle with specks on it, and the football's silhouette is the thing that survives being small.
+
 The round's Live Activity is the one lock screen in the app that **needs no APNs key**: a scramble
 has no feed, so every change is a tap in this app and `RoundActivityService` updates the activity
 itself with `pushType` left nil. Do not give it a token it would never use. It starts on the first

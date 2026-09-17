@@ -61,15 +61,21 @@ async function main() {
     console.log(`team-${abbr}`);
   }
 
-  // The Tally mark, for the header.
-  const mark = path.join(CATALOG, "TallyMark.imageset");
-  rmSync(mark, { recursive: true, force: true });
-  mkdirSync(mark, { recursive: true });
-  await render(path.join(ROOT, "public/icon.svg"), MARK_PT, path.join(mark, "TallyMark"));
-  writeFileSync(
-    path.join(mark, "Contents.json"),
-    contents([1, 2, 3].map((s) => ({ idiom: "universal", filename: `TallyMark${s === 1 ? "" : `@${s}x`}.png`, scale: `${s}x` }))),
-  );
+  // The contest marks, for the chip and the share card. Same badge every time; the ball inside it
+  // is the only thing that changes, which is what makes a golf card still read as Tally.
+  for (const [name, source] of [
+    ["TallyMark", "public/icon.svg"],
+    ["GolfMark", "public/golf.svg"],
+  ]) {
+    const mark = path.join(CATALOG, `${name}.imageset`);
+    rmSync(mark, { recursive: true, force: true });
+    mkdirSync(mark, { recursive: true });
+    await render(path.join(ROOT, source), MARK_PT, path.join(mark, name));
+    writeFileSync(
+      path.join(mark, "Contents.json"),
+      contents([1, 2, 3].map((s) => ({ idiom: "universal", filename: `${name}${s === 1 ? "" : `@${s}x`}.png`, scale: `${s}x` }))),
+    );
+  }
 
   // The app icon: iOS masks its own corners, so the artwork fills the square edge to edge.
   const icon = path.join(CATALOG, "AppIcon.appiconset");
@@ -126,7 +132,7 @@ async function main() {
     writeFileSync(path.join(CATALOG, "Contents.json"), JSON.stringify({ info: { author: "xcode", version: 1 } }, null, 2) + "\n");
   }
   await browser.close();
-  console.log(`wrote ${files.length} stickers, the mark and the app icon to ios/Tally/Assets.xcassets`);
+  console.log(`wrote ${files.length} stickers, both marks and the app icon to ios/Tally/Assets.xcassets`);
 }
 
 main().catch((err) => {

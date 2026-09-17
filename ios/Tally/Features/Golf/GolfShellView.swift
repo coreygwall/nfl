@@ -70,7 +70,7 @@ struct CardChip: View {
         let name = golf.card(cardId)?.name ?? "Golf"
         PoolMenu {
             HStack(spacing: 6) {
-                Image("TallyMark")
+                Image("GolfMark")
                     .resizable()
                     .scaledToFit()
                     .frame(width: 22, height: 22)
