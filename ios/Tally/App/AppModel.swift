@@ -259,6 +259,23 @@ final class AppModel {
         }
     }
 
+    private static let pagerKey = "tally.labs.pager"
+
+    /**
+     Labs: the pool's page wears a pager between pools.
+
+     A trial of a second way to switch. Home is the switcher and stays so; this is for the person
+     who lives on the Pool tab and wants the next pool one flick away. Off by default, and honest
+     about what it is not: the page below reloads rather than sliding, because a pool is a session
+     and a bootstrap, not a page.
+     */
+    var poolPager: Bool = false {
+        didSet {
+            guard poolPager != oldValue else { return }
+            UserDefaults.standard.set(poolPager, forKey: AppModel.pagerKey)
+        }
+    }
+
     private func setContext(_ next: ContestContext) {
         guard next != context else { return }
         context = next
@@ -309,6 +326,7 @@ final class AppModel {
         monitor.start(queue: DispatchQueue(label: "tally.network"))
         theme = UserDefaults.standard.string(forKey: AppModel.themeKey).flatMap(ThemeChoice.init(rawValue:)) ?? .system
         golfCards = UserDefaults.standard.bool(forKey: AppModel.golfKey)
+        poolPager = UserDefaults.standard.bool(forKey: AppModel.pagerKey)
         context = golfCards ? AppModel.loadContext() : .pool
         loadLegacyPin()
         announcementsSeenId = AnnouncementSeen.load(pool: pool)

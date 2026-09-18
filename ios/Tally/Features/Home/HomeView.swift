@@ -46,6 +46,7 @@ struct HomeView: View {
 
     private var poolSection: some View {
         VStack(alignment: .leading, spacing: 10) {
+            if model.poolPager, model.catalog.pools.count > 1 { PoolPager() }
             SectionLabel(text: "This week")
             if let pool = model.catalog.current {
                 ActivePoolCard(pool: pool, week: week.value, season: season.value, failed: week.error != nil)
@@ -127,6 +128,87 @@ struct HomeView: View {
         } else {
             do { completed = .loaded(try await model.service.weekBoard(done)) } catch { completed = .failed(error.asAPIError) }
         }
+    }
+}
+
+/**
+ Labs: the pools as pages, at the top of the pool's own page.
+
+ The mark and the name, a dot per pool, and a chevron each side that is live only when there is a
+ pool that way. A flick on this row goes the same way; the gesture is contained to the row so it
+ cannot fight the horizontal scrollers further down the page. The order is by name rather than
+ the catalogue's, because the catalogue sorts by last opened — which would put whichever pool you
+ just switched to at the front and shuffle left and right under your thumb.
+
+ The page below reloads rather than slides. A pool is a session and a bootstrap, and the honest
+ thing is the skeleton the page already draws while one lands, not a slide into a blank.
+ */
+private struct PoolPager: View {
+    @Environment(AppModel.self) private var model
+    @State private var drag: CGFloat = 0
+
+    private var pools: [PoolMembership] {
+        model.catalog.pools.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+    private var index: Int { pools.firstIndex { $0.ref == model.pool } ?? 0 }
+    private var previous: PoolMembership? { index > 0 ? pools[index - 1] : nil }
+    private var next: PoolMembership? { index + 1 < pools.count ? pools[index + 1] : nil }
+
+    var body: some View {
+        HStack(spacing: 8) {
+            arrow("chevron.left", to: previous)
+            VStack(spacing: 6) {
+                HStack(spacing: 8) {
+                    Image("TallyMark")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: 28, height: 28)
+                    Text(model.poolName).display(18).lineLimit(1)
+                }
+                HStack(spacing: 5) {
+                    ForEach(pools) { pool in
+                        Circle()
+                            .fill(pool.ref == model.pool ? Color.ink : Color.line)
+                            .frame(width: 6, height: 6)
+                    }
+                }
+            }
+            .frame(maxWidth: .infinity)
+            .offset(x: drag)
+            arrow("chevron.right", to: next)
+        }
+        .padding(.horizontal, 10)
+        .padding(.vertical, 10)
+        .cardFlat()
+        .contentShape(Rectangle())
+        .gesture(
+            DragGesture(minimumDistance: 20)
+                .onChanged { drag = $0.translation.width / 3 }
+                .onEnded { value in
+                    let target = value.translation.width < -50 ? next : value.translation.width > 50 ? previous : nil
+                    withAnimation(Motion.snap) { drag = 0 }
+                    if let target { go(target) }
+                }
+        )
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Pool \(index + 1) of \(pools.count), \(model.poolName)")
+    }
+
+    private func arrow(_ symbol: String, to pool: PoolMembership?) -> some View {
+        Button { if let pool { go(pool) } } label: {
+            Image(systemName: symbol)
+                .font(.system(size: 14, weight: .bold))
+                .foregroundStyle(pool == nil ? Color.line : Color.ink)
+                .frame(width: 32, height: 32)
+        }
+        .buttonStyle(.plain)
+        .disabled(pool == nil)
+        .accessibilityLabel(pool.map { "Switch to \($0.name)" } ?? "No pool this way")
+    }
+
+    private func go(_ pool: PoolMembership) {
+        Haptics.tap()
+        model.switchPool(pool.ref)
     }
 }
 

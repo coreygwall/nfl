@@ -8,10 +8,12 @@ import TallyKit
  them is going to become "Announcements", so the same jobs are done by a peek and a sheet, both
  opened from the megaphone in the navigation bar of every tab:
 
- - `AnnouncementPeekSheet` is what the megaphone opens — the unread ones, in a medium detent, over
-   whatever you were doing. Reading a notice should not cost you your place in a pick flow.
- - `AnnouncementsFeedSheet` is the whole thing, with the composer and the switch for whoever runs
-   the pool.
+ - `AnnouncementPeekSheet` is what the megaphone opens — every announcement loaded so far, in a
+   medium detent that grows, over whatever you were doing. Reading a notice should not cost you
+   your place in a pick flow, and it is the reading: opening it clears the badge.
+ - `AnnouncementsFeedSheet` is behind it for the two jobs a peek cannot do — the older pages, and
+   the composer and switch for whoever runs the pool. A member with two announcements never needs
+   it, so it only offers itself when one of those jobs exists.
 
  Both read one feed off `AppModel`, so the badge and the sheets can never disagree about what is
  unread.
@@ -43,8 +45,10 @@ struct MegaphoneButton: View {
                     }
                 }
                 // The badge hangs outside the glyph, and a navigation bar will happily clip it.
-                .padding(.trailing, 8)
-                .padding(.top, 6)
+                // Room on every side rather than only where the badge goes: the bar draws a glass
+                // circle around the whole label, and one-sided padding put the megaphone off its
+                // centre.
+                .padding(6)
         }
         .accessibilityLabel(label)
     }
@@ -59,19 +63,18 @@ struct MegaphoneButton: View {
 // MARK: The peek
 
 /**
- What the megaphone opens away from Home.
+ What the megaphone opens.
 
- It is deliberately not the feed: a medium detent over the picks you are in the middle of, showing
- what is new and nothing else, with two ways out — read one, or read them all. Whichever you pick,
- you chose it; the sheet never decided for you that you were done with what you were doing.
+ It is deliberately not the feed: a medium detent over the picks you are in the middle of, with the
+ announcements in it whole — the body, the like, and for a commissioner the edit — so reading and
+ reacting never cost you your place. It used to show three and hand everything else to the feed
+ behind a "View all", which for a pool with two announcements was a second tap to see what the
+ first had already shown. The feed is still there for what a peek cannot hold: the older pages
+ once there are enough to page, and the composer for whoever runs the pool.
  */
 struct AnnouncementPeekSheet: View {
     @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-
-    private var unread: [PoolMessage] { model.unreadAnnouncementList }
-    /// Nothing new is still worth opening — the last thing said is the thing you came to check.
-    private var shown: [PoolMessage] { Array((unread.isEmpty ? model.messages : unread).prefix(3)) }
 
     var body: some View {
         NavigationStack {
@@ -83,24 +86,20 @@ struct AnnouncementPeekSheet: View {
                             Text(model.announcementsEnabled ? "No announcements yet." : "Announcements are off.")
                                 .sans(14).foregroundStyle(Color.ink2)
                         } else {
-                            if unread.isEmpty {
-                                Text("Nothing new. Here's the last one.")
-                                    .sans(12, weight: .bold).foregroundStyle(Color.ink3)
-                            }
-                            ForEach(Array(shown.enumerated()), id: \.element.id) { index, message in
+                            ForEach(Array(model.messages.enumerated()), id: \.element.id) { index, message in
                                 if index > 0 { DashedDivider() }
-                                AnnouncementRow(message: message, canManage: false, preview: true) {
-                                    model.openAnnouncementsFeed(focus: message.id)
-                                }
-                            }
-                            if unread.count > shown.count {
-                                Text("+\(unread.count - shown.count) more unread")
-                                    .sans(12, weight: .bold).foregroundStyle(Color.ink2)
+                                AnnouncementRow(message: message, canManage: model.canPostAnnouncements)
                             }
                         }
-                        Button("View all announcements") { model.openAnnouncementsFeed() }
-                            .buttonStyle(.tally(.plain, size: .small, fullWidth: true))
-                            .padding(.top, 2)
+                        if model.canPostAnnouncements {
+                            Button("Post an announcement") { model.openAnnouncementsFeed() }
+                                .buttonStyle(.tally(.plain, size: .small, fullWidth: true))
+                                .padding(.top, 2)
+                        } else if model.hasMoreAnnouncements {
+                            Button("Older announcements") { model.openAnnouncementsFeed() }
+                                .buttonStyle(.tally(.plain, size: .small, fullWidth: true))
+                                .padding(.top, 2)
+                        }
                     }
                     .padding(16)
                     .padding(.bottom, 24)
@@ -113,6 +112,9 @@ struct AnnouncementPeekSheet: View {
         }
         .presentationDetents([.medium, .large])
         .presentationDragIndicator(.visible)
+        // Opening this *is* reading them: it shows every one, so the badge has nothing left to
+        // count once it is up.
+        .task { model.markAnnouncementsRead() }
     }
 }
 

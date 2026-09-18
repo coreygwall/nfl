@@ -199,7 +199,12 @@ took last week. (A golf card has its own three; see above.)
   owed, as the entry that owes them, otherwise onto the pool's page. The chip top-left of the
   pool's own tabs (`PoolChip`) is the mark and the pool name, and it is a label rather than a menu.
   `PoolsView` is only join / start / the catalogue, the way in at the bottom of Home. The pool's
-  page does not list the other pools; Home says everything that strip used to.
+  page does not list the other pools; Home says everything that strip used to. Behind Labs
+  (`poolPager`) the Pool tab wears a `PoolPager` row — chevrons, dots, a contained flick — as a
+  trial of a second switcher for whoever lives on that tab. It pages by *name*, not the
+  catalogue's last-opened order, or the pool you just switched to would jump to the front and
+  left/right would shuffle under your thumb. The page reloads rather than slides: a pool is a
+  session and a bootstrap, not a page.
 - **The web has no switcher, and stopped pretending to.** A pool *is* an address there: the Worker
   serving a page serves exactly one, so a second pool is a second host, and browser storage is per
   origin — a catalogue of them is not something a tab can hold. `PoolSheet` off the lockup names
@@ -219,9 +224,11 @@ took last week. (A golf card has its own three; see above.)
   the query (`EntryPicker`), or the previous entry's "locked in" screen follows you.
 - **Rules is not a tab.** `RulesSheet` on iOS, `/rules` on web, linked from Home and the board.
 - **Announcements is not a tab either**, and the megaphone differs by surface on purpose. On iOS it
-  always opens a peek — a medium sheet of the unread ones — from every tab, and there is no
-  announcements section on Home; reading a notice must not cost you your place in a pick flow, and
-  "Read them all" is a second, deliberate tap. On web the feed is a section on the pool home, so
+  always opens a peek — a medium sheet of the announcements, whole, with the like in each row —
+  from every pool tab, and there is no announcements section on the pool's page; reading a notice
+  must not cost you your place in a pick flow, and opening the peek is the reading, so it clears
+  the badge. The full feed is behind it only for what a sheet cannot hold: older pages, and the
+  commissioner's composer. On web the feed is a section on the pool home, so
   there the megaphone scrolls to it and peeks elsewhere. Read state is the id of the newest post
   the *device* has looked at (`AnnouncementRead`, mirrored from `src/lib/announcementRead.ts`),
   never a count or a timestamp, and never per entry: a phone that picks for the family is one
