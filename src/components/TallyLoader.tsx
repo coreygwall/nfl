@@ -4,9 +4,9 @@ import type { Abbr } from "../../shared/teams.ts";
 /**
  * The loading animation.
  *
- * A spinning ring is what every app uses while it waits. This one draws a tally mark — four
- * strokes and the diagonal — because that is what the app is called, and because five is the
- * number the whole pool is built on. It draws, holds, and rubs out, which is also roughly what a
+ * A spinning ring is what every app uses while it waits. This one writes the tally mark — four
+ * strokes and the fifth through them — because that is what the app is called, and because five
+ * is the number the whole pool is built on. It draws, holds, and rubs out, which is also roughly what a
  * week does.
  *
  * Pure CSS: no JavaScript ticking at sixty frames a second behind a request that is already the
@@ -27,45 +27,43 @@ export function TallyLoader({ label = "Loading…", size = 64 }: { label?: strin
  * one part of a page catches up.
  */
 export function TallyMark({ size = 64 }: { size?: number }) {
-  // Four uprights and the slash across them, in a 56x40 box. The slash is gold so the fifth
-  // stroke reads as the one that completes the set, which is the whole point of a tally.
-  const uprights = [7, 18, 29, 40];
+  // The icon's geometry (public/icon.svg) in a 100x68 box; TallyGlyph.swift draws the same paths.
+  // Each upright leans and lands at its own height, and the fifth stroke is a heavy pull with a
+  // cut of the paper down its middle — one stroke with a scar, which is how the stroke that
+  // completes the set gets to be the one you see. The weights come from CSS (`--tally-k`,
+  // `--tally-edge`, `--tally-cut`) because the dark theme needs its own: a light stroke on a dark
+  // ground swells where a dark one on a light ground shrinks, and at the light weights the dark
+  // cut nearly closes.
+  const uprights: [string, number][] = [
+    ["M20 9 C 19 26, 21.5 44, 22 63", 8.2],
+    ["M37 14 C 38.5 29, 36 43, 37.5 57", 7.4],
+    ["M53.5 7 C 52 26, 55 43, 53 61", 9],
+    ["M71 12 C 72.5 27, 70 42, 71.5 60", 7.8],
+  ];
+  const hook = "M8 63 C 26 49, 46 33, 66 19 C 74 13.5, 80 8, 85 5 C 86.5 4.5, 87 6, 86 7.5";
   return (
     <svg
       width={size}
-      height={(size * 40) / 56}
-      viewBox="0 0 56 40"
+      height={(size * 68) / 100}
+      viewBox="0 0 100 68"
       fill="none"
+      strokeLinecap="round"
+      strokeLinejoin="round"
       aria-hidden="true"
       className="tally-mark overflow-visible"
     >
-      {uprights.map((x, i) => (
-        <line
-          key={x}
-          x1={x}
-          y1={7}
-          x2={x}
-          y2={33}
+      {uprights.map(([d, w], i) => (
+        <path
+          key={d}
+          d={d}
           pathLength={1}
           stroke="var(--color-ink)"
-          strokeWidth={4}
-          strokeLinecap="round"
           className="tally-stroke"
-          style={{ "--i": i } as React.CSSProperties}
+          style={{ "--i": i, strokeWidth: `calc(${w}px * var(--tally-k))` } as React.CSSProperties}
         />
       ))}
-      <line
-        x1={2}
-        y1={33}
-        x2={48}
-        y2={7}
-        pathLength={1}
-        stroke="var(--color-flag)"
-        strokeWidth={4.5}
-        strokeLinecap="round"
-        className="tally-stroke"
-        style={{ "--i": 4 } as React.CSSProperties}
-      />
+      <path d={hook} pathLength={1} stroke="var(--color-ink)" className="tally-stroke" style={{ "--i": 4, strokeWidth: "var(--tally-edge)" } as React.CSSProperties} />
+      <path d={hook} pathLength={1} stroke="var(--color-paper)" className="tally-stroke" style={{ "--i": 4, strokeWidth: "var(--tally-cut)" } as React.CSSProperties} />
     </svg>
   );
 }

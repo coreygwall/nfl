@@ -4,9 +4,9 @@ import TallyKit
 /**
  The loading animation.
 
- A spinning ring is what every app uses while it waits. This one draws a tally mark — four strokes
- and the diagonal — because that is what the app is called, and because five is the number the
- whole pool is built on. It draws, holds, and goes, which is roughly what a week does too.
+ A spinning ring is what every app uses while it waits. This one writes the tally mark — four
+ strokes and the fifth through them — because that is what the app is called, and because five is
+ the number the whole pool is built on. It draws, holds, and goes, which is roughly what a week does too.
 
  With Reduce Motion on it is a finished mark sitting still, which still says "five" and still says
  "Tally", and says nothing at all about waiting.
@@ -60,7 +60,7 @@ struct TallyMark: View {
                 }
             }
         }
-        .frame(width: size, height: size * 40 / 56)
+        .frame(width: size, height: size * TallyGlyph.aspect)
         .accessibilityHidden(true)
     }
 
@@ -75,7 +75,7 @@ struct TallyMark: View {
         guard fade > 0 else { return }
         var context = context
         context.opacity = fade
-        TallyGlyph.draw(into: context, size: size, progress: progress, ink: .ink, slash: .flag)
+        TallyGlyph.draw(into: context, size: size, progress: progress, ink: .ink, ground: .paper)
     }
 }
 

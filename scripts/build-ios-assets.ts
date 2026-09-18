@@ -83,19 +83,35 @@ async function main() {
   // The app icon: iOS masks its own corners, so the artwork fills the square edge to edge. The
   // glyph is the one in public/icon.svg — four uprights and the slash, the mark the loader draws —
   // rather than a football, because the app is the count and the football is one thing it counts.
-  const iconSvg = (ground: string, ink: string) =>
-    `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="1024" height="1024">
+  // It is drawn by a hand rather than a ruler: each upright leans and lands at its own height, and
+  // the fifth stroke is a heavy pull with a cut of the ground down its middle. The dark tile is
+  // the same geometry with its own weights, because yellow on black swells where black on yellow
+  // shrinks — drawn at the light weights, the dark cut nearly closed. TallyGlyph.swift and
+  // TallyLoader.tsx carry the same numbers.
+  const iconSvg = (ground: string, ink: string, dark: boolean) => {
+    const k = dark ? 0.92 : 1;
+    const [edge, cut] = dark ? [13.2, 5.6] : [14, 4];
+    const hook = "M26 92 C 44 78, 64 62, 84 48 C 92 42.5, 98 37, 103 34 C 104.5 33.5, 105 35, 104 36.5";
+    const uprights: [string, number][] = [
+      ["M38 38 C 37 55, 39.5 73, 40 92", 8.2],
+      ["M55 43 C 56.5 58, 54 72, 55.5 86", 7.4],
+      ["M71.5 36 C 70 55, 73 72, 71 90", 9],
+      ["M89 41 C 90.5 56, 88 71, 89.5 89", 7.8],
+    ];
+    return `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="1024" height="1024">
       <rect width="128" height="128" fill="${ground}"/>
       <rect x="9" y="9" width="110" height="110" rx="26" fill="none" stroke="${ink}" stroke-width="7"/>
-      <g fill="none" stroke="${ink}" stroke-linecap="round">
-        <path d="M40 42v44M56 42v44M72 42v44M88 42v44" stroke-width="8"/>
-        <path d="M32 88L97 40" stroke-width="9"/>
+      <g fill="none" stroke="${ink}" stroke-linecap="round" stroke-linejoin="round">
+        ${uprights.map(([d, w]) => `<path d="${d}" stroke-width="${(w * k).toFixed(2)}"/>`).join("")}
+        <path d="${hook}" stroke-width="${edge}"/>
       </g>
+      <path d="${hook}" fill="none" stroke="${ground}" stroke-width="${cut}" stroke-linecap="round" stroke-linejoin="round"/>
     </svg>`;
-  const iconPage = (ground: string, ink: string, px: number) =>
+  };
+  const iconPage = (ground: string, ink: string, px: number, dark = false) =>
     `<!doctype html><html><body style="margin:0;background:${ground}">
       <div style="width:${px}px;height:${px}px;background:${ground};display:flex;align-items:center;justify-content:center">
-        ${iconSvg(ground, ink).replace('width="1024" height="1024"', `width="${px}" height="${px}"`)}
+        ${iconSvg(ground, ink, dark).replace('width="1024" height="1024"', `width="${px}" height="${px}"`)}
       </div></body></html>`;
 
   const icon = path.join(CATALOG, "AppIcon.appiconset");
@@ -108,8 +124,9 @@ async function main() {
   // The dark icon (iOS 18+). Not the light one dimmed: the relationship inverts. On a home screen
   // full of dark icons the yellow square was the loudest thing on the page, so at night the ground
   // becomes the app's own warm near-black and the strokes become the yellow — the same two
-  // colours, the other way round, which is what the rest of the app does when it goes dark.
-  await page.setContent(iconPage("#1A1713", "#FFD23F", 1024));
+  // colours, the other way round, which is what the rest of the app does when it goes dark — and
+  // the dark weights, per iconSvg.
+  await page.setContent(iconPage("#1A1713", "#FFD23F", 1024, true));
   await page.screenshot({ path: path.join(icon, "AppIcon-Dark.png") });
 
   // The web's touch icon is the light icon at 180, so a home-screen shortcut matches the app.
