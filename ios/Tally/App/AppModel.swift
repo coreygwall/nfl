@@ -666,8 +666,10 @@ final class AppModel {
 
      A code names a *pool*, not a host, so the app asks the hosts it can reach — the one it is
      standing in, the default, then every other pool on the phone — until one claims it. A 404 is
-     an answer rather than a failure, which is why the walk carries on past one; anything else
-     (offline, a host that is down) stops it, because "no pool has that code" would be a lie.
+     an *answer*: that host does not have it, and the next one might. What matters is telling the
+     two endings apart at the finish: "no pool has that code" is only true if somebody actually
+     said so, so a walk where nothing answered says it could not reach Tally instead of blaming
+     a code that may be perfectly good.
 
      Joining is only the *finding*. The pool it lands on decides who you are the usual way: a
      device with no session there gets the welcome screen, exactly as a tapped link does.
@@ -682,7 +684,9 @@ final class AppModel {
         }
         var reachedSomeone = false
         for origin in origins {
-            let probe = PoolService(client: APIClient(pool: PoolRef(origin: origin, slug: ""), auth: { [:] }))
+            // No session: the lookup is the one route a stranger is meant to call, and the slug is
+            // what it answers *with*, so there is nothing to put in either yet.
+            let probe = PoolService(client: APIClient(pool: PoolRef(origin: origin, slug: ""), auth: { AuthHeaders() }))
             do {
                 let found = try await probe.lookupJoinCode(code).pool
                 let ref = PoolRef(origin: origin, slug: found.slug)

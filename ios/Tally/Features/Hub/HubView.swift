@@ -443,7 +443,7 @@ private struct StartCarousel: View {
         all += PoolTypes.all.map { type in
             StartOption(
                 id: type.slug,
-                symbol: StartOption.symbol(for: type.slug),
+                symbol: startSymbol(for: type.slug),
                 name: type.name,
                 tagline: type.tagline,
                 sports: type.sports,
@@ -486,15 +486,16 @@ private struct StartOption: Identifiable {
     let sports: [String]
     /// nil when this type cannot be started yet.
     let start: (() -> Void)?
+}
 
-    static func symbol(for slug: String) -> String {
-        switch slug {
-        case "high-five": return "football.fill"
-        case "survivor": return "flame.fill"
-        case "brackets": return "list.bullet.indent"
-        case "majors": return "rosette"
-        default: return "trophy.fill"
-        }
+/// What a pool type is drawn as in the carousel. Not one of the three marks: see `StartCarousel`.
+private func startSymbol(for slug: String) -> String {
+    switch slug {
+    case "high-five": return "football.fill"
+    case "survivor": return "flame.fill"
+    case "brackets": return "list.bullet.indent"
+    case "majors": return "rosette"
+    default: return "trophy.fill"
     }
 }
 
