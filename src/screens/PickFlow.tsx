@@ -677,14 +677,57 @@ function RankRow({
   onDown: () => void;
 }) {
   const controls = useDragControls();
+  const cardRef = useRef<HTMLLIElement>(null);
+  const hold = useRef<number | null>(null);
+  const pressedAt = useRef<{ x: number; y: number } | null>(null);
+  const lifted = useRef(false);
+
+  // Press and hold anywhere on the card to lift it; the grip still lifts at once. Before the
+  // hold lands, a finger that moves is scrolling and the browser keeps it (`touch-pan-y`). After
+  // it lands the page must not move under the drag, and the only way to say that for a touch
+  // already in flight is a non-passive touchmove that prevents the default — a `touch-action`
+  // set mid-gesture is ignored.
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const block = (e: TouchEvent) => { if (lifted.current) e.preventDefault(); };
+    el.addEventListener("touchmove", block, { passive: false });
+    return () => el.removeEventListener("touchmove", block);
+  }, []);
+
+  const cancelHold = () => {
+    if (hold.current !== null) { window.clearTimeout(hold.current); hold.current = null; }
+    pressedAt.current = null;
+  };
+  const lift = (e: React.PointerEvent) => { lifted.current = true; controls.start(e); };
+  const onPointerDown = (e: React.PointerEvent) => {
+    if ((e.target as HTMLElement).closest("button")) return;
+    // A mouse has no scroll to protect, so it drags on the press like the grip does.
+    if (e.pointerType === "mouse") { lift(e); return; }
+    pressedAt.current = { x: e.clientX, y: e.clientY };
+    hold.current = window.setTimeout(() => { hold.current = null; lift(e); }, 220);
+  };
+  const onPointerMove = (e: React.PointerEvent) => {
+    const start = pressedAt.current;
+    if (!start) return;
+    if (Math.hypot(e.clientX - start.x, e.clientY - start.y) > 8) cancelHold();
+  };
+
   return (
     <Reorder.Item
+      ref={cardRef}
       value={gameId}
       dragListener={false}
       dragControls={controls}
       layout
       whileDrag={{ scale: 1.03, boxShadow: "6px 6px 0 0 var(--color-shadow)", zIndex: 10 }}
-      className="card-flat relative flex touch-pan-y select-none items-center gap-3 bg-surface p-2.5"
+      onDragEnd={() => { lifted.current = false; }}
+      onPointerDown={onPointerDown}
+      onPointerMove={onPointerMove}
+      onPointerUp={cancelHold}
+      onPointerCancel={cancelHold}
+      className="card-flat relative flex cursor-grab touch-pan-y select-none items-center gap-3 bg-surface p-2.5 active:cursor-grabbing"
+      style={{ WebkitTouchCallout: "none" }}
     >
       <motion.div key={rank} initial={{ scale: 0.7 }} animate={{ scale: 1 }} transition={{ type: "spring", stiffness: 600, damping: 20 }}>
         <RankBadge rank={rank} />
@@ -706,7 +749,7 @@ function RankRow({
             than one that stays quiet. */}
         <div
           className="-m-1 cursor-grab touch-none rounded-lg p-3 text-ink-3 active:cursor-grabbing"
-          onPointerDown={(e) => controls.start(e)}
+          onPointerDown={(e) => { e.stopPropagation(); lift(e); }}
           aria-hidden="true"
         >
           <Grip />

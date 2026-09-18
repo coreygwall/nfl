@@ -260,8 +260,12 @@ struct OutcomeTag: View {
 
 /**
  Drag to reorder without a `List`: the whole screen scrolls as one, so the rows are laid out by
- hand and a drag on the grip lifts a row and slides it past its neighbours. The chevrons do the
- same thing one step at a time, for anyone who would rather tap.
+ hand and a drag lifts a row and slides it past its neighbours. Two ways to lift one: the grip
+ lifts at once, and anywhere else on the card lifts after a press and hold — people reach for the
+ card, not the grip, and a card that scrolls the page when it is pulled reads as broken. The hold
+ is what keeps a scroll a scroll: a finger that moves first is scrolling and the sequence never
+ starts, one that stays is lifting and the scroll view lets it go. The chevrons do the same thing
+ one step at a time, for anyone who would rather tap.
  */
 struct ReorderList: View {
     @Environment(AppModel.self) private var model
@@ -291,16 +295,16 @@ struct ReorderList: View {
                     lifted: isDragging,
                     onUp: { onOrder(Draft(selections: selections, order: order).moving(from: i, to: i - 1).order) },
                     onDown: { onOrder(Draft(selections: selections, order: order).moving(from: i, to: i + 1).order) },
-                    drag: DragGesture(minimumDistance: 2, coordinateSpace: .global)
-                        .onChanged { value in
-                            if dragging == nil { dragging = gameId; Haptics.tap() }
-                            dragOffset = value.translation.height
-                        }
+                    drag: drag(index: i, gameId: gameId),
+                    hold: LongPressGesture(minimumDuration: 0.25)
                         .onEnded { _ in
-                            let target = max(0, min(order.count - 1, i + Int((dragOffset / (rowHeight + gap)).rounded())))
-                            if target != i { onOrder(Draft(selections: selections, order: order).moving(from: i, to: target).order); Haptics.tap() }
-                            dragging = nil
-                            dragOffset = 0
+                            if dragging == nil { dragging = gameId; dragOffset = 0; Haptics.tap() }
+                        }
+                        .sequenced(before: drag(index: i, gameId: gameId))
+                        .onEnded { value in
+                            // Held and let go without moving: the drag never began, so nothing
+                            // else will put the row back down.
+                            if case .second(_, nil) = value { dragging = nil; dragOffset = 0 }
                         }
                 )
                 .frame(height: rowHeight)
@@ -313,6 +317,22 @@ struct ReorderList: View {
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: order)
     }
 
+    /// The drag itself, shared by the grip and the held card: lift on the first movement, drop
+    /// into whichever slot the row is nearest when the finger lets go.
+    private func drag(index i: Int, gameId: String) -> some Gesture {
+        DragGesture(minimumDistance: 2, coordinateSpace: .global)
+            .onChanged { value in
+                if dragging == nil { dragging = gameId; Haptics.tap() }
+                dragOffset = value.translation.height
+            }
+            .onEnded { _ in
+                let target = max(0, min(order.count - 1, i + Int((dragOffset / (rowHeight + gap)).rounded())))
+                if target != i { onOrder(Draft(selections: selections, order: order).moving(from: i, to: target).order); Haptics.tap() }
+                dragging = nil
+                dragOffset = 0
+            }
+    }
+
     /// How far a resting row moves aside while another is dragged over it.
     private func shiftFor(index i: Int) -> CGFloat {
         guard let dragging, let from = order.firstIndex(of: dragging), dragging != order[i] else { return 0 }
@@ -323,7 +343,7 @@ struct ReorderList: View {
     }
 }
 
-struct RankRow<G: Gesture>: View {
+struct RankRow<G: Gesture, H: Gesture>: View {
     @Environment(AppModel.self) private var model
     let gameId: String
     let team: String
@@ -334,7 +354,11 @@ struct RankRow<G: Gesture>: View {
     let lifted: Bool
     let onUp: () -> Void
     let onDown: () -> Void
+    /// The grip's: lifts on the first movement.
     let drag: G
+    /// The card's: a press and hold, then the same drag. The chevrons and the grip sit inside it
+    /// and take the touch first, so a tap on either is still a tap.
+    let hold: H
 
     var body: some View {
         HStack(spacing: 12) {
@@ -372,6 +396,8 @@ struct RankRow<G: Gesture>: View {
         }
         .padding(10)
         .frame(maxWidth: .infinity, alignment: .leading)
+        .contentShape(Rectangle())
+        .gesture(hold)
         .background {
             ZStack {
                 if lifted { RoundedRectangle(cornerRadius: TallyRadius.card, style: .continuous).fill(Color.ink).offset(x: 6, y: 6) }
