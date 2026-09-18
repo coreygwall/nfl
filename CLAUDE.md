@@ -131,9 +131,9 @@ sentences: **the first tab is everywhere you can stand, the rest are the contest
 always last.** Home — the app's, not the pool's — is the first tab of both shells and the only
 switcher: every pool and card on the phone as one card each, the ones that want something first and
 dressed to say so, with the count on the tab. The tab bar after it belongs to the family you are in
-— no Board on a card, no Round in a pool. The chip top-left of a contest's own tabs names where you
-are and opens nothing; it was the switcher once, and a second switcher two taps from the first is
-how apps grow eleven tabs.
+— no Board on a card, no Round in a pool. The header at the top of a contest's own tabs names where
+you are and opens nothing; it was a chip in the navigation bar and the switcher once, and a second
+switcher two taps from the first is how apps grow eleven tabs.
 
 `AppModel.context` holds the one fact (pool, or card *X*), `RootView` is the only place that reads
 it to choose a shell, and `PoolShellView` / `GolfShellView` do not import each other. The shared
@@ -201,8 +201,10 @@ took last week. (A golf card has its own three; see above.)
 
 - **Switching pools is the Home tab on iOS, and nothing else.** `AppModel` holds one pool, one
   session, one service; a tap on a card there swaps the whole app — onto the picks if any are
-  owed, as the entry that owes them, otherwise onto the pool's page. The chip top-left of the
-  pool's own tabs (`PoolChip`) is the mark and the pool name, and it is a label rather than a menu.
+  owed, as the entry that owes them, otherwise onto the pool's page. The header at the top of
+  the pool's own tabs (`ScreenHeader`) is the mark and the pool name, and it is a label rather
+  than a menu — and it is page content, not a toolbar item, because iOS 26 wraps a leading
+  toolbar item in glass sized to its own idea of the width, which for a name was one letter.
   `PoolsView` is only join / start / the catalogue, the way in at the bottom of Home. The pool's
   page does not list the other pools; Home says everything that strip used to. Behind Labs
   (`poolPager`) the Pool tab wears a `PoolPager` row — chevrons, dots, a contained flick — as a

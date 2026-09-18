@@ -5,9 +5,9 @@ import TallyKit
  The pool's frame: five tabs on Liquid Glass, the first of them the app's rather than the pool's.
 
  Home is every pool and card on the phone (`HubView`), and it is the switcher — it used to be a
- menu behind the chip in the navigation bar, which could list names and nothing else. Pool is
- this pool's own page. The chip top-left of the other tabs still says which pool you are in; it
- just no longer opens anything, because where you are and where else you could be are different
+ menu behind a chip in the navigation bar, which could list names and nothing else. Pool is
+ this pool's own page. The header at the top of the other tabs (`ScreenHeader`) says which pool
+ you are in and opens nothing, because where you are and where else you could be are different
  questions now, and the second one has a tab.
 
  The right-hand side of the bar is the megaphone, and on Picks and Board the week. Who you are
@@ -88,12 +88,13 @@ struct PoolShellView: View {
     }
 }
 
-/// One tab's page: the paper, the scrolling content, and the shared header in the toolbar.
+/// One tab's page: the paper, the header naming where you are, the scrolling content, and the
+/// pool's buttons in the bar.
 struct PoolScreen<Content: View>: View {
     @Environment(AppModel.self) private var model
     let week: Int?
     let onWeek: (Int) -> Void
-    /// The app's home wears the Tally lockup and none of the pool's controls: the megaphone is
+    /// The app's home is headed "Tally" and wears none of the pool's controls: the megaphone is
     /// this pool's feed, and a page about every pool cannot honestly carry one pool's megaphone.
     var hub = false
     @ViewBuilder let content: Content
@@ -105,17 +106,21 @@ struct PoolScreen<Content: View>: View {
                 ScrollView {
                     VStack(spacing: 0) {
                         if !model.online { OfflineBanner() }
-                        content
-                            .padding(.horizontal, 16)
-                            .padding(.top, 6)
-                            .padding(.bottom, 120)
+                        VStack(spacing: 0) {
+                            if hub {
+                                ScreenHeader(mark: "TallyMark", title: "Tally")
+                            } else {
+                                ScreenHeader(mark: "FootballMark", title: model.poolName)
+                            }
+                            content
+                        }
+                        .padding(.horizontal, 16)
+                        .padding(.top, 6)
+                        .padding(.bottom, 120)
                     }
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    if hub { TallyLockup() } else { PoolChip() }
-                }
                 if !hub && model.announcementsAvailable {
                     ToolbarItem(placement: .topBarTrailing) { MegaphoneButton() }
                 }
@@ -127,50 +132,6 @@ struct PoolScreen<Content: View>: View {
             }
             .toolbarTitleDisplayMode(.inline)
         }
-    }
-}
-
-/// The mark and the name, for the one tab that is about the whole app rather than one pool.
-struct TallyLockup: View {
-    var body: some View {
-        HStack(spacing: 8) {
-            Image("TallyMark")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 28, height: 28)
-            Text("Tally").font(TallyFont.display(17)).foregroundStyle(Color.ink)
-        }
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("Tally")
-    }
-}
-
-/**
- The pool you are in, in the navigation bar of every one of its tabs.
-
- A label, and only a label. It was a menu — the switcher — until the home tab took that job, and a
- chip that still opened a list of pools would be a second switcher two taps from the first. What
- it says is the one thing the other tabs cannot say for themselves: which pool this board, these
- picks, belong to.
- */
-struct PoolChip: View {
-    @Environment(AppModel.self) private var model
-
-    var body: some View {
-        HStack(spacing: 6) {
-            Image("FootballMark")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 22, height: 22)
-            Text(model.poolName)
-                .font(TallyFont.display(15, weight: .bold))
-                .foregroundStyle(Color.ink)
-                .lineLimit(1)
-                .truncationMode(.tail)
-        }
-        .frame(maxWidth: 170)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("In \(model.poolName)")
     }
 }
 
