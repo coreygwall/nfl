@@ -181,6 +181,20 @@ public struct PoolDTO: Codable, Hashable, Sendable {
     public let slug: String
     public let name: String
     public let type: String?
+    /// The short code that gets somebody in — `KDP472`, written `KDP-472`. Optional so a Worker
+    /// that predates join codes still decodes.
+    public let joinCode: String?
+
+    public init(id: String, slug: String, name: String, type: String?, joinCode: String? = nil) {
+        self.id = id; self.slug = slug; self.name = name; self.type = type; self.joinCode = joinCode
+    }
+}
+
+/// What a join code resolves to. The host that answered is the pool's, so it is not repeated.
+public struct JoinLookupResponse: Codable, Sendable {
+    public let pool: PoolDTO
+
+    public init(pool: PoolDTO) { self.pool = pool }
 }
 
 public struct PoolSummary: Codable, Hashable, Sendable {
@@ -189,6 +203,8 @@ public struct PoolSummary: Codable, Hashable, Sendable {
     public let name: String
     public let type: String
     public let season: Int
+    /// The short code that gets somebody in. Optional so a Worker that predates it still decodes.
+    public let joinCode: String?
     public let createdAt: Date
 }
 

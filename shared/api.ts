@@ -26,6 +26,18 @@ export interface PoolDTO {
   slug: string;
   name: string;
   type: string;
+  /**
+   * The short code that gets somebody in — `KDP472`, written `KDP-472`. Sent to everyone in the
+   * pool rather than to its commissioner alone, because the pool's link is already public and
+   * this is the same fact in a form you can say out loud; a pool grows when the person who is
+   * already in it can invite their brother-in-law without going through anybody.
+   */
+  joinCode?: string | null;
+}
+
+/** What a join code resolves to. The host that answered is the pool's, so it is not repeated. */
+export interface JoinLookupResponse {
+  pool: PoolDTO;
 }
 
 export interface BootstrapResponse {

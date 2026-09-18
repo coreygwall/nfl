@@ -19,6 +19,17 @@ public struct PoolService: Sendable {
         try await client.get("/bootstrap")
     }
 
+    /**
+     The pool a join code opens, asked of one host.
+
+     Needs no session: whoever has the code is being invited, and the answer is only what the
+     pool already says at its own public address. A host that does not know the code answers 404,
+     which is how the app walks the hosts it knows until one claims it.
+     */
+    public func lookupJoinCode(_ code: String) async throws -> JoinLookupResponse {
+        try await client.get("/join/\(PoolCode.normalize(code))")
+    }
+
     public func week(_ week: Int) async throws -> WeekResponse {
         try await client.get("/weeks/\(week)")
     }

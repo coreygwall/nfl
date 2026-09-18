@@ -151,6 +151,27 @@ starts on the pool, because a phone that was in a pool last night is still in it
 Home is one tap left with a badge if anything is owed. None of this is the web's; a pool *is* an
 address there.
 
+**One card shell, and the family only fills the body.** `ContestCard` in `HubView.swift` owns the
+badge, the name, the line under it, the divider, the chevron, the padding and the tap; a pool puts
+its entries in the body and a card puts its players there. That is the whole reason the two read
+as one kind of object on a screen that holds both, and it is why a third family costs a body
+rather than a card. The body has a *floor* rather than a fixed height (`contestBodyMinHeight`),
+which is the one concession to content: a pool with four entries has more to say than a card
+nobody has teed off on, and clipping it to match would throw away the thing the card exists for.
+`HubAttention` is the only input to how a card is dressed — flag and hard shadow for something
+owed, a hard shadow for something happening, flat otherwise — decided in the shell and nowhere
+else, so nothing can look urgent without being urgent. The golf card's score used to hang off the
+right-hand edge of its header, which is how a card two taps from a pool came to look like a
+different app's idea of a list row.
+
+Under the cards is **the carousel of what you could start**, and then one button to join. Every
+tile wears a *drawn symbol* rather than one of the three marks, deliberately: the marks say which
+family a contest you are standing in belongs to, and nothing in the carousel has been started, so
+there is no family to name — and a pool played over four days of golf would otherwise have to wear
+the football, which is the mistake the marks were split up to avoid. A type that cannot be started
+yet says so rather than offering a button that apologises; today that is everything except a golf
+card, because the Worker that serves a pool is still the thing that creates it.
+
 Golf is off by default (Account ▸ Settings ▸ Labs). Off means the menu draws exactly as it did and
 the golf shell is unreachable; off is not a reset, so the cards stay on the phone. `TallyKit/Golf/`
 holds the whole model and draws nothing: a scramble is a list of strokes with a name on each and the
@@ -252,6 +273,45 @@ took last week. (A golf card has its own three; see above.)
 - **The web tab bar is not drawn while picks are being made** (`useHideNav`) — the tray takes its
   place — so anything that has to be reachable mid-pick needs its own route out. That is what the
   flow's "Go to pool home" link is for, and why the e2e helpers reach Account by address.
+
+## A pool has two ways in, and only one of them can be said out loud
+
+A link was the only way into a pool until `migrations/0012_pool_codes.sql`. It works when the
+invitation arrives somewhere you can tap it and not at all when it arrives across a table, because
+nobody reads "playtally dot app slash p slash high dash five" to a friend. The join code is the
+second way: **three letters, then three digits** — `KDP-472` — minted once per pool and never
+rotated by itself.
+
+The shape is the load-bearing part, and it is deliberately *not* the device claim code's (`Codes` /
+`shared/codes.ts`, eight characters of one mixed alphabet). Those are different things: a claim
+code is a secret that proves a name is yours, so it is long and guessed at behind a lockout; a join
+code is a handle, printed in a group chat and typed by whoever wants in. Three consequences follow:
+
+- **One input box tells three things apart** without a round trip — a link has a scheme, a join
+  code is 3+3, a claim code is eight of anything. `JoinPoolForm` takes a code *or* a link for
+  exactly this reason, and refuses a typo before spending a request on it.
+- **Both alphabets drop what people misread**: no I, L or O among the letters, no 0 or 1 among the
+  digits. 23³ × 8³ ≈ 6.2 million, which is not a number that needs a plan; the unique index on the
+  column is what actually prevents a collision, and `ensureJoinCode` rolls again if it loses.
+- **A short list is never minted** (`UNMINTABLE` in `shared/pool-codes.ts`) — a doormat, not a
+  censor, the same posture as `shared/profanity.ts`. This is not filtering something a person
+  chose; it is not *handing* a code to a pool full of somebody's family.
+
+The rules live twice, once per language (`shared/pool-codes.ts`, `PoolCode.swift`), and
+`poolCodeParity.test.ts` fails if either alphabet or either half's length drifts — a Swift build
+cannot see the TypeScript, the wire carries a plain string that satisfies both, and the cost of
+disagreement is somebody typing the code from the group chat and being told it is not a code.
+
+`GET /api/join/:code` is the one route a stranger is meant to call, and it answers with what the
+pool already says at its own public address. A code names a *pool*, not a host, so `joinByCode`
+walks the hosts the app can reach — the one it is standing in, the default, then every pool on the
+phone — and treats a 404 as an answer rather than a failure. **The code goes to everyone in the
+pool, not to its commissioner alone**: the pool's link is already public and this is the same fact
+in a sayable form, so a pool grows when the person already in it can invite their brother-in-law
+without going through anybody. `ensurePool` mints one for any row that lacks it, which is how the
+pool that predates the column got one, and `hasCurrentLegacySchema` in `worker/ready.ts` now checks
+for that column too — adopting the revision marker skips `applySchema` entirely, so a check against
+an older migration's tables would mark a database current while it was missing this one.
 
 ## The roster is the server's; the device only keeps the keys
 

@@ -67,6 +67,9 @@ struct RootView: View {
         .sheet(isPresented: $model.showPools) {
             PoolsView()
         }
+        .sheet(isPresented: $model.showJoin) {
+            JoinPoolSheet()
+        }
         .sheet(isPresented: $model.showNotificationSettings) {
             NotificationSettingsSheet()
         }

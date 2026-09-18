@@ -26,6 +26,17 @@ three pools had to open each to learn that Thursday's picks were still owed in o
 that. The header at the top of a contest's own tabs still names where you are; it just no longer opens
 anything, because a second switcher two taps from the first is how apps grow eleven tabs.
 
+Every card on it is the same object — `ContestCard` owns the badge, the name, the line under it,
+the divider, the chevron and the tap, and a family fills only the body — so a golf afternoon and an
+NFL season read as one kind of thing on the screen that holds both. The body has a floor rather
+than a fixed height: a pool with four entries genuinely has more to say than a card nobody has teed
+off on. A third family costs a body, not a card.
+
+Under the cards are the two things that are not about a contest you are already in: a carousel of
+what you could start, and a button to join one. The carousel's tiles wear drawn symbols rather than
+the marks, because nothing there has been started yet and so has no family to name — and a pool
+played over four days of golf would otherwise wear the football.
+
 Home is *not* where a launch lands. The pool you were in last night is the pool you are in this
 morning, on the tab you left. Home is one tap to the left, and if nothing is owed you never need
 to visit it.
@@ -78,6 +89,8 @@ it is to keep the **way in** identical and let the inside differ.
 | `HubView` / `HubModel` | The switcher: every pool and card as a card. The model asks each pool with its own Keychain session and keeps the widgets' snapshot of it; `Hub` in TallyKit is the rule for what a card wants and how it says so. |
 | `ScreenHeader` | The mark and the name at the top of every tab: where you are, not where else you could be. Page content rather than a toolbar item, because the iOS 26 bar sizes a leading item's glass to a width of its own choosing. |
 | `AppModel` vs `GolfModel` vs `HubModel` | The pool's object owns a session, a bootstrap and a week. A card has none of those, and the home tab is about every pool at once, so each gets its own object rather than optional properties on the pool's. |
+| `ContestCard` (`HubView.swift`) | One card's whole shape. A family supplies the body and nothing else, and `HubAttention` is the only input to how it is dressed. |
+| `JoinPoolForm` | A code or a link, behind two doors: the home tab's button and `PoolsView`. One form, so an invitation is never explained twice. |
 | `AccountView(inPool:)` | The one screen both families draw besides Home. |
 
 Two rules fall out of this and should be enforced by review, because they are what keeps the blast

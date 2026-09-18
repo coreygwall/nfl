@@ -388,3 +388,54 @@ describe("late joiner", () => {
     }
   });
 });
+
+describe("the join code", () => {
+  /** The pool's own code, as bootstrap hands it to everyone in the pool. */
+  async function joinCode(): Promise<string> {
+    const { body } = await api("/bootstrap", { now: BEFORE });
+    expect(body.pool?.joinCode, "bootstrap should carry the pool's join code").toBeTruthy();
+    return body.pool.joinCode;
+  }
+
+  it("mints one for the pool that existed before codes did, and keeps it", async () => {
+    const first = await joinCode();
+    // Three letters then three digits, none of the characters people misread.
+    expect(first).toMatch(/^[ABCDEFGHJKMNPQRSTUVWXYZ]{3}[23456789]{3}$/);
+    // Minting happens once: the second look finds the same code, not a fresh one.
+    expect(await joinCode()).toBe(first);
+  });
+
+  it("opens the pool it belongs to, however it was typed", async () => {
+    const code = await joinCode();
+    const dashed = `${code.slice(0, 3)}-${code.slice(3)}`;
+    for (const typed of [code, code.toLowerCase(), dashed]) {
+      const { status, body } = await api(`/join/${encodeURIComponent(typed)}`, { now: BEFORE });
+      expect(status, typed).toBe(200);
+      expect(body.pool.slug).toBe("high-five");
+      expect(body.pool.joinCode).toBe(code);
+      // Enough to open the pool, and nothing about who is in it.
+      expect(body.pool.name).toBeTruthy();
+      expect(Object.keys(body.pool).sort()).toEqual(["id", "joinCode", "name", "slug", "type"]);
+    }
+  });
+
+  it("says no to a code no pool answers to", async () => {
+    const code = await joinCode();
+    // Shaped like a code, and not this pool's: the digits are rolled forward.
+    const other = code.slice(0, 3) + [...code.slice(3)].map((d) => ((Number(d) % 8) + 2).toString()).join("");
+    expect(other).not.toBe(code);
+    const { status, body } = await api(`/join/${other}`, { now: BEFORE });
+    expect(status).toBe(404);
+    expect(body.error?.code ?? body.code).toBe("NO_SUCH_POOL");
+  });
+
+  it("turns away what is not a code at all, before it costs a lookup", async () => {
+    // Too short, an excluded letter, digits and letters the wrong way round, and an eight
+    // character device claim code — the near miss that shares the input box with it.
+    for (const wrong of ["KDP47", "KIP472", "472KDP", "Q7MN4PK2"]) {
+      const { status, body } = await api(`/join/${wrong}`, { now: BEFORE });
+      expect(status, wrong).toBe(400);
+      expect(body.error?.code ?? body.code).toBe("BAD_CODE");
+    }
+  });
+});

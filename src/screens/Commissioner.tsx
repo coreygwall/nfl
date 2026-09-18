@@ -18,6 +18,7 @@ import {
 import type { CommissionerPlayerDTO, RoleHolder } from "../../shared/api.ts";
 import { formatShortDay } from "../lib/time.ts";
 import { formatCode } from "../../shared/codes.ts";
+import { formatPoolCode, isPoolCodeShaped } from "../../shared/pool-codes.ts";
 import { poolUrl } from "../lib/basename.ts";
 import { ErrorState, Menu, Segmented, Spinner } from "../components/Common.tsx";
 import { Cards, Check, LinkIcon, Rows } from "../components/Icons.tsx";
@@ -171,6 +172,20 @@ function PoolSettings() {
     }
   };
 
+  const joinCode = pool.joinCode;
+
+  /** The same invitation in the form you can say across a table, rather than tap. */
+  const copyCode = async () => {
+    if (!joinCode) return;
+    const shown = formatPoolCode(joinCode);
+    try {
+      await navigator.clipboard.writeText(shown);
+      toast("Join code copied. Anyone can type it into Tally to get in.", "success");
+    } catch {
+      window.prompt("Join code", shown);
+    }
+  };
+
   const copyInvite = async () => {
     const link = poolUrl("/welcome");
     try {
@@ -231,9 +246,16 @@ function PoolSettings() {
           {overview.data.readyCount} squared away ·{" "}
           {overview.data.unclaimedCount === 0 ? "everyone has a device" : `${overview.data.unclaimedCount} not on a phone yet`}
         </p>
-        <button className="btn btn-sm mt-3" onClick={copyInvite}>
-          Copy invite link
-        </button>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <button className="btn btn-sm" onClick={copyInvite}>
+            Copy invite link
+          </button>
+          {joinCode && isPoolCodeShaped(joinCode) && (
+            <button className="btn btn-sm font-display tracking-wide" onClick={copyCode} aria-label={`Copy the join code, ${formatPoolCode(joinCode)}`}>
+              {formatPoolCode(joinCode)}
+            </button>
+          )}
+        </div>
       </div>
 
       <Commissioners
