@@ -16,7 +16,7 @@ ios/
     Features/          Welcome · Home · Picks · Board · Rules · Office · Pools — one folder per screen
       Golf/            the second contest family: a scramble card's shell and its three screens
     Resources/Fonts/   Bricolage Grotesque + Inter as static TTFs (scripts/build-ios-fonts.py)
-    Assets.xcassets/   32 team stickers, the mark and the icon (scripts/build-ios-assets.ts)
+    Assets.xcassets/   32 team stickers, the three marks and the icon (scripts/build-ios-assets.ts)
   TallyKit/            a Swift package with everything that is not a screen
     Models/            the API contract (mirrors shared/api.ts), Sport + Team, pool types
     Rules/             what shared/*.ts knows: locks, scoring, drafts, codes, names

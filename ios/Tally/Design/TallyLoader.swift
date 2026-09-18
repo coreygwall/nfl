@@ -1,4 +1,5 @@
 import SwiftUI
+import TallyKit
 
 /**
  The loading animation.
@@ -68,33 +69,13 @@ struct TallyMark: View {
         min(max((t - from) / (to - from), 0), 1)
     }
 
-    /**
-     Four uprights and the slash across them, each starting a beat after the one before so the mark
-     is written rather than switched on. The offsets are chosen so the fifth stroke finishes exactly
-     as the draw window closes.
-
-     The slash is gold: it is the stroke that completes the set, which is the whole idea of a tally.
-     */
+    /// The strokes are `TallyGlyph`'s, in TallyKit, so the loader, the widgets and the icon are one
+    /// mark; what is the loader's own is the fade and the stagger being driven by a clock.
     private func draw(into context: GraphicsContext, size: CGSize, progress: Double, fade: Double) {
         guard fade > 0 else { return }
-        let w = size.width / 56
-        let h = size.height / 40
         var context = context
         context.opacity = fade
-
-        func stroke(_ index: Int, from: CGPoint, to: CGPoint, colour: Color, width: CGFloat) {
-            let drawn = min(max((progress - Double(index) * 0.14) / 0.44, 0), 1)
-            guard drawn > 0 else { return }
-            var path = Path()
-            path.move(to: from)
-            path.addLine(to: CGPoint(x: from.x + (to.x - from.x) * drawn, y: from.y + (to.y - from.y) * drawn))
-            context.stroke(path, with: .color(colour), style: StrokeStyle(lineWidth: width, lineCap: .round))
-        }
-
-        for (index, x) in [7.0, 18.0, 29.0, 40.0].enumerated() {
-            stroke(index, from: CGPoint(x: x * w, y: 7 * h), to: CGPoint(x: x * w, y: 33 * h), colour: .ink, width: 4)
-        }
-        stroke(4, from: CGPoint(x: 2 * w, y: 33 * h), to: CGPoint(x: 48 * w, y: 7 * h), colour: .flag, width: 4.5)
+        TallyGlyph.draw(into: context, size: size, progress: progress, ink: .ink, slash: .flag)
     }
 }
 

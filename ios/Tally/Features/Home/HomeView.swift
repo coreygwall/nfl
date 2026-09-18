@@ -159,7 +159,7 @@ private struct PoolPager: View {
             arrow("chevron.left", to: previous)
             VStack(spacing: 6) {
                 HStack(spacing: 8) {
-                    Image("TallyMark")
+                    Image("FootballMark")
                         .resizable()
                         .scaledToFit()
                         .frame(width: 28, height: 28)

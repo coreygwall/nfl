@@ -159,7 +159,7 @@ private struct PoolHubCard: View {
 
     private var header: some View {
         HStack(alignment: .top, spacing: 10) {
-            Image("TallyMark")
+            Image("FootballMark")
                 .resizable()
                 .scaledToFit()
                 .frame(width: 28, height: 28)

@@ -158,7 +158,7 @@ struct PoolChip: View {
 
     var body: some View {
         HStack(spacing: 6) {
-            Image("TallyMark")
+            Image("FootballMark")
                 .resizable()
                 .scaledToFit()
                 .frame(width: 22, height: 22)
