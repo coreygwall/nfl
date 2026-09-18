@@ -29,7 +29,12 @@ struct PoolShellView: View {
             .badge(hub.needsYou > 0 ? Text("\(hub.needsYou)") : nil)
             Tab("Pool", systemImage: "newspaper.fill", value: AppTab.pool) {
                 PoolScreen(week: nil, onWeek: { _ in }) {
+                    // Keyed on the pool so a switch while this tab is up starts the page over.
+                    // Its boards are per-pool state, and a page that kept them would draw the
+                    // last pool's picks and standings under the next pool's name until the new
+                    // requests landed — indistinguishable when both are on the same week.
                     HomeView()
+                        .id("\(model.pool.host)/\(model.pool.slug)")
                 }
             }
             Tab("Picks", systemImage: "football.fill", value: AppTab.picks) {

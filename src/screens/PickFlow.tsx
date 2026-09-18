@@ -223,16 +223,18 @@ function PickFlowInner({ week }: { week: number }) {
 
   return (
     <div>
-      <EntryPicker />
+      {/* One row of ways out — back a step, or out to the pool — then who you are picking as. */}
       {(step === "select" || step === "rank") && (
-        <Link
-          to="/"
-          className="btn btn-sm mb-1 inline-flex md:hidden"
-          aria-label="Go to pool home"
-        >
-          <House size={16} /> Pool home
-        </Link>
+        <div className="mb-3 flex flex-wrap items-center gap-2">
+          {step === "rank" && (
+            <button className="btn btn-sm" onClick={() => setStep("select")} disabled={put.isPending}><ChevronLeft /> Back</button>
+          )}
+          <Link to="/" className="btn btn-sm inline-flex md:hidden" aria-label="Go to pool home">
+            <House size={16} /> Pool home
+          </Link>
+        </div>
       )}
+      <EntryPicker />
       <AnimatePresence mode="wait" initial={false}>
         {step === "review" ? (
           <StepWrap key="review" wide={reviewWide}>
@@ -256,7 +258,6 @@ function PickFlowInner({ week }: { week: number }) {
               error={saveError}
               offline={!online}
               onOrder={(order) => setDraft((d) => ({ ...d, order }))}
-              onBack={() => setStep("select")}
               onSubmit={submit}
             />
           </StepWrap>
@@ -576,7 +577,7 @@ function PickTray({
 // ---------- Rank ----------
 
 function RankStep({
-  frozen, order, availableRanks, selections, gamesById, merged, pending, error, offline, onOrder, onBack, onSubmit,
+  frozen, order, availableRanks, selections, gamesById, merged, pending, error, offline, onOrder, onSubmit,
 }: {
   frozen: Pick[];
   order: string[];
@@ -588,13 +589,11 @@ function RankStep({
   error: string | null;
   offline: boolean;
   onOrder: (order: string[]) => void;
-  onBack: () => void;
   onSubmit: () => void;
 }) {
   const possible = merged.reduce((sum, p) => sum + (6 - p.rank), 0);
   return (
     <div>
-      <button className="btn btn-sm mb-4" onClick={onBack} disabled={pending}><ChevronLeft /> Back</button>
       <h2 className="font-display text-2xl font-extrabold tracking-tight">How sure are you?</h2>
       <p className="mb-4 text-sm text-ink-2">
         Drag to reorder — top pick <b>5 points</b>, bottom one <b>1</b>. Up to <b>{possible}</b> this week.
@@ -741,7 +740,8 @@ function matchupDetail(pick: Pick, game: GameDTO | undefined, compact: boolean):
   const opp = TEAMS[game.away === pick.team ? game.home : game.away];
   const name = compact ? opp.display : `the ${opp.nickname}`;
   const started = game.awayScore !== null && game.homeScore !== null && game.status !== "upcoming";
-  if (!started) return `over ${name} · ${formatTime(game.kickoffAt)}`;
+  // Before kickoff it is a fixture, not a claim: "vs." at home, "@" away, the way a schedule reads.
+  if (!started) return `${pick.team === game.home ? "vs." : "@"} ${opp.display} · ${formatTime(game.kickoffAt)}`;
   const mine = pick.team === game.home ? game.homeScore! : game.awayScore!;
   const theirs = pick.team === game.home ? game.awayScore! : game.homeScore!;
   const line = `${mine}\u2013${theirs}`;
