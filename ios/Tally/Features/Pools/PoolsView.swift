@@ -6,41 +6,23 @@ import TallyKit
 
  This used to be the switcher as well, which is why it never felt like one: a list to switch with,
  a form to join with and a catalogue to read were three jobs on one sheet, and the one people
- came for was buried under the other two. Switching is the home tab now, and this sheet is the
- way in at the bottom of it.
+ came for was buried under the other two. Switching is the home tab now, and so is starting
+ something — the carousel there is this catalogue with a thumb on it. What is left here is the
+ long read: every type Tally plays, including the ones that are not built yet.
+
+ The join half is `JoinPoolForm`, the same view the home tab's button opens on its own sheet. One
+ form behind two doors, because an invitation explained twice is an invitation explained two
+ slightly different ways.
  */
 struct PoolsView: View {
-    @Environment(AppModel.self) private var model
     @Environment(\.dismiss) private var dismiss
-    @State private var link = ""
-    @State private var error: String?
-
     var body: some View {
         NavigationStack {
             ZStack {
                 Color.paper.ignoresSafeArea()
                 ScrollView {
                     VStack(alignment: .leading, spacing: 20) {
-                        VStack(alignment: .leading, spacing: 8) {
-                            SectionLabel(text: "Join a pool")
-                            Text("Paste the link your commissioner sent. Tapping one in Messages opens it here too.").sans(14).foregroundStyle(Color.ink2)
-                            TextField("https://playtally.app/p/…", text: $link)
-                                .tallyField(font: TallyFont.sans(15))
-                                .textInputAutocapitalization(.never)
-                                .autocorrectionDisabled()
-                                .keyboardType(.URL)
-                            if let error { Text(error).sans(14, weight: .semibold).foregroundStyle(Color.danger) }
-                            Button("Open pool") {
-                                guard let url = URL(string: link.trimmingCharacters(in: .whitespaces)), PoolRef.parse(url) != nil else {
-                                    error = "That doesn't look like a pool link."
-                                    return
-                                }
-                                model.open(url)
-                                dismiss()
-                            }
-                            .buttonStyle(.tally(.primary, size: .small))
-                            .disabled(link.isEmpty)
-                        }
+                        JoinPoolForm(onJoined: { dismiss() })
 
                         VStack(alignment: .leading, spacing: 8) {
                             SectionLabel(text: "Start a pool")

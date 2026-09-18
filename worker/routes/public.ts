@@ -5,6 +5,7 @@ import { ApiError, badRequest, notFound } from "../errors.ts";
 import { nameKey, validateName } from "../../shared/names.ts";
 import { isVulgar, VULGAR_MESSAGE } from "../../shared/profanity.ts";
 import { codesMatch, generateCode } from "../../shared/codes.ts";
+import { isPoolCodeShaped, normalizePoolCode } from "../../shared/pool-codes.ts";
 import { clearedSessionCookie, hashToken, isLockedOut, lockUntil, MAX_CLAIM_ATTEMPTS, newToken, sessionCookie } from "../auth.ts";
 import { validatePicks } from "../../shared/picks.ts";
 import { buildSeasonBoard, buildWeekBoard } from "../../shared/scoring.ts";
@@ -17,6 +18,7 @@ import type {
   ClaimResponse,
   CreatePlayerResponse,
   GameDTO,
+  JoinLookupResponse,
   PutPicksResponse,
   SeasonBoardResponse,
   WeekBoardResponse,
@@ -33,6 +35,7 @@ import {
   deviceCounts,
   findPlayerByKey,
   getPlayer,
+  getPoolByJoinCode,
   noteClaimFailure,
   ownerOfEntry,
   setClaimCode,
@@ -74,6 +77,15 @@ export const MAX_ENTRIES = 12;
 const SIGNUPS_PER_HOUR = 40;
 const SIGNUP_WINDOW_MINUTES = 60;
 
+/**
+ * How many join codes one caller may try in an hour. Generous, because a person typing a code
+ * from a group chat gets it wrong a couple of times and a household shares an address — and it
+ * does not need to be tight: the answer to a correct guess is a pool's public name, which its
+ * link already gives away to anyone who has the link.
+ */
+const JOIN_LOOKUPS_PER_HOUR = 60;
+const JOIN_WINDOW_MINUTES = 60;
+
 /** Registers a new device for a player and returns the token only this response will carry. */
 async function issueToken(db: D1Database, playerId: string, now: string): Promise<string> {
   const token = newToken();
@@ -107,7 +119,7 @@ publicRoutes.get("/bootstrap", async (c) => {
     build: BUILD_ID,
     season: SEASON,
     poolName: pool.name,
-    pool: { id: pool.id, slug: pool.slug, name: pool.name, type: pool.type },
+    pool: { id: pool.id, slug: pool.slug, name: pool.name, type: pool.type, joinCode: pool.joinCode },
     roles,
     currentWeek: pickWeek(games, now),
     boardWeek: boardWeek(games, now),
@@ -119,6 +131,44 @@ publicRoutes.get("/bootstrap", async (c) => {
     myEntries: account ? players.filter((p) => ids.has(p.id)).map(publicPlayer) : [],
     ...(mine?.claimCode ? { myCode: mine.claimCode } : {}),
     myPasskeys: passkeys,
+  };
+  return c.json(body);
+});
+
+/**
+ * A join code, turned back into a pool.
+ *
+ * The one route a stranger is meant to call: whoever has the code is being invited, and the
+ * answer is only what the pool already says about itself at its own public address. It exists
+ * because a link is not sayable — this is how an invite survives being read across a table.
+ *
+ * A Worker serves one pool today, so it answers for its own and 404s for anything else; when it
+ * serves many, this is the lookup that already knows how to find the right one. Guessing is
+ * limited per caller: six million codes and one pool make enumeration pointless rather than
+ * impossible, and the limit is what keeps it that way as pools are added.
+ */
+publicRoutes.get("/join/:code", async (c) => {
+  const typed = c.req.param("code");
+  if (!isPoolCodeShaped(typed)) throw badRequest("BAD_CODE", "That doesn't look like a join code.");
+  const now = c.get("now");
+  const limitKey = `join:${callerIp(c.req.raw.headers)}`;
+  const seen = await rateLimit(c.env.DB, limitKey, now);
+  if (seen.count >= JOIN_LOOKUPS_PER_HOUR) {
+    throw new ApiError(429, "TOO_MANY_LOOKUPS", "That's a lot of codes from one place. Try again in a bit.");
+  }
+  await noteRateLimit(
+    c.env.DB,
+    limitKey,
+    seen.count + 1,
+    seen.resetAt ?? new Date(Date.parse(now) + JOIN_WINDOW_MINUTES * 60_000).toISOString(),
+    now,
+  );
+  // Asked for its own pool first, which also mints the code for a row that predates the column.
+  const own = await currentPool(c);
+  const pool = own.joinCode && normalizePoolCode(own.joinCode) === normalizePoolCode(typed) ? own : await getPoolByJoinCode(c.env.DB, typed);
+  if (!pool) throw new ApiError(404, "NO_SUCH_POOL", "No pool has that code. Check it with whoever invited you.");
+  const body: JoinLookupResponse = {
+    pool: { id: pool.id, slug: pool.slug, name: pool.name, type: pool.type, joinCode: pool.joinCode },
   };
   return c.json(body);
 });

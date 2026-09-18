@@ -2,6 +2,7 @@ import type { Abbr } from "../shared/teams.ts";
 import type { Game, Pick, Player, Winner } from "../shared/types.ts";
 import type { PlayerPick } from "../shared/scoring.ts";
 import { parsePrefs, type NotifyPrefs } from "../shared/notify-prefs.ts";
+import { generatePoolCode, isPoolCodeShaped, normalizePoolCode } from "../shared/pool-codes.ts";
 
 interface GameRow {
   id: string;
@@ -815,6 +816,8 @@ export interface PoolRecord {
   season: number;
   createdAt: string;
   createdBy: string | null;
+  /** The short code that gets somebody in. Minted on first sight; see `ensurePool`. */
+  joinCode: string | null;
 }
 
 interface PoolRow {
@@ -825,6 +828,7 @@ interface PoolRow {
   season: number;
   created_at: string;
   created_by: string | null;
+  join_code: string | null;
 }
 
 const toPool = (r: PoolRow): PoolRecord => ({
@@ -835,6 +839,7 @@ const toPool = (r: PoolRow): PoolRecord => ({
   season: r.season,
   createdAt: r.created_at,
   createdBy: r.created_by ?? null,
+  joinCode: r.join_code ?? null,
 });
 
 export async function getPoolBySlug(db: D1Database, slug: string): Promise<PoolRecord | null> {
@@ -842,21 +847,57 @@ export async function getPoolBySlug(db: D1Database, slug: string): Promise<PoolR
   return row ? toPool(row) : null;
 }
 
+/** The pool a join code opens, or null. Normalised first, so "kdp 472" finds "KDP472". */
+export async function getPoolByJoinCode(db: D1Database, code: string): Promise<PoolRecord | null> {
+  const normalized = normalizePoolCode(code);
+  if (!isPoolCodeShaped(normalized)) return null;
+  const row = await db.prepare("SELECT * FROM pools WHERE join_code = ?").bind(normalized).first<PoolRow>();
+  return row ? toPool(row) : null;
+}
+
+/**
+ * Gives a pool a join code if it has none, and returns the pool either way.
+ *
+ * The retry is what the unique index is for: two pools minting at once is the only way to collide
+ * in a space of six million, and losing that race has to mean rolling again rather than throwing.
+ * A pool that somehow cannot be given a code still works — it has a link, which is how every pool
+ * worked until now — so this never fails a request that was about something else.
+ */
+async function ensureJoinCode(db: D1Database, pool: PoolRecord): Promise<PoolRecord> {
+  if (pool.joinCode) return pool;
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const code = generatePoolCode();
+    const written = await db
+      .prepare("UPDATE pools SET join_code = ? WHERE id = ? AND join_code IS NULL")
+      .bind(code, pool.id)
+      .run()
+      .then(() => true)
+      .catch(() => false);
+    if (!written) continue;
+    // Read back rather than trusting the write: another request may have won the race for this
+    // row, in which case its code is the pool's and this one was never used.
+    const fresh = await getPoolBySlug(db, pool.slug);
+    if (fresh?.joinCode) return fresh;
+  }
+  return pool;
+}
+
 /**
  * The pool row, created on first sight from the deployment's own settings. Renaming it later is
- * the commissioner's to do, so the name is only ever written here when the row is new.
+ * the commissioner's to do, so the name is only ever written here when the row is new. The join
+ * code is filled in here too, which is how the pool that predates the column gets one.
  */
 export async function ensurePool(
   db: D1Database,
   pool: { slug: string; name: string; type: string; season: number; now: string },
 ): Promise<PoolRecord> {
   const existing = await getPoolBySlug(db, pool.slug);
-  if (existing) return existing;
+  if (existing) return ensureJoinCode(db, existing);
   await db
-    .prepare("INSERT OR IGNORE INTO pools (id, slug, name, type, season, created_at) VALUES (?, ?, ?, ?, ?, ?)")
-    .bind(pool.slug, pool.slug, pool.name, pool.type, pool.season, pool.now)
+    .prepare("INSERT OR IGNORE INTO pools (id, slug, name, type, season, created_at, join_code) VALUES (?, ?, ?, ?, ?, ?, ?)")
+    .bind(pool.slug, pool.slug, pool.name, pool.type, pool.season, pool.now, generatePoolCode())
     .run();
-  return (await getPoolBySlug(db, pool.slug))!;
+  return ensureJoinCode(db, (await getPoolBySlug(db, pool.slug))!);
 }
 
 export async function renamePool(db: D1Database, poolId: string, name: string): Promise<void> {

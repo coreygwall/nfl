@@ -155,8 +155,23 @@ private struct PoolSettingsView: View {
             SectionLabel(text: "Who's in")
             Text("\(Format.plural(o.playerCount, "entry", "entries")) · \(o.readyCount) squared away · \(o.unclaimedCount == 0 ? "everyone has a device" : "\(o.unclaimedCount) not on a phone yet")")
                 .sans(13).foregroundStyle(Color.ink2)
-            ShareLink(item: model.shareURL) { Label("Share the invite link", systemImage: "square.and.arrow.up") }
-                .buttonStyle(.tally(.plain, size: .small))
+            HStack(spacing: 8) {
+                ShareLink(item: model.shareURL) { Label("Share the invite link", systemImage: "square.and.arrow.up") }
+                    .buttonStyle(.tally(.plain, size: .small))
+                if let code = o.pool.joinCode, PoolCode.isShaped(code) {
+                    // The same invitation in the form you can say across a table. Tap to copy,
+                    // because the other half of saying it is somebody typing it in.
+                    Button {
+                        UIPasteboard.general.string = PoolCode.format(code)
+                        Haptics.tap()
+                        model.toast("Join code copied. Anyone can type it into Tally to get in.", kind: .success)
+                    } label: {
+                        Label(PoolCode.format(code), systemImage: "doc.on.doc")
+                    }
+                    .buttonStyle(.tally(.plain, size: .small))
+                    .accessibilityLabel("Copy the join code, \(PoolCode.format(code))")
+                }
+            }
         }
         .padding(12).frame(maxWidth: .infinity, alignment: .leading).cardFlat()
     }

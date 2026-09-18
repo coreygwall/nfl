@@ -61,7 +61,7 @@ commissionerRoutes.get("/", async (c) => {
   ]);
   const body: CommissionerOverview = {
     now: c.get("now"),
-    pool: { id: pool.id, slug: pool.slug, name: pool.name, type: pool.type, season: pool.season, createdAt: pool.createdAt },
+    pool: { id: pool.id, slug: pool.slug, name: pool.name, type: pool.type, season: pool.season, createdAt: pool.createdAt, joinCode: pool.joinCode },
     playerCount: players.length,
     readyCount: players.filter((p) => p.ready).length,
     unclaimedCount: players.filter((p) => (devices.get(p.id) ?? 0) === 0).length,

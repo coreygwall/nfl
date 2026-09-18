@@ -184,6 +184,8 @@ final class AppModel {
     var showCommissioner = false
     var showLeagueOffice = false
     var showPools = false
+    /// The join sheet: a code from a group chat, or a link somebody sent.
+    var showJoin = false
     /// The welcome screen over a signed-in device — from a sign-in link or "I'm someone new".
     var showWelcome = false
     var welcomeStartsNew = false
@@ -657,6 +659,56 @@ final class AppModel {
         // The tab stays put: switching from the board lands on the other pool's board. A switch
         // is a change of *where*, and the frame should not also decide *what* you were doing.
         Task { await self.refreshBootstrap() }
+    }
+
+    /**
+     Turns a join code into a pool and stands in it.
+
+     A code names a *pool*, not a host, so the app asks the hosts it can reach — the one it is
+     standing in, the default, then every other pool on the phone — until one claims it. A 404 is
+     an *answer*: that host does not have it, and the next one might. What matters is telling the
+     two endings apart at the finish: "no pool has that code" is only true if somebody actually
+     said so, so a walk where nothing answered says it could not reach Tally instead of blaming
+     a code that may be perfectly good.
+
+     Joining is only the *finding*. The pool it lands on decides who you are the usual way: a
+     device with no session there gets the welcome screen, exactly as a tapped link does.
+     */
+    func joinByCode(_ typed: String) async -> String? {
+        let code = PoolCode.normalize(typed)
+        guard PoolCode.isShaped(code) else { return "That doesn't look like a join code." }
+        var seen: Set<String> = []
+        var origins: [URL] = []
+        for origin in [pool.origin, PoolRef.default.origin] + catalog.pools.map(\.ref.origin) {
+            if seen.insert(origin.absoluteString).inserted { origins.append(origin) }
+        }
+        var reachedSomeone = false
+        for origin in origins {
+            // No session: the lookup is the one route a stranger is meant to call, and the slug is
+            // what it answers *with*, so there is nothing to put in either yet.
+            let probe = PoolService(client: APIClient(pool: PoolRef(origin: origin, slug: ""), auth: { AuthHeaders() }))
+            do {
+                let found = try await probe.lookupJoinCode(code).pool
+                let ref = PoolRef(origin: origin, slug: found.slug)
+                catalog.open(ref, name: found.name, poolType: found.type)
+                catalog.save()
+                switchPool(ref)
+                tab = .pool
+                showJoin = false
+                Haptics.lockedIn()
+                toast("You're in \(found.name).", kind: .success)
+                return nil
+            } catch {
+                let err = error.asAPIError
+                // This host does not have it; the next one might.
+                if err.code == "NO_SUCH_POOL" || err.status == 404 { reachedSomeone = true; continue }
+                if err.code == "BAD_CODE" { return "That doesn't look like a join code." }
+                if err.status == 429 { return "That's a lot of tries. Give it a few minutes." }
+            }
+        }
+        return reachedSomeone
+            ? "No pool has that code. Check it with whoever invited you."
+            : "Couldn't reach Tally. Check your connection and try again."
     }
 
     func removePool(_ id: String) {

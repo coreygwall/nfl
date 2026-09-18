@@ -9,6 +9,7 @@ import pickHistorySchema from "../migrations/0008_pick_history.sql?raw";
 import pushSchema from "../migrations/0009_push.sql?raw";
 import rolesSchema from "../migrations/0010_roles.sql?raw";
 import messagesSchema from "../migrations/0011_messages.sql?raw";
+import poolCodesSchema from "../migrations/0012_pool_codes.sql?raw";
 import schedule from "../shared/schedule-2026.json";
 import { finalsFromCsv, gamesFromCsv, NFLVERSE_GAMES_CSV } from "../shared/nflverse.ts";
 import { applyResults, ensurePool, getMeta, listGames, setMeta, updateKickoffs, upsertGames } from "./db.ts";
@@ -26,8 +27,8 @@ const split = (sql: string) =>
 
 const statements = split(schema);
 // Everything after the initial schema: additive, and safe to re-run.
-const alterStatements = [...split(devicesSchema), ...split(householdSchema), ...split(readySchema), ...split(passkeySchema), ...split(entriesSchema), ...split(rateLimitSchema), ...split(pickHistorySchema), ...split(pushSchema), ...split(rolesSchema), ...split(messagesSchema)];
-const SCHEMA_REVISION = "0011_messages";
+const alterStatements = [...split(devicesSchema), ...split(householdSchema), ...split(readySchema), ...split(passkeySchema), ...split(entriesSchema), ...split(rateLimitSchema), ...split(pickHistorySchema), ...split(pushSchema), ...split(rolesSchema), ...split(messagesSchema), ...split(poolCodesSchema)];
+const SCHEMA_REVISION = "0012_pool_codes";
 const SCHEMA_REVISION_KEY = "app_schema_revision";
 const RUNTIME_REVISION_KEY = "app_runtime_revision";
 
@@ -53,14 +54,22 @@ async function applySchema(db: D1Database): Promise<void> {
 }
 
 /**
- * Existing production databases predate the revision marker. Confirm the final migration's three
- * tables once, then adopt the marker without replaying eleven migrations in the request path.
+ * Existing production databases predate the revision marker. Confirm the *latest* migration's
+ * artifacts once, then adopt the marker without replaying every migration in the request path.
+ *
+ * This has to name the newest migration, not a fixed one: adopting the marker skips `applySchema`
+ * entirely, so a database checked against an older migration's tables would be marked current
+ * while missing every column added after them. Each new migration adds its own check here.
  */
 async function hasCurrentLegacySchema(db: D1Database): Promise<boolean> {
-  const row = await db.prepare(
+  const tables = await db.prepare(
     "SELECT count(*) AS n FROM sqlite_master WHERE type = 'table' AND name IN (?, ?, ?)",
   ).bind("pool_communication_settings", "pool_messages", "pool_message_reactions").first<{ n: number }>();
-  return row?.n === 3;
+  if (tables?.n !== 3) return false;
+  const columns = await db.prepare("SELECT count(*) AS n FROM pragma_table_info('pools') WHERE name = ?")
+    .bind("join_code")
+    .first<{ n: number }>();
+  return columns?.n === 1;
 }
 
 async function prepareRuntime(env: Env): Promise<void> {
