@@ -199,7 +199,12 @@ took last week. (A golf card has its own three; see above.)
   owed, as the entry that owes them, otherwise onto the pool's page. The chip top-left of the
   pool's own tabs (`PoolChip`) is the mark and the pool name, and it is a label rather than a menu.
   `PoolsView` is only join / start / the catalogue, the way in at the bottom of Home. The pool's
-  page does not list the other pools; Home says everything that strip used to.
+  page does not list the other pools; Home says everything that strip used to. Behind Labs
+  (`poolPager`) the Pool tab wears a `PoolPager` row — chevrons, dots, a contained flick — as a
+  trial of a second switcher for whoever lives on that tab. It pages by *name*, not the
+  catalogue's last-opened order, or the pool you just switched to would jump to the front and
+  left/right would shuffle under your thumb. The page reloads rather than slides: a pool is a
+  session and a bootstrap, not a page.
 - **The web has no switcher, and stopped pretending to.** A pool *is* an address there: the Worker
   serving a page serves exactly one, so a second pool is a second host, and browser storage is per
   origin — a catalogue of them is not something a tab can hold. `PoolSheet` off the lockup names

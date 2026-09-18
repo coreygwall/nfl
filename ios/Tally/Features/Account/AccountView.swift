@@ -178,28 +178,45 @@ struct AccountView: View {
     }
 
     /**
-     Labs: built, and not yet on for everyone. One switch today. Off by default, and off is not a
-     reset — the cards stay on the phone for when it comes back on.
+     Labs: built, and not yet on for everyone. Off by default, and off is not a reset — the cards
+     stay on the phone for when golf comes back on.
      */
     private var labsRow: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            labsSwitch(
+                title: "Golf cards",
+                symbol: "flask.fill",
+                on: Binding(get: { model.golfCards }, set: { model.golfCards = $0 }),
+                detail: "A tally of whose shots your scramble team kept, hole by hole. Adds your cards to Home. Early: one phone keeps the card."
+            )
+            labsSwitch(
+                title: "Pool pager",
+                symbol: "arrow.left.arrow.right",
+                on: Binding(get: { model.poolPager }, set: { model.poolPager = $0 }),
+                detail: "A row at the top of the Pool tab to flick between your pools, when you have more than one. Home still switches too."
+            )
+        }
+        .padding(12)
+    }
+
+    private func labsSwitch(title: String, symbol: String, on: Binding<Bool>, detail: String) -> some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack(spacing: 12) {
-                Image(systemName: "flask.fill").font(.system(size: 15, weight: .bold)).frame(width: 24)
-                Text("Golf cards").font(TallyFont.display(16))
+                Image(systemName: symbol).font(.system(size: 15, weight: .bold)).frame(width: 24)
+                Text(title).font(TallyFont.display(16))
                 Chip(text: "labs", size: 10)
                 Spacer()
-                Toggle("Golf cards", isOn: Binding(get: { model.golfCards }, set: { on in
+                Toggle(title, isOn: Binding(get: { on.wrappedValue }, set: { value in
                     Haptics.tap()
-                    model.golfCards = on
+                    on.wrappedValue = value
                 }))
                 .labelsHidden()
                 .tint(.turf)
             }
-            Text("A tally of whose shots your scramble team kept, hole by hole. Adds golf cards to the menu behind the pool's name. Early: one phone keeps the card.")
+            Text(detail)
                 .sans(12).foregroundStyle(Color.ink2)
                 .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(12)
     }
 
     /**
