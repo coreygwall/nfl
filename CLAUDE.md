@@ -387,16 +387,25 @@ attaches both offices to the calling account — and stays valid as a break-glas
 route groups. There is one `pools` row today, seeded from `POOL_SLUG`/`POOL_NAME`; `currentPool()`
 in `worker/roles.ts` is the seam where a second one arrives.
 
-## Deploying is a push, and only to one branch
+## Deploying is a merge into `main`
 
-There is no `main`. Cloudflare Workers Builds deploys from **`claude/nfl-pool-app-9tv2om`**, so a
-push there is a release and anything else is only a preview URL. This matters for Apple: the app's
-entitlements name `playtally.app`, so the association file has to reach production before the app
-will honour it. `README.md` has the plan for moving to `main`.
+Cloudflare Workers Builds deploys from **`main`**, so a merge there is a release and every other
+branch is only a preview URL. Nothing is pushed to `main` directly: work goes on a feature branch
+and arrives through a pull request, which is what lets the `CI` check stand between a mistake and
+the people making picks.
 
-## Before pushing
+`claude/nfl-pool-app-9tv2om` is the branch that used to deploy, kept only because old pull requests
+and links name it. **Pushing to it releases nothing** — which is the one way this move can still
+bite, because a push there looks exactly as successful as it always did.
 
-CI does not gate the deploy, so run these first — they take about a minute:
+This matters for Apple: the app's entitlements name `playtally.app`, so the association file has to
+reach production — a merged pull request — before the app will honour it. A preview URL is never
+enough. `README.md` has the cutover steps, kept for the next time a branch has to change.
+
+## Before opening a pull request
+
+The `CI` check runs these, and a pull request cannot merge until it passes — but running them first
+is faster than a review cycle, and they take about a minute:
 
 ```sh
 npm run typecheck && npm test && npm run test:e2e

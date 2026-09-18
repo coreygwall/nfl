@@ -43,8 +43,8 @@ publish it before the first install.
    Xcode → *Settings* → *Accounts* → your team shows it too, and once Xcode has made a
    provisioning profile it is the prefix of the App ID in *Signing & Capabilities*.
 3. **Tell the domain about the app.** In `wrangler.jsonc` set
-   `"APPLE_APP_IDS": "ABCDE12345.app.playtally.ios"`, then get that onto **production** — the
-   branch Cloudflare deploys from, which today is `claude/nfl-pool-app-9tv2om`. A preview URL is
+   `"APPLE_APP_IDS": "ABCDE12345.app.playtally.ios"`, then get that onto **production** — a pull
+   request merged into `main`, the branch Cloudflare deploys from. A preview URL is
    not enough: the entitlements name `playtally.app`, so that is the only host iOS will ask.
    Check it landed:
 
@@ -334,8 +334,7 @@ In `wrangler.jsonc`, set the Key ID you noted in step 2:
 ```
 
 Unlike the key itself this is **not a secret** — it travels in the header of every push — so it
-belongs in config, committed. Then push to the deploy branch (`claude/nfl-pool-app-9tv2om`), which
-is what releases it.
+belongs in config, committed. Then merge it into `main`, which is what releases it.
 
 `APPLE_TEAM_ID` and `APPLE_BUNDLE_ID` are already filled in.
 

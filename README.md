@@ -39,34 +39,45 @@ database heals on its own.)
 
 From a laptop instead: `npx wrangler login && npm run deploy && npx wrangler secret put ADMIN_PIN`.
 
-## How code ships (and the move to `main`)
+## How code ships
 
-**Today there is no `main`.** `claude/nfl-pool-app-9tv2om` is the branch Cloudflare Workers Builds
-deploys from, so a push to it *is* a release. Everyone works on that one branch.
+**`main` is the branch Cloudflare Workers Builds deploys from**, so a merge into `main` is a
+release. Work happens on a feature branch and reaches `main` through a pull request; nothing is
+pushed to `main` directly.
 
-The consequence worth knowing: **CI does not gate the deploy.** The Cloudflare build and the GitHub
-Actions run start from the same push and finish independently, so a commit that fails the tests is
-already live by the time CI goes red. Until that changes, run `npm run typecheck`, `npm test` and
-`npm run test:e2e` locally before pushing — the suite takes about a minute and is the only thing
-standing between a mistake and the people making picks.
+The thing this bought: **CI can gate the deploy.** With the branch rule requiring the `CI` check,
+only code that passed the tests can merge, and only merged code deploys. Before the move there was
+no such gate — the Cloudflare build and the GitHub Actions run started from the same push and
+finished independently, so a commit that failed the tests was already live by the time CI went red.
+Run `npm run typecheck`, `npm test` and `npm run test:e2e` before opening a pull request anyway;
+the suite takes about a minute and it is faster than a review cycle.
 
-**The plan is to move to `main`**, which fixes exactly that: with pull requests into a protected
-branch, only code that passed CI can merge, and only merged code deploys. It is deliberately *not*
-being done mid-season, because two of the steps live in dashboards rather than in this repo, and if
-they are done out of order pushes stop deploying silently — which, during a week when picks are
-live, is the worst way to find out.
+Swift is the exception that still cannot be checked here: there is no Swift toolchain in the Linux
+dev container, so `ios/` compile errors surface in the macOS job on the pull request rather than
+locally.
 
-The order matters. Nobody should push to `main` until step 2 is done:
+`claude/nfl-pool-app-9tv2om` is the branch that used to deploy. It is kept because old pull
+requests and links still name it; it deploys nothing now, and pushing to it does nothing at all.
 
-1. `git branch main claude/nfl-pool-app-9tv2om && git push -u origin main` — same history, new name.
-2. Cloudflare → Workers & Pages → `nfl` → **Settings → Builds** → set the **production branch** to
-   `main`. Until this happens, `main` is a branch that deploys nothing.
-3. GitHub → repo **Settings** → set the **default branch** to `main`.
-4. GitHub → **Settings → Rules** → protect `main`: require the `CI` check to pass before merging.
-5. Point the agents at it: work happens on feature branches, pull requests go into `main`. Claude
-   sessions take their branch from the session config; Codex needs telling separately.
-6. Optional and worth it: Cloudflare → **Settings → Builds** → enable non-production branch builds,
-   which gives every pull request its own preview URL to click through before merging.
+<details>
+<summary>How the move was done, for the next time a branch has to change</summary>
+
+The order mattered, because two of the steps live in dashboards rather than in this repo, and out
+of order they stop pushes deploying silently:
+
+1. `git branch main claude/nfl-pool-app-9tv2om && git push -u origin main` — same history, new
+   name. A branch nothing deploys from yet is free to create at any time, including mid-week.
+2. Cloudflare → Workers &amp; Pages → `nfl` → **Settings → Builds** → production branch to `main`.
+   Until this, `main` deploys nothing; after it, the old branch deploys nothing.
+3. GitHub → **Settings** → default branch to `main`.
+4. GitHub → **Settings → Rules** → protect `main`: require the `CI` check before merging.
+5. Optional and worth it: Cloudflare → **Settings → Builds** → enable non-production branch
+   builds, so every pull request gets its own preview URL.
+
+Because `main` was created at the deploy branch's exact head, step 2 rebuilt identical code — the
+cutover itself shipped nothing.
+
+</details>
 
 ## Sharing the link
 
