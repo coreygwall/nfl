@@ -211,7 +211,8 @@ struct MatchupText: View {
             if scores.mine < scores.theirs { return "Trailing \(name) \(line)" }
             return "Level with \(name) \(line)"
         }
-        return "over \(name) · \(Format.time(game.kickoffAt))"
+        // Before kickoff it is a fixture, not a claim: "vs." at home, "@" away, the way a schedule reads.
+        return "\(pick.team == game.home ? "vs." : "@") \(opp.display) · \(Format.time(game.kickoffAt))"
     }
 
     /// Both numbers, from this pick's side, once the game has one.
