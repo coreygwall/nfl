@@ -23,7 +23,7 @@ same icon: every pool and every card on the phone as one card each, sorted by wh
 from you and dressed to say so, with the count on the tab. It is the switcher. It used to be a menu
 behind the chip in the navigation bar, and a menu can list names and nothing else — a phone with
 three pools had to open each to learn that Thursday's picks were still owed in one. A card can say
-that. The chip top-left of a contest's own tabs still names where you are; it just no longer opens
+that. The header at the top of a contest's own tabs still names where you are; it just no longer opens
 anything, because a second switcher two taps from the first is how apps grow eleven tabs.
 
 Home is *not* where a launch lands. The pool you were in last night is the pool you are in this
@@ -76,7 +76,7 @@ it is to keep the **way in** identical and let the inside differ.
 | `RootView` | Picks the shell from that one fact. The only place the choice is made. |
 | `PoolShellView` / `GolfShellView` | One per family. Neither knows the other exists. Both put `HubView` first. |
 | `HubView` / `HubModel` | The switcher: every pool and card as a card. The model asks each pool with its own Keychain session and keeps the widgets' snapshot of it; `Hub` in TallyKit is the rule for what a card wants and how it says so. |
-| `PoolChip` / `CardChip` | The label top-left of a contest's own tabs. Where you are, not where else you could be. |
+| `ScreenHeader` | The mark and the name at the top of every tab: where you are, not where else you could be. Page content rather than a toolbar item, because the iOS 26 bar sizes a leading item's glass to a width of its own choosing. |
 | `AppModel` vs `GolfModel` vs `HubModel` | The pool's object owns a session, a bootstrap and a week. A card has none of those, and the home tab is about every pool at once, so each gets its own object rather than optional properties on the pool's. |
 | `AccountView(inPool:)` | The one screen both families draw besides Home. |
 

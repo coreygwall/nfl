@@ -40,10 +40,12 @@ struct GolfShellView: View {
     }
 }
 
-/// One tab's page: the paper, the scrolling content, the chip and the card's menu in the bar.
+/// One tab's page: the paper, the header naming the card, the scrolling content, and the card's
+/// menu in the bar.
 struct GolfScreen<Content: View>: View {
+    @Environment(GolfModel.self) private var golf
     let cardId: String
-    /// The app's home wears the Tally lockup and none of this card's controls.
+    /// The app's home is headed "Tally" and wears none of this card's controls.
     var hub = false
     @ViewBuilder let content: Content
 
@@ -53,48 +55,25 @@ struct GolfScreen<Content: View>: View {
                 PaperBackground()
                 ScrollView {
                     VStack(spacing: 0) {
+                        if hub {
+                            ScreenHeader(mark: "TallyMark", title: "Tally")
+                        } else {
+                            ScreenHeader(mark: "GolfMark", title: golf.card(cardId)?.name ?? "Golf")
+                        }
                         content
-                            .padding(.horizontal, 16)
-                            .padding(.top, 6)
-                            .padding(.bottom, 120)
                     }
+                    .padding(.horizontal, 16)
+                    .padding(.top, 6)
+                    .padding(.bottom, 120)
                 }
             }
             .toolbar {
-                ToolbarItem(placement: .topBarLeading) {
-                    if hub { TallyLockup() } else { CardChip(cardId: cardId) }
-                }
                 if !hub {
                     ToolbarItem(placement: .topBarTrailing) { CardMenu(cardId: cardId) }
                 }
             }
             .toolbarTitleDisplayMode(.inline)
         }
-    }
-}
-
-/// The card you are in, top-left of every one of its tabs. A label, like the pool's chip: the
-/// home tab is where you go to stand somewhere else.
-struct CardChip: View {
-    @Environment(GolfModel.self) private var golf
-    let cardId: String
-
-    var body: some View {
-        let name = golf.card(cardId)?.name ?? "Golf"
-        HStack(spacing: 6) {
-            Image("GolfMark")
-                .resizable()
-                .scaledToFit()
-                .frame(width: 22, height: 22)
-            Text(name)
-                .font(TallyFont.display(15, weight: .bold))
-                .foregroundStyle(Color.ink)
-                .lineLimit(1)
-                .truncationMode(.tail)
-        }
-        .frame(maxWidth: 170)
-        .accessibilityElement(children: .combine)
-        .accessibilityLabel("On \(name)")
     }
 }
 

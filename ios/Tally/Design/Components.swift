@@ -296,6 +296,38 @@ struct Stamp: View {
     }
 }
 
+/**
+ The name at the top of a page: the mark and, in display type, where you are.
+
+ It is content, not a toolbar item, and that is the whole point. It was a chip in the navigation
+ bar's leading slot, and on iOS 26 the bar wraps each item in Liquid Glass and sizes that glass to
+ what it feels like proposing — which for a truncatable name was a circle with room for one letter.
+ A row at the top of the scroll view is laid out by the same rules as everything under it, so the
+ name is the width of the page and the bar keeps only the buttons that belong there.
+ */
+struct ScreenHeader: View {
+    let mark: String
+    let title: String
+
+    var body: some View {
+        HStack(spacing: 10) {
+            Image(mark)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 32, height: 32)
+            Text(title)
+                .font(TallyFont.display(26))
+                .foregroundStyle(Color.ink)
+                .lineLimit(1)
+                .minimumScaleFactor(0.7)
+            Spacer(minLength: 0)
+        }
+        .padding(.bottom, 12)
+        .accessibilityElement(children: .combine)
+        .accessibilityAddTraits(.isHeader)
+    }
+}
+
 struct SectionLabel: View {
     let text: String
     var body: some View {

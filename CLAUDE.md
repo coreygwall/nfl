@@ -131,9 +131,9 @@ sentences: **the first tab is everywhere you can stand, the rest are the contest
 always last.** Home — the app's, not the pool's — is the first tab of both shells and the only
 switcher: every pool and card on the phone as one card each, the ones that want something first and
 dressed to say so, with the count on the tab. The tab bar after it belongs to the family you are in
-— no Board on a card, no Round in a pool. The chip top-left of a contest's own tabs names where you
-are and opens nothing; it was the switcher once, and a second switcher two taps from the first is
-how apps grow eleven tabs.
+— no Board on a card, no Round in a pool. The header at the top of a contest's own tabs names where
+you are and opens nothing; it was a chip in the navigation bar and the switcher once, and a second
+switcher two taps from the first is how apps grow eleven tabs.
 
 `AppModel.context` holds the one fact (pool, or card *X*), `RootView` is the only place that reads
 it to choose a shell, and `PoolShellView` / `GolfShellView` do not import each other. The shared
@@ -168,14 +168,24 @@ body**; `ScrambleTally.summary` survives only as the fallback for a render that 
 footer's `playtally.app` is the seam for the link that belongs there once there is a recap to point
 at or an App Store listing.
 
-**One badge, and the ball inside it says which contest.** `GolfMark` is `TallyMark` with a ball on
-a tee where the football sits — same yellow ground, same ink, same border — so the golf chip and
-the poster read as Tally without wearing the pool's game; a card that three people just played
-should not be selling football to them. Both are rasterised at 1x/2x/3x from SVG
-(`public/icon.svg`, `public/golf.svg`) by `scripts/build-ios-assets.ts`, which is why they are
-**app-target assets and so invisible to the widget extension** — a lock screen that ever wants a
-mark has to draw one, per the rule above. The tee is what makes it legible at 22pt: a bare ball is
-a circle with specks on it, and the football's silhouette is the thing that survives being small.
+**One badge, and what sits inside it says which contest.** Three marks share the same yellow
+ground, ink and border: `TallyMark` is the app's — four uprights and the fifth stroke through them,
+drawn by a hand rather than a ruler, with a cut of the ground down the fifth — and it is the icon,
+the lockup and the welcome screen; `FootballMark` is a pool's, on the
+pool chip, the pager and Home's pool cards; `GolfMark` is a card's, on the golf chip and the
+poster. The app's own mark is the tally rather than the football because the app is the count and
+a football is one of the things it counts — the golf card is what showed that: a card three people
+just played should not be selling football to them, and a third family should cost a badge, not a
+brand. All three are rasterised at 1x/2x/3x from SVG (`public/icon.svg`, `public/football.svg`,
+`public/golf.svg`) by `scripts/build-ios-assets.ts`, which also writes the app icon and the web's
+touch icon from the same glyph, so they are **app-target assets and so invisible to the widget
+extension** — a lock screen that wants the mark draws it with `TallyGlyph` in TallyKit, which is
+also what the app's loader draws through, so there is one set of strokes. The mark has **two sets
+of weights, not one**: in the dark the strokes are 8% lighter and the cut 40% wider, because a
+light stroke on a dark ground swells where a dark stroke on a light one shrinks, and drawn at the
+light weights the dark cut nearly closed. The icon script, `TallyGlyph` and `TallyLoader.tsx` each
+carry both sets; change one and change all three. The tee is what makes the golf ball legible at
+22pt: a bare ball is a circle with specks on it.
 
 The round's Live Activity is the one lock screen in the app that **needs no APNs key**: a scramble
 has no feed, so every change is a tap in this app and `RoundActivityService` updates the activity
@@ -196,8 +206,10 @@ took last week. (A golf card has its own three; see above.)
 
 - **Switching pools is the Home tab on iOS, and nothing else.** `AppModel` holds one pool, one
   session, one service; a tap on a card there swaps the whole app — onto the picks if any are
-  owed, as the entry that owes them, otherwise onto the pool's page. The chip top-left of the
-  pool's own tabs (`PoolChip`) is the mark and the pool name, and it is a label rather than a menu.
+  owed, as the entry that owes them, otherwise onto the pool's page. The header at the top of
+  the pool's own tabs (`ScreenHeader`) is the mark and the pool name, and it is a label rather
+  than a menu — and it is page content, not a toolbar item, because iOS 26 wraps a leading
+  toolbar item in glass sized to its own idea of the width, which for a name was one letter.
   `PoolsView` is only join / start / the catalogue, the way in at the bottom of Home. The pool's
   page does not list the other pools; Home says everything that strip used to. Behind Labs
   (`poolPager`) the Pool tab wears a `PoolPager` row — chevrons, dots, a contained flick — as a

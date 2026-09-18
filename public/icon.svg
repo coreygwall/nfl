@@ -1,8 +1,12 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128">
   <rect width="128" height="128" rx="30" fill="#FFD23F"/>
   <rect x="7" y="7" width="114" height="114" rx="24" fill="none" stroke="#14120F" stroke-width="7"/>
-  <g transform="rotate(-32 64 64)">
-    <path d="M19 64C33 34 48 27 64 27s31 7 45 37C95 94 80 101 64 101S33 94 19 64Z" fill="#14120F"/>
-    <path d="M43 64h42M52 55v18M64 55v18M76 55v18" fill="none" stroke="#F6F1E8" stroke-width="6" stroke-linecap="round"/>
+  <g fill="none" stroke="#14120F" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M38 38 C 37 55, 39.5 73, 40 92" stroke-width="8.2"/>
+    <path d="M55 43 C 56.5 58, 54 72, 55.5 86" stroke-width="7.4"/>
+    <path d="M71.5 36 C 70 55, 73 72, 71 90" stroke-width="9"/>
+    <path d="M89 41 C 90.5 56, 88 71, 89.5 89" stroke-width="7.8"/>
+    <path d="M26 92 C 44 78, 64 62, 84 48 C 92 42.5, 98 37, 103 34 C 104.5 33.5, 105 35, 104 36.5" stroke-width="14"/>
   </g>
+  <path d="M26 92 C 44 78, 64 62, 84 48 C 92 42.5, 98 37, 103 34 C 104.5 33.5, 105 35, 104 36.5" fill="none" stroke="#FFD23F" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
 </svg>

@@ -44,6 +44,11 @@
   --color-on-accent: #14120f;
   --color-on-turf: #ffffff;
   --color-dot: rgb(20 18 15 / 0.06);
+  /* The loading mark's weights (TallyLoader.tsx). The dark theme thins the strokes and widens the
+     cut, because a light stroke on a dark ground swells where a dark one on light shrinks. */
+  --tally-k: 1;
+  --tally-edge: 14px;
+  --tally-cut: 4px;
 
   --shadow-hard: 4px 4px 0 0 var(--color-shadow);
   --shadow-hard-sm: 2px 2px 0 0 var(--color-shadow);
@@ -101,6 +106,9 @@
     --color-on-accent: #14120f;
     --color-on-turf: #14120f;
     --color-dot: rgb(244 239 230 / 0.05);
+    --tally-k: 0.92;
+    --tally-edge: 13.2px;
+    --tally-cut: 5.6px;
   }
 }
 
@@ -134,6 +142,9 @@
   --color-on-accent: #14120f;
   --color-on-turf: #14120f;
   --color-dot: rgb(244 239 230 / 0.05);
+  --tally-k: 0.92;
+  --tally-edge: 13.2px;
+  --tally-cut: 5.6px;
 }
 
 :root[data-theme="light"] {
@@ -310,7 +321,8 @@ button {
   /* Team logos drifting past on the welcome page. The track holds two copies of the
      list, so translating by half its width loops without a seam. */
   /* ---- The loading mark ------------------------------------------------------------------
-     Four strokes and the diagonal, drawn and then rubbed out in the order they were written.
+     Four strokes and the fifth through them, drawn and then rubbed out in the order they were
+     written; the fifth is two paths, the ink and the cut, on the same beat.
      Every line carries pathLength="1", so one set of keyframes works for the short uprights and
      the long slash alike; the negative offset at the end pulls the dash off the far side, which
      erases in the same direction the hand drew. */
