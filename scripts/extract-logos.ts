@@ -15,7 +15,9 @@ const CUSTOM = path.join(ROOT, "scripts/custom-logos");
 const PKG = "react-nfl-logos@1.0.3";
 const OUTLINE_WIDTH = 18; // in 560x400 viewBox units
 const PAD = OUTLINE_WIDTH / 2 + 6;
-const STRIPPED = new Set(["WAS", "CLE"]); // stale/poor marks in the package; replaced by custom art
+// Stale or poor marks in the package, replaced by custom art. LA is the pre-2020 ram's head there;
+// the monogram in custom-logos/ is the current one.
+const STRIPPED = new Set(["WAS", "CLE", "LA"]);
 const RASTER_WIDTH = 360; // px for logos shipped as PNG
 const RASTER = new Set(["TEN"]); // embeds a bitmap; shipped as PNG
 const RENAME: Record<string, string> = { LAR: "LA" }; // package → nflverse abbreviation
