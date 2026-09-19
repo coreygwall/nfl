@@ -51,6 +51,23 @@ struct ShareCardSheet: View {
     @Environment(\.dismiss) private var dismiss
     let card: ScrambleCard
 
+    private enum Mode: Hashable { case link, poster }
+    /**
+     Two different acts, one button.
+
+     The link gets the other three onto the card *during* the round; the poster goes in the group
+     chat *after* it. They are both "share", which is why they live behind one control rather than
+     two menu items — and the link leads, because a round that is still being played is the common
+     case and the poster of a half-finished round is nobody's trophy. A finished round opens on the
+     poster, because by then the argument is over and the picture is the point.
+     */
+    @State private var mode: Mode
+
+    init(card: ScrambleCard) {
+        self.card = card
+        _mode = State(initialValue: card.isComplete ? .poster : .link)
+    }
+
     @State private var rendered: URL?
     @State private var failed = false
 
@@ -63,26 +80,17 @@ struct ShareCardSheet: View {
             ZStack {
                 Color.paper.ignoresSafeArea()
                 VStack(spacing: 18) {
-                    poster
-                    if failed {
-                        VStack(spacing: 8) {
-                            Text("The card wouldn't draw.")
-                                .sans(13, weight: .semibold)
-                                .foregroundStyle(Color.ink2)
-                            ShareLink(item: ScrambleTally.summary(card)) {
-                                Label("Send it as text instead", systemImage: "square.and.arrow.up")
-                            }
-                            .buttonStyle(.tally(.plain, size: .small))
+                    TallySegmented(
+                        value: $mode,
+                        options: [(Mode.link, "Play together"), (Mode.poster, "Poster")]
+                    )
+                    if mode == .link {
+                        ScrollView {
+                            ShareLinkSheet(cardId: card.id).padding(.bottom, 24)
                         }
-                    } else if let rendered {
-                        ShareLink(item: rendered, subject: Text(title)) {
-                            Label("Share the card", systemImage: "square.and.arrow.up")
-                        }
-                        .buttonStyle(.tally(.primary, fullWidth: true))
                     } else {
-                        Spinner(label: "Drawing the card…")
+                        posterBody
                     }
-                    Spacer(minLength: 0)
                 }
                 .padding(16)
             }
@@ -92,6 +100,31 @@ struct ShareCardSheet: View {
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
             .task { await render() }
         }
+    }
+
+    /// The round as a picture, and the one button that sends it.
+    @ViewBuilder
+    private var posterBody: some View {
+        poster
+        if failed {
+            VStack(spacing: 8) {
+                Text("The card wouldn't draw.")
+                    .sans(13, weight: .semibold)
+                    .foregroundStyle(Color.ink2)
+                ShareLink(item: ScrambleTally.summary(card)) {
+                    Label("Send it as text instead", systemImage: "square.and.arrow.up")
+                }
+                .buttonStyle(.tally(.plain, size: .small))
+            }
+        } else if let rendered {
+            ShareLink(item: rendered, subject: Text(title)) {
+                Label("Share the card", systemImage: "square.and.arrow.up")
+            }
+            .buttonStyle(.tally(.primary, fullWidth: true))
+        } else {
+            Spinner(label: "Drawing the card…")
+        }
+        Spacer(minLength: 0)
     }
 
     /// Draw it once, when the sheet appears. It takes a few milliseconds, which is why there is a

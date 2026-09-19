@@ -197,3 +197,29 @@ export const Megaphone = ({ size = 18, ...p }: P) => (
     <path d="M16 8a4 4 0 010 6M7 14l1 6h4l-2-5" />
   </svg>
 );
+
+/** A flag on a stick: the hole you are standing on, and the Round tab of a golf card. */
+export const Flag = ({ size = 20, ...p }: P) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...p}>
+    <path d="M6 21V3" />
+    <path d="M6 4h11l-2.2 3.5L17 11H6" />
+  </svg>
+);
+
+/** A square grid: the scorecard, hole by hole. */
+export const Grid = ({ size = 20, ...p }: P) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...p}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M3 10h18M3 15h18M9 4v16" />
+  </svg>
+);
+
+/** A QR code, as a sign rather than a scannable thing: three finders and some noise. */
+export const QrIcon = ({ size = 18, ...p }: P) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...p}>
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <path d="M14 14h3v3h-3zM19 19h2M14 21h2M21 14v3" />
+  </svg>
+);

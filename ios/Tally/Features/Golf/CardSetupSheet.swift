@@ -361,6 +361,9 @@ struct CardSetupSheet: View {
             card.pars = finalPars
             card.contests = contests
             card.points = points
+            // Names, pars, contests and stakes all move on one clock. Without this a shared card
+            // would keep losing them to whichever other phone last touched its settings.
+            card.touchSettings()
             if !card.holeNumbers.contains(card.currentHole) { card.go(to: 1) }
             golf.save(card)
         } else {
