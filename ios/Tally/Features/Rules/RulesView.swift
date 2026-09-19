@@ -72,12 +72,22 @@ struct HowToPlay: View {
 }
 
 /**
- Rules stopped being a tab.
+ What the question mark opens, beside the megaphone on every one of the pool's tabs.
 
- It is a document you read once and then send to someone else — the only screen in the app you
- would visit fewer than five times in a season — and it was holding a quarter of the navigation.
- It opens over whatever you were looking at instead, from the board and from home, which is also
- where the question actually occurs to people.
+ **The rules belong to a pool, not to the app.** They lived under *About Tally* on the account
+ tab, one heading below the app's version number, which said they were a fact about the software —
+ and they are not: they are how *this* pool scores, from this pool's own type content, and a phone
+ holding two pools would have had one page of settings claiming to explain both. So they moved to
+ the pool's own bar, next to the other thing that belongs to one pool.
+
+ **Beside the megaphone rather than on a page, for the same reason the megaphone is.** The question
+ arrives mid-pick — what is the 5 for, can I still change this — and an answer that costs you your
+ place in the flow is an answer people do without. A medium detent over whatever you were doing,
+ draggable to full for the fine print, is the same shape the announcements peek uses, and the two
+ controls now behave alike because they are the same kind of thing: a pool speaking to you.
+
+ Home and the board still link to it in words (`LinkButton`), because that is where somebody
+ browsing rather than picking goes looking.
  */
 struct RulesSheet: View {
     @Environment(\.dismiss) private var dismiss
@@ -97,5 +107,27 @@ struct RulesSheet: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
         }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+}
+
+/// The question mark in the pool's bar. Sized and padded to match `MegaphoneButton` exactly — they
+/// sit next to each other, and iOS 26 draws a glass circle around each label, so two glyphs of
+/// different weights would read as two different kinds of control.
+struct RulesButton: View {
+    @Environment(AppModel.self) private var model
+
+    var body: some View {
+        Button {
+            Haptics.tap()
+            model.showRules = true
+        } label: {
+            Image(systemName: "questionmark.circle.fill")
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(Color.ink)
+                .padding(6)
+        }
+        .accessibilityLabel("How \(model.poolName) works")
     }
 }

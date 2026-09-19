@@ -288,7 +288,15 @@ took last week. (A golf card has its own three; see above.)
   remember the address. Both are rows on `src/screens/Account.tsx`, drawn from `roles` in the
   bootstrap, the same rule the app follows. Switching entries clears the pick flow's `step` from
   the query (`EntryPicker`), or the previous entry's "locked in" screen follows you.
-- **Rules is not a tab.** `RulesSheet` on iOS, `/rules` on web, linked from Home and the board.
+- **Rules is not a tab, and on iOS it is not a setting either.** `RulesSheet` on iOS, `/rules` on
+  web, linked from Home and the board — and on iOS opened by a question mark in the pool's bar,
+  immediately right of the megaphone, on every one of the pool's tabs. It used to be the first row
+  under *About Tally* on the account page, which put a fact about **one pool** one line above the
+  app's version number; a phone holding two pools had a settings page claiming to explain both.
+  Beside the megaphone it is the pool's, the way the megaphone is, and reachable at the moment the
+  question actually arrives — mid-pick, where leaving the flow to find an answer means not finding
+  it. It opens at a medium detent, draggable to full, which is the announcements peek's shape: two
+  controls that behave alike because they are the same kind of thing.
 - **Announcements is not a tab either**, and the megaphone differs by surface on purpose. On iOS it
   always opens a peek — a medium sheet of the announcements, whole, with the like in each row —
   from every pool tab, and there is no announcements section on the pool's page; reading a notice
@@ -299,6 +307,14 @@ took last week. (A golf card has its own three; see above.)
   the *device* has looked at (`AnnouncementRead`, mirrored from `src/lib/announcementRead.ts`),
   never a count or a timestamp, and never per entry: a phone that picks for the family is one
   reader.
+- **Signing out is a button that asks first**, and its word is red while its fill is not.
+  `.danger` as a *fill* is the app's vocabulary for irreversible — deleting a golf card takes
+  every hole with it — and signing out keeps every pick on the board, so spending the loud red
+  there is how it stops meaning anything where it matters. `TallyButtonStyle.label` is the
+  override that makes a plain button carry a red word, the same way `Chip` names its label colour.
+  It was an underlined link with the reassurance in grey beneath it: a footnote's weight on the
+  one control that ends a session, directly under a column of full-width rows that all look like
+  the things you tap. The reassurance is in the confirmation now, where somebody is deciding.
 - **Pinch does nothing.** `.noZoom()` on the root and on each sheet — there is no zoomable content
   in Tally, so a pinch that scales the page is always an accident.
 - Web keeps the pick flow's step in the query string, and `PickFlowRoute` keys the flow by

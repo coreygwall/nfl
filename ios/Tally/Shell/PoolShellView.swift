@@ -124,6 +124,13 @@ struct PoolScreen<Content: View>: View {
                 if !hub && model.announcementsAvailable {
                     ToolbarItem(placement: .topBarTrailing) { MegaphoneButton() }
                 }
+                // Right of the megaphone, and on every one of the pool's tabs for the same reason
+                // it is: "what is the 5 for" arrives in the middle of picking, and an answer that
+                // costs you your place in the flow is one people do without. Never on the app's
+                // own home — the rules are one pool's, and that page is about all of them.
+                if !hub {
+                    ToolbarItem(placement: .topBarTrailing) { RulesButton() }
+                }
                 if let week {
                     ToolbarItem(placement: .topBarTrailing) {
                         WeekMenu(week: week, max: model.maxWeek, onChange: onWeek)
