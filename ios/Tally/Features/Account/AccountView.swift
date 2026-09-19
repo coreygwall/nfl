@@ -24,6 +24,7 @@ struct AccountView: View {
     @State private var showCode = false
     @State private var adding = false
     @State private var attaching = false
+    @State private var confirmSignOut = false
     /// Drawn from the pool's shell, or from a golf card's. The account is the same person either
     /// way; the entries and the offices are the pool's, so from a card they are not on the page.
     let inPool: Bool
@@ -270,14 +271,18 @@ struct AccountView: View {
         return build.map { "\(short) (\($0))" } ?? short
     }
 
+    /**
+     What Tally is, and the way out.
+
+     *How scoring works* used to be the first row here, which put a fact about **one pool** under a
+     heading about the app, one line above its version number. It is the pool's, so it is in the
+     pool's bar now — the question mark beside the megaphone (`RulesButton`) — and a phone holding
+     two pools no longer has a settings page claiming to explain both at once.
+     */
     private var aboutSection: some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "About Tally")
             SettingsGroup {
-                if inPool {
-                    SettingsRow(title: "How scoring works", symbol: "book.fill") { model.showRules = true }
-                    SettingsDivider()
-                }
                 SettingsRow(title: "Join or start a pool", detail: "And what else Tally plays", symbol: "square.grid.2x2.fill") { model.showPools = true }
                 SettingsDivider()
                 HStack(spacing: 12) {
@@ -287,10 +292,37 @@ struct AccountView: View {
                 }
                 .padding(12)
             }
-            LinkButton(title: "Sign out on this phone", color: .danger) { model.signOut() }
-                .padding(.top, 6)
-            Text("Your picks stay on the board. Signing back in needs \(Biometry.label) or your code.")
-                .sans(12).foregroundStyle(Color.ink3)
+            signOutRow
+        }
+    }
+
+    /**
+     Signing out is a button, and it asks first.
+
+     It was an underlined link with the explanation in grey underneath — the visual weight of a
+     footnote on the one control that ends the session, sitting directly below a list of full-width
+     rows that all *look* like the things you tap. It is a real button now, in the app's own
+     shape, so it reads as deliberate.
+
+     **The word is red; the fill is not.** A solid `.danger` fill is this app's vocabulary for
+     irreversible — deleting a golf card, where every hole goes with it — and signing out is not
+     that: every pick stays on the board and the way back is Face ID. Spending the loud red here
+     is how it stops meaning anything where it matters. The confirmation carries the same reassurance
+     the grey line used to, at the moment somebody is actually deciding rather than before they
+     have thought about it.
+     */
+    private var signOutRow: some View {
+        Button("Sign out") {
+            Haptics.tap()
+            confirmSignOut = true
+        }
+        .buttonStyle(.tally(.plain, fullWidth: true, label: Color.danger))
+        .padding(.top, 6)
+        .confirmationDialog("Sign out?", isPresented: $confirmSignOut, titleVisibility: .visible) {
+            Button("Sign out", role: .destructive) { model.signOut() }
+            Button("Stay signed in", role: .cancel) {}
+        } message: {
+            Text("Your picks stay on the board and nothing is deleted. Signing back in on this phone needs \(Biometry.label) or your code.")
         }
     }
 }

@@ -51,6 +51,12 @@ struct TallyButtonStyle: ButtonStyle {
     var kind: Kind = .plain
     var size: Size = .regular
     var fullWidth = false
+    /// Overrides the kind's own label colour, the way `Chip` does. It exists for the one shape the
+    /// fills cannot say: a button that is a *real* button — surface, border, hard shadow — whose
+    /// word is red. A solid `.danger` fill is the app's word for irreversible, and spending it on
+    /// something reversible (signing out, which leaves every pick on the board) teaches people to
+    /// ignore it where it matters.
+    var label: Color? = nil
 
     @Environment(\.isEnabled) private var isEnabled
 
@@ -66,6 +72,7 @@ struct TallyButtonStyle: ButtonStyle {
     }
 
     private var foreground: Color {
+        if let label { return label }
         switch kind {
         case .primary: return .paper
         case .turf, .danger: return .onFill
@@ -100,8 +107,13 @@ struct TallyButtonStyle: ButtonStyle {
 
 extension ButtonStyle where Self == TallyButtonStyle {
     static var tally: TallyButtonStyle { TallyButtonStyle() }
-    static func tally(_ kind: TallyButtonStyle.Kind, size: TallyButtonStyle.Size = .regular, fullWidth: Bool = false) -> TallyButtonStyle {
-        TallyButtonStyle(kind: kind, size: size, fullWidth: fullWidth)
+    static func tally(
+        _ kind: TallyButtonStyle.Kind,
+        size: TallyButtonStyle.Size = .regular,
+        fullWidth: Bool = false,
+        label: Color? = nil
+    ) -> TallyButtonStyle {
+        TallyButtonStyle(kind: kind, size: size, fullWidth: fullWidth, label: label)
     }
 }
 
