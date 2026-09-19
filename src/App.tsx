@@ -14,6 +14,7 @@ import { League } from "./screens/League.tsx";
 import { Rules } from "./screens/Rules.tsx";
 import { Privacy } from "./screens/Privacy.tsx";
 import { Landing } from "./screens/Landing.tsx";
+import { GolfCard } from "./screens/GolfCard.tsx";
 import { POOL_SLUG } from "./lib/basename.ts";
 import { Announcements } from "./components/Announcements.tsx";
 import { fallbackPoolWeeks } from "./lib/poolFallback.ts";
@@ -55,10 +56,19 @@ function RequirePlayer({ children }: { children: ReactNode }) {
 
 export default function App() {
   // The bare domain is Tally's own front door; a pool only exists under /p/<slug>.
+  //
+  // A golf card is neither. It lives at /g/<token> off the root because it is not *in* a pool —
+  // the link is the whole entrance and the person holding it may have no account at all — and it
+  // draws its own shell rather than the pool's `AppShell`, with the card's three tabs instead of
+  // a pool's four. Matched before the landing page's catch-all, or a shared link would bounce to
+  // a page about football.
   if (!POOL_SLUG) {
     return (
       <Routes>
         <Route index element={<Landing />} />
+        <Route path="g/:token" element={<GolfCard tab="round" />} />
+        <Route path="g/:token/tally" element={<GolfCard tab="tally" />} />
+        <Route path="g/:token/scorecard" element={<GolfCard tab="scorecard" />} />
         <Route path="*" element={<Navigate to="/" replace />} />
       </Routes>
     );

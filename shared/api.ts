@@ -2,6 +2,7 @@ import type { Game, GameStatus, Pick, Player } from "./types.ts";
 import type { WeekSummary } from "./week.ts";
 import type { SeasonBoard, WeekBoard } from "./scoring.ts";
 import type { PickInput } from "./picks.ts";
+import type { ScrambleCard } from "./golf.ts";
 
 export interface GameDTO extends Game {
   locked: boolean;
@@ -245,4 +246,23 @@ export interface PasskeyOptionsResponse {
 export interface PasskeyAuthResponse {
   player: Player;
   token: string;
+}
+
+/**
+ * A shared golf card, as the link-holder's browser and the app both read it.
+ *
+ * `revision` is the cheap way to tell "nothing has changed since I last looked" from "somebody
+ * else has been playing" — a client keeps the last one it saw and compares, rather than diffing
+ * two cards to find out whether to redraw.
+ */
+export interface GolfCardResponse {
+  token: string;
+  revision: number;
+  updatedAt: string;
+  card: ScrambleCard;
+}
+
+export interface PublishCardResponse extends GolfCardResponse {
+  /** False when the app asked for a link it already had. The share sheet says so either way. */
+  created: boolean;
 }

@@ -10,6 +10,7 @@ import pushSchema from "../migrations/0009_push.sql?raw";
 import rolesSchema from "../migrations/0010_roles.sql?raw";
 import messagesSchema from "../migrations/0011_messages.sql?raw";
 import poolCodesSchema from "../migrations/0012_pool_codes.sql?raw";
+import golfCardsSchema from "../migrations/0013_golf_cards.sql?raw";
 import schedule from "../shared/schedule-2026.json";
 import { finalsFromCsv, gamesFromCsv, NFLVERSE_GAMES_CSV } from "../shared/nflverse.ts";
 import { applyResults, ensurePool, getMeta, listGames, setMeta, updateKickoffs, upsertGames } from "./db.ts";
@@ -27,8 +28,8 @@ const split = (sql: string) =>
 
 const statements = split(schema);
 // Everything after the initial schema: additive, and safe to re-run.
-const alterStatements = [...split(devicesSchema), ...split(householdSchema), ...split(readySchema), ...split(passkeySchema), ...split(entriesSchema), ...split(rateLimitSchema), ...split(pickHistorySchema), ...split(pushSchema), ...split(rolesSchema), ...split(messagesSchema), ...split(poolCodesSchema)];
-const SCHEMA_REVISION = "0012_pool_codes";
+const alterStatements = [...split(devicesSchema), ...split(householdSchema), ...split(readySchema), ...split(passkeySchema), ...split(entriesSchema), ...split(rateLimitSchema), ...split(pickHistorySchema), ...split(pushSchema), ...split(rolesSchema), ...split(messagesSchema), ...split(poolCodesSchema), ...split(golfCardsSchema)];
+const SCHEMA_REVISION = "0013_golf_cards";
 const SCHEMA_REVISION_KEY = "app_schema_revision";
 const RUNTIME_REVISION_KEY = "app_runtime_revision";
 
@@ -69,7 +70,11 @@ async function hasCurrentLegacySchema(db: D1Database): Promise<boolean> {
   const columns = await db.prepare("SELECT count(*) AS n FROM pragma_table_info('pools') WHERE name = ?")
     .bind("join_code")
     .first<{ n: number }>();
-  return columns?.n === 1;
+  if (columns?.n !== 1) return false;
+  const cards = await db.prepare(
+    "SELECT count(*) AS n FROM sqlite_master WHERE type = 'table' AND name = ?",
+  ).bind("golf_cards").first<{ n: number }>();
+  return cards?.n === 1;
 }
 
 async function prepareRuntime(env: Env): Promise<void> {
