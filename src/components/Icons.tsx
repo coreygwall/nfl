@@ -131,6 +131,19 @@ export const X = ({ size = 18, ...p }: P) => (
     <path d="M6 6l12 12M18 6L6 18" />
   </svg>
 );
+/// An envelope, for the row that writes to Tally.
+export const Mail = ({ size = 18, ...p }: P) => (
+  <svg {...base(size, p)}>
+    <rect x="3" y="5" width="18" height="14" rx="2.5" />
+    <path d="M3.5 7l8.5 6 8.5-6" />
+  </svg>
+);
+/// A shield, for the privacy row. Drawn rather than pulled in, the same as everything else here.
+export const Shield = ({ size = 18, ...p }: P) => (
+  <svg {...base(size, p)}>
+    <path d="M12 3l7 3v5.5c0 4.2-2.9 7.9-7 9.5-4.1-1.6-7-5.3-7-9.5V6l7-3z" />
+  </svg>
+);
 export const Pencil = ({ size = 16, ...p }: P) => (
   <svg {...base(size, p)}>
     <path d="M4 20l4.5-1L19 8.5a2.1 2.1 0 00-3-3L5.5 16 4 20z" />

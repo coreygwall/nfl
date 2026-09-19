@@ -48,6 +48,7 @@ import {
   noteRateLimit,
   publicPlayer,
   rateLimit,
+  renamePlayer,
   replacePicks,
   touchPlayer,
 } from "../db.ts";
@@ -171,6 +172,49 @@ publicRoutes.get("/join/:code", async (c) => {
     pool: { id: pool.id, slug: pool.slug, name: pool.name, type: pool.type, joinCode: pool.joinCode },
   };
   return c.json(body);
+});
+
+/**
+ * Renaming a name you are responsible for: your own, or one of the entries you manage.
+ *
+ * The account page could show you your name and never let you change it — a typo in your own name
+ * was a message to whoever runs the pool, which is an absurd errand for the one field that is
+ * unambiguously yours. The commissioner's `PATCH /commissioner/players/:id` has always done this;
+ * this is the same act without the office, narrowed to the two names the account page already
+ * lists.
+ *
+ * Every check the commissioner's route runs, this runs too, plus the profanity screen `POST
+ * /entries` applies — a commissioner typing a real person's unusual name is not the same risk as
+ * anyone at all choosing any string, so the stricter of the two paths is the right one here.
+ *
+ * Authorization is deliberately *not* "any signed-in account": it is the calling account itself,
+ * or a player in that account's `entry_owners`. A rename is the one edit that changes what
+ * everybody else sees on the board, so it stays scoped to names the caller already manages.
+ */
+publicRoutes.patch("/players/:id/name", async (c) => {
+  const account = c.get("account");
+  if (!account) throw new ApiError(401, "NO_PLAYER", "Sign in to change a name.");
+  const player = await getPlayer(c.env.DB, c.req.param("id"));
+  if (!player) throw notFound("NO_PLAYER", "No such player");
+
+  if (player.id !== account.id) {
+    const owner = await ownerOfEntry(c.env.DB, player.id);
+    if (owner?.id !== account.id) {
+      throw new ApiError(403, "NOT_YOURS", "That name isn't one of yours to change.");
+    }
+  }
+
+  const body = (await c.req.json().catch(() => ({}))) as { name?: unknown };
+  const check = validateName(body.name);
+  if (!check.ok) throw badRequest("INVALID_NAME", check.message);
+  if (isVulgar(check.name)) throw badRequest("INVALID_NAME", VULGAR_MESSAGE);
+  const key = nameKey(check.name);
+  const clash = await findPlayerByKey(c.env.DB, key);
+  if (clash && clash.id !== player.id) {
+    throw new ApiError(409, "NAME_TAKEN", "Somebody in the pool already has that name.");
+  }
+  await renamePlayer(c.env.DB, player.id, check.name, key);
+  return c.json({ player: { id: player.id, name: check.name } });
 });
 
 publicRoutes.post("/entries", async (c) => {

@@ -307,6 +307,39 @@ took last week. (A golf card has its own three; see above.)
   the *device* has looked at (`AnnouncementRead`, mirrored from `src/lib/announcementRead.ts`),
   never a count or a timestamp, and never per entry: a phone that picks for the family is one
   reader.
+- **The account page has no section called "Settings".** It had one, which was a tautology on a
+  page that is entirely settings — and a drawer: notifications, the appearance control and two
+  feature flags shared a heading because none of them had a better one. The sections name what
+  they are now — *Signed in as*, *Entries*, *Run the pool*, *Preferences*, *Signing in*, *About
+  Tally* — and two things moved to where they belong. `PasskeyRow` was a caption under your name
+  at the top; it is a way back into your account, so it sits in *Signing in* with the other one,
+  and the *Another device* section (one row, its own heading) folded in beside it. Labs was two
+  switches and two paragraphs sitting open in the middle of the page, about 200pt of experiments
+  that pushed everything after them below the fold; it is `LabsSheet` behind one row that says how
+  many are on.
+- **A name is yours to fix.** `PATCH /api/players/:id/name` renames the calling account, or a
+  player in its `entry_owners` — every check the commissioner's rename runs plus the profanity
+  screen `POST /entries` applies, because a commissioner typing somebody's unusual name is not the
+  same risk as anyone at all choosing any string. Before it, the page showed your name and let you
+  change nothing about it, so a typo in your own name was an errand to whoever runs the pool —
+  which nobody runs, which is how a pool fills up with names nobody meant. `AppModel.renamed` moves
+  the Keychain cache *and* refreshes the bootstrap, in that order, and takes care not to let
+  `SessionStore.save` make the renamed entry the active one: renaming a child from the account page
+  must not quietly start picking as them.
+- **`/privacy` is a page, and the only copy of it.** There was no privacy policy anywhere, which
+  Apple will not accept at submission and which a pool that keeps picks forever ought to say out
+  loud regardless. Every claim on it is checked against the schema rather than written from a
+  template — no email, no password, no analytics, no ad tech, tokens stored only as SHA-256, an IP
+  address kept as a rate-limit key that expires. iOS links to the web page rather than keeping its
+  own copy: a policy has to live at a public address anyway, and two copies is how one goes stale.
+  The support address is `shared/contact.ts` + `Contact.swift`, a plain constant, with
+  `contactParity.test.ts` holding the two together — a Swift build cannot see the TypeScript, and
+  the cost of drift on this particular string is somebody writing in and never being answered,
+  which looks exactly like being ignored. It was a build-time `VITE_SUPPORT_EMAIL` first, which
+  was wrong twice over: `.env` is gitignored, so every production build would have read it as
+  undefined and shipped the page with no way to reach anybody — and a support address is published
+  on purpose anyway, because the App Store listing needs one and a settings page with no way to
+  get help sends people to their commissioner for things that are not their pool's fault.
 - **Signing out is a button that asks first**, and its word is red while its fill is not.
   `.danger` as a *fill* is the app's vocabulary for irreversible — deleting a golf card takes
   every hole with it — and signing out keeps every pick on the board, so spending the loud red

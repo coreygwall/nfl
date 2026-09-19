@@ -121,6 +121,18 @@ public struct EntryResponse: Codable, Sendable {
     public let player: Player
 }
 
+/// What a rename answers with: the id that was changed and the name it now has. Deliberately not
+/// a whole `Player` — the route returns exactly these two fields, and decoding into a type with
+/// more of them would break the moment `Player` gained a required one.
+public struct RenameResponse: Codable, Sendable {
+    public struct Renamed: Codable, Sendable {
+        public let id: String
+        public let name: String
+    }
+
+    public let player: Renamed
+}
+
 public struct PickCount: Codable, Hashable, Sendable {
     public let away: Int
     public let home: Int

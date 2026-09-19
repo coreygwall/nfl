@@ -183,3 +183,66 @@ describe("attaching that same kind of player without a commissioner", () => {
     expect(rescue.status).toBe(200);
   });
 });
+
+/**
+ * Changing a name you are responsible for.
+ *
+ * The account page listed your name and every entry you manage and let you edit none of them, so
+ * a typo in your own name was an errand for whoever runs the pool. The route is the commissioner's
+ * rename without the office, and the interesting cases are all about *whose* name it is.
+ */
+describe("renaming yourself and the entries you manage", () => {
+  const rename = (id: string, body: unknown, token?: string) =>
+    api(`/players/${id}/name`, { method: "PATCH", token, body });
+
+  it("renames the account's own name and the board follows", async () => {
+    const { owner } = await family();
+    const fresh = name();
+    const r = await rename(owner.player.id, { name: fresh }, owner.token);
+    expect(r.status).toBe(200);
+    expect(r.body.player.name).toBe(fresh);
+    const boot = (await api("/bootstrap", { token: owner.token })).body;
+    expect(boot.account.name).toBe(fresh);
+    expect(boot.players.find((p: any) => p.id === owner.player.id).name).toBe(fresh);
+  });
+
+  it("renames a managed entry, which is the typo people actually make", async () => {
+    const { owner, child } = await family();
+    const fresh = name();
+    expect((await rename(child.id, { name: fresh }, owner.token)).status).toBe(200);
+    const boot = (await api("/bootstrap", { token: owner.token })).body;
+    expect(boot.myEntries.find((p: any) => p.id === child.id).name).toBe(fresh);
+  });
+
+  it("is nobody else's name to change, signed in or not", async () => {
+    const { owner, child } = await family();
+    const stranger = (await api("/players", { body: { name: name() } })).body;
+    expect((await rename(owner.player.id, { name: name() })).status).toBe(401);
+    expect((await rename(owner.player.id, { name: name() }, stranger.token)).status).toBe(403);
+    expect((await rename(child.id, { name: name() }, stranger.token)).status).toBe(403);
+    // And the name really did not move.
+    const boot = (await api("/bootstrap", { token: owner.token })).body;
+    expect(boot.account.name).toBe(owner.player.name);
+  });
+
+  it("refuses a name somebody else is already using, and a name that is not one", async () => {
+    const { owner, child } = await family();
+    const other = (await api("/players", { body: { name: name() } })).body;
+    expect((await rename(owner.player.id, { name: other.player.name }, owner.token)).status).toBe(409);
+    expect((await rename(owner.player.id, { name: child.name.toUpperCase() }, owner.token)).status).toBe(409);
+    expect((await rename(owner.player.id, { name: "x" }, owner.token)).status).toBe(400);
+    expect((await rename(owner.player.id, { name: "shit" }, owner.token)).status).toBe(400);
+  });
+
+  it("lets a name be re-cased or re-spaced without colliding with itself", async () => {
+    const { owner } = await family();
+    const r = await rename(owner.player.id, { name: owner.player.name.toUpperCase() }, owner.token);
+    expect(r.status).toBe(200);
+    expect(r.body.player.name).toBe(owner.player.name.toUpperCase());
+  });
+
+  it("refuses a player that does not exist", async () => {
+    const { owner } = await family();
+    expect((await rename("nope", { name: name() }, owner.token)).status).toBe(404);
+  });
+});
