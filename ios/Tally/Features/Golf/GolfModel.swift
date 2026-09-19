@@ -91,4 +91,10 @@ final class GolfModel {
     func setPar(_ par: Int, card id: String, hole: Int) {
         mutate(id) { $0.setPar(par, on: hole) }
     }
+
+    /// Name who took a hole's side contest, or clear it with nil. Goes through `mutate` like
+    /// every other change, so the lock screen and the catalogue see it at the same moment.
+    func award(_ contest: SideContest, card id: String, hole: Int, to playerId: String?) {
+        mutate(id) { $0.award(contest, on: hole, to: playerId) }
+    }
 }

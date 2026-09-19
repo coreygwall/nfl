@@ -18,6 +18,44 @@ public struct TallyRow: Hashable, Identifiable, Sendable {
 }
 
 /**
+ One hole's side contest: which it is, and who took it.
+
+ Only holes that *currently* host a contest are ever built into one of these, so a `winner` of nil
+ means nobody has claimed it rather than nobody could.
+ */
+public struct ContestResult: Hashable, Identifiable, Sendable {
+    public let hole: Int
+    public let contest: SideContest
+    public let winner: GolfPlayer?
+
+    /// The hole cannot host two contests today — par is one number — but the id says both anyway,
+    /// so a third contest on a par four would not collide with anything.
+    public var id: String { "\(hole)-\(contest.rawValue)" }
+    public var claimed: Bool { winner != nil }
+}
+
+/// One line of the points board: the three things that earn, and what they came to.
+public struct PointsRow: Hashable, Identifiable, Sendable {
+    public let player: GolfPlayer
+    public let kept: Int
+    public let longestDrives: Int
+    public let closestToPins: Int
+    /// Those three at this card's values. The number the board is sorted by.
+    public let points: Int
+    /// 1-based, and shared on a tie, the same rule the shots-kept board follows.
+    public let place: Int
+
+    public var id: String { player.id }
+
+    public func wins(_ contest: SideContest) -> Int {
+        switch contest {
+        case .longestDrive: return longestDrives
+        case .closestToPin: return closestToPins
+        }
+    }
+}
+
+/**
  The reading of a card: who had the most shots kept, and where they were kept.
 
  Sorted by shots kept, because that is the question; drives and holed shots break the *order* of a
@@ -114,6 +152,10 @@ public enum ScrambleTally {
         public let mostKept: Best?
         public let offTheTee: Best?
         public let holed: Best?
+        /// Nil when the contest is not being played at all, and nil when it is but nobody has
+        /// been named yet — a poster should not carry an empty trophy either way.
+        public let longestDrive: Best?
+        public let closestToPin: Best?
     }
 
     public static func highlights(_ card: ScrambleCard) -> Highlights {
@@ -123,7 +165,107 @@ public enum ScrambleTally {
             guard top > 0 else { return nil }
             return Highlights.Best(names: rows.filter { value($0) == top }.map(\.player.name), count: top)
         }
-        return Highlights(mostKept: best(\.kept), offTheTee: best(\.drives), holed: best(\.holed))
+        func bestContest(_ contest: SideContest) -> Highlights.Best? {
+            guard card.contests.runs(contest) else { return nil }
+            var counts: [String: Int] = [:]
+            for result in contestResults(card) where result.contest == contest {
+                guard let winner = result.winner else { continue }
+                counts[winner.id, default: 0] += 1
+            }
+            let top = counts.values.max() ?? 0
+            guard top > 0 else { return nil }
+            return Highlights.Best(names: rows.filter { counts[$0.id] == top }.map(\.player.name), count: top)
+        }
+        return Highlights(
+            mostKept: best(\.kept),
+            offTheTee: best(\.drives),
+            holed: best(\.holed),
+            longestDrive: bestContest(.longestDrive),
+            closestToPin: bestContest(.closestToPin)
+        )
+    }
+
+    // MARK: The contests beside the round
+
+    /// Every hole hosting a contest today, in playing order, with whoever has claimed it.
+    public static func contestResults(_ card: ScrambleCard) -> [ContestResult] {
+        card.contestHoles.compactMap { hole -> ContestResult? in
+            guard let contest = card.contest(for: hole) else { return nil }
+            return ContestResult(hole: hole, contest: contest, winner: card.winner(of: contest, on: hole))
+        }
+    }
+
+    /// How many of one contest a player has taken.
+    public static func wins(_ contest: SideContest, by playerId: String, on card: ScrambleCard) -> Int {
+        contestResults(card).filter { $0.contest == contest && $0.winner?.id == playerId }.count
+    }
+
+    /**
+     The points board.
+
+     Built even when `points.enabled` is off, because the board is a reading of the card rather
+     than a setting — the screen decides whether to draw it. Sorted by points, then by the awards
+     that are hardest to get (closest, then longest), then by shots kept, then by name; the
+     *place* is shared on equal points alone, so a tie on the number stays a tie the way it does
+     on the other board.
+     */
+    public static func points(_ card: ScrambleCard) -> [PointsRow] {
+        let values = card.points
+        let kept = Dictionary(uniqueKeysWithValues: rows(card).map { ($0.id, $0.kept) })
+        var wins: [SideContest: [String: Int]] = [:]
+        for result in contestResults(card) {
+            guard let winner = result.winner else { continue }
+            wins[result.contest, default: [:]][winner.id, default: 0] += 1
+        }
+        func won(_ contest: SideContest, _ id: String) -> Int { wins[contest]?[id] ?? 0 }
+        func total(_ id: String) -> Int {
+            kept[id, default: 0] * values.perShotKept
+                + won(.longestDrive, id) * values.perLongestDrive
+                + won(.closestToPin, id) * values.perClosestToPin
+        }
+        let sorted = card.players.sorted { a, b in
+            let pa = total(a.id), pb = total(b.id)
+            if pa != pb { return pa > pb }
+            let ca = won(.closestToPin, a.id), cb = won(.closestToPin, b.id)
+            if ca != cb { return ca > cb }
+            let la = won(.longestDrive, a.id), lb = won(.longestDrive, b.id)
+            if la != lb { return la > lb }
+            let ka = kept[a.id, default: 0], kb = kept[b.id, default: 0]
+            if ka != kb { return ka > kb }
+            return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
+        }
+        var out: [PointsRow] = []
+        for (index, player) in sorted.enumerated() {
+            let p = total(player.id)
+            let place = index > 0 && out[index - 1].points == p ? out[index - 1].place : index + 1
+            out.append(PointsRow(
+                player: player,
+                kept: kept[player.id, default: 0],
+                longestDrives: won(.longestDrive, player.id),
+                closestToPins: won(.closestToPin, player.id),
+                points: p,
+                place: place
+            ))
+        }
+        return out
+    }
+
+    /**
+     What everything is worth, in one line, mentioning only what this card is actually playing.
+
+     "1 a shot kept · 10 a long drive · 10 a closest". Said once under the board rather than
+     spelled out on every row: the row's job is the count and the total, and the arithmetic
+     between them is the same on every row.
+     */
+    public static func pointsLine(_ card: ScrambleCard) -> String {
+        let values = card.points
+        var parts: [String] = []
+        if values.perShotKept > 0 { parts.append("\(values.perShotKept) a shot kept") }
+        for contest in card.contests.playing where values.value(of: contest) > 0 {
+            parts.append("\(values.value(of: contest)) a \(contest == .longestDrive ? "long drive" : "closest")")
+        }
+        guard !parts.isEmpty else { return "Nothing is worth anything yet." }
+        return parts.joined(separator: " · ")
     }
 
     /**
@@ -156,6 +298,30 @@ public enum ScrambleTally {
                 if row.holed > 0 { detail.append("\(row.holed) holed") }
                 let tail = detail.isEmpty ? "" : " (\(detail.joined(separator: ", ")))"
                 lines.append("\(row.place). \(row.player.name) — \(row.kept)\(tail)")
+            }
+        }
+
+        let contests = contestResults(card).filter(\.claimed)
+        if !contests.isEmpty {
+            for contest in card.contests.playing {
+                let taken = contests.filter { $0.contest == contest }
+                guard !taken.isEmpty else { continue }
+                lines.append("")
+                lines.append(contest.title)
+                for result in taken {
+                    lines.append("Hole \(result.hole) — \(result.winner?.name ?? "")")
+                }
+            }
+        }
+
+        if card.points.enabled {
+            let board = points(card)
+            if board.contains(where: { $0.points > 0 }) {
+                lines.append("")
+                lines.append("Points (\(pointsLine(card)))")
+                for row in board {
+                    lines.append("\(row.place). \(row.player.name) — \(row.points)")
+                }
             }
         }
 

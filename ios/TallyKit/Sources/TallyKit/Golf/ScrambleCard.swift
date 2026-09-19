@@ -69,18 +69,56 @@ public struct Stroke: Codable, Hashable, Identifiable, Sendable {
     public static var unclaimed: Stroke { Stroke(kind: .unclaimed) }
 }
 
-/// One hole's record: the strokes in the order they were taken, and whether the ball is in.
+/// One hole's record: the strokes in the order they were taken, whether the ball is in, and who
+/// took the hole's side contest if it hosts one.
 public struct HoleEntry: Codable, Hashable, Sendable {
     public let hole: Int
     public var strokes: [Stroke]
     public var finished: Bool
     public var updatedAt: Date
+    /// At most one of each contest. Kept even when the hole's par no longer hosts that contest —
+    /// see `SideContests.swift` for why the record outlives the counting.
+    public var awards: [HoleAward]
 
-    public init(hole: Int, strokes: [Stroke] = [], finished: Bool = false, updatedAt: Date = Date()) {
+    public init(
+        hole: Int,
+        strokes: [Stroke] = [],
+        finished: Bool = false,
+        updatedAt: Date = Date(),
+        awards: [HoleAward] = []
+    ) {
         self.hole = hole
         self.strokes = strokes
         self.finished = finished
         self.updatedAt = updatedAt
+        self.awards = awards
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case hole, strokes, finished, updatedAt, awards
+    }
+
+    /**
+     Hand-written for one reason: `awards` arrived after cards were already on phones.
+
+     Swift's synthesised decoder does not fall back to a property's default when the key is
+     missing — it throws. `CardCatalog.load` turns a throw into an empty catalogue, so a
+     synthesised decoder here would have deleted every round anybody had ever kept, silently, on
+     the update that shipped this file. Every field added from here on decodes the same way.
+     */
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        hole = try c.decode(Int.self, forKey: .hole)
+        strokes = try c.decode([Stroke].self, forKey: .strokes)
+        finished = try c.decode(Bool.self, forKey: .finished)
+        updatedAt = try c.decode(Date.self, forKey: .updatedAt)
+        awards = try c.decodeIfPresent([HoleAward].self, forKey: .awards) ?? []
+    }
+
+    /// Who took this hole's contest, whatever the hole's par says today. `ScrambleCard.winner`
+    /// is the one that applies the par rule; this is the raw record.
+    public func award(_ contest: SideContest) -> String? {
+        awards.first { $0.contest == contest }?.playerId
     }
 
     /// Every stroke counts on the card, whoever or whatever it belonged to.
@@ -110,6 +148,10 @@ public struct ScrambleCard: Codable, Hashable, Identifiable, Sendable {
     public var holes: [HoleEntry]
     /// The hole the team is standing on. Part of the record, so a relaunch lands on the right tee.
     public var currentHole: Int
+    /// Which side contests the group is playing. Both off is a round exactly as it was before.
+    public var contests: ContestRules
+    /// What a shot and an award are worth, and whether anybody is counting.
+    public var points: PointValues
 
     public init(
         id: String = UUID().uuidString,
@@ -119,7 +161,9 @@ public struct ScrambleCard: Codable, Hashable, Identifiable, Sendable {
         players: [GolfPlayer],
         pars: [Int],
         holes: [HoleEntry] = [],
-        currentHole: Int = 1
+        currentHole: Int = 1,
+        contests: ContestRules = .off,
+        points: PointValues = .standard
     ) {
         self.id = id
         self.name = name
@@ -129,6 +173,28 @@ public struct ScrambleCard: Codable, Hashable, Identifiable, Sendable {
         self.pars = pars
         self.holes = holes
         self.currentHole = currentHole
+        self.contests = contests
+        self.points = points
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case id, name, course, createdAt, players, pars, holes, currentHole, contests, points
+    }
+
+    /// Hand-written for the same reason as `HoleEntry`'s: a card saved before side contests
+    /// existed has neither key, and a throw here is a wiped catalogue rather than an error.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        id = try c.decode(String.self, forKey: .id)
+        name = try c.decode(String.self, forKey: .name)
+        course = try c.decode(String.self, forKey: .course)
+        createdAt = try c.decode(Date.self, forKey: .createdAt)
+        players = try c.decode([GolfPlayer].self, forKey: .players)
+        pars = try c.decode([Int].self, forKey: .pars)
+        holes = try c.decode([HoleEntry].self, forKey: .holes)
+        currentHole = try c.decode(Int.self, forKey: .currentHole)
+        contests = try c.decodeIfPresent(ContestRules.self, forKey: .contests) ?? .off
+        points = try c.decodeIfPresent(PointValues.self, forKey: .points) ?? .standard
     }
 
     // MARK: Reading
@@ -147,6 +213,46 @@ public struct ScrambleCard: Codable, Hashable, Identifiable, Sendable {
     public func player(_ id: String?) -> GolfPlayer? {
         guard let id else { return nil }
         return players.first { $0.id == id }
+    }
+
+    // MARK: The contests beside the round
+
+    /**
+     Which side contest this hole hosts, if any — decided by par, and by nothing else.
+
+     Par is the whole rule (`SideContests.swift` says why), so correcting the fourth to a three on
+     the fourth tee turns it into a closest-to-the-pin hole there and then. A card with neither
+     contest switched on answers nil everywhere, which is how every round that predates this
+     behaves.
+     */
+    public func contest(for hole: Int) -> SideContest? {
+        guard holeNumbers.contains(hole) else { return nil }
+        return SideContest.allCases.first { $0.par == par(hole) && contests.runs($0) }
+    }
+
+    /// Every hole currently hosting a contest, in playing order.
+    public var contestHoles: [Int] {
+        guard contests.any else { return [] }
+        return holeNumbers.filter { contest(for: $0) != nil }
+    }
+
+    /**
+     Who took a hole's contest — nil if nobody has said yet, and nil if the hole no longer hosts
+     the contest the award was recorded under.
+
+     That second case is a par corrected after the fact. The award stays on disk and comes back if
+     the par comes back; it simply stops counting, the same way holes 10-18 stop counting when a
+     round is shortened to nine.
+     */
+    public func winner(of contest: SideContest, on hole: Int) -> GolfPlayer? {
+        guard self.contest(for: hole) == contest else { return nil }
+        return player(entry(hole)?.award(contest))
+    }
+
+    /// The hole's contest and whoever has it, in one lookup, for a screen standing on that tee.
+    public func standing(on hole: Int) -> (contest: SideContest, winner: GolfPlayer?)? {
+        guard let contest = contest(for: hole) else { return nil }
+        return (contest, winner(of: contest, on: hole))
     }
 
     /// Only holes on the card: a round shortened to nine after the back was played keeps the
@@ -248,5 +354,27 @@ public struct ScrambleCard: Codable, Hashable, Identifiable, Sendable {
     public mutating func go(to hole: Int) {
         guard holeNumbers.contains(hole) else { return }
         currentHole = hole
+    }
+
+    /**
+     Name who took a hole's side contest, or clear it by passing nil.
+
+     Deliberately *not* guarded by `contest(for:)`: the hole is allowed to be recorded before its
+     par is right, and the reading side already refuses to count an award on a hole that does not
+     host that contest. Guarding here instead would mean a tap that looked like it worked and
+     stored nothing.
+
+     It is allowed on a finished hole, unlike `record`. A stray tap cannot turn a birdie into a
+     par here — an award changes no score — and the closest to the pin is usually settled while
+     somebody is already writing the hole down.
+     */
+    public mutating func award(_ contest: SideContest, on hole: Int, to playerId: String?) {
+        guard holeNumbers.contains(hole) else { return }
+        let known = playerId.flatMap { id in players.first { $0.id == id }?.id }
+        guard known != nil || playerId == nil else { return }
+        update(hole) { entry in
+            entry.awards.removeAll { $0.contest == contest }
+            if let known { entry.awards.append(HoleAward(contest: contest, playerId: known)) }
+        }
     }
 }

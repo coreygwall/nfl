@@ -138,6 +138,15 @@ struct ShareCardView: View {
             if let holed = highlights.holed {
                 BragLine(symbol: "flag.fill", label: "Holed", best: holed, unit: "shot")
             }
+            // The side games go above nothing and below everything: they are the loudest brag in
+            // the group chat and the least related to the score, so they sit with the other
+            // things that are true about a person rather than about the round.
+            if let long = highlights.longestDrive {
+                BragLine(symbol: SideContest.longestDrive.symbol, label: "Longest drive", best: long, unit: "hole")
+            }
+            if let close = highlights.closestToPin {
+                BragLine(symbol: SideContest.closestToPin.symbol, label: "Closest to pin", best: close, unit: "hole")
+            }
         }
     }
 
@@ -250,13 +259,19 @@ extension ShareCardView {
             name: "Saturday scramble",
             course: "Blue Hill",
             players: ["Corey", "Dan", "Pete", "Sam"].map { GolfPlayer(name: $0) },
-            pars: CardSetupSheet.standardPars
+            pars: CardSetupSheet.standardPars,
+            contests: ContestRules(longestDrive: true, closestToPin: true)
         )
         let ids = card.players.map(\.id)
         for hole in 1...18 {
             card.record(.shot(by: ids[hole % ids.count]), on: hole)
             card.record(.shot(by: ids[(hole + 1) % ids.count]), on: hole)
             card.finish(hole: hole, tapIn: hole % 3 != 0)
+            // The side games too, so the preview draws the card at its busiest rather than
+            // leaving the two lines that only appear on a card that played them untested by eye.
+            if let contest = card.contest(for: hole) {
+                card.award(contest, on: hole, to: ids[hole % ids.count])
+            }
         }
         return card
     }

@@ -180,6 +180,37 @@ score is the count, a **tap-in** counts on the card and credits nobody, a **pena
 distinction the whole feature exists for. One phone keeps the card today; every hole carries
 `updatedAt` so sharing is a merge rule rather than a rewrite.
 
+Beside the round are **the two bets** (`SideContests.swift`): longest drive and closest to the pin,
+each switched on per card. Three rules hold the feature together, and the second and third are only
+obvious once the first is true:
+
+- **Par decides where a contest runs, and nothing else does.** A par five hosts a longest drive, a
+  par three a closest to the pin; there is no stored list of contest holes. There cannot be, because
+  par is corrected from the tee you are standing on (`ParChip`) — a list written at setup would be
+  wrong the moment the fourth turned out to be a three, and derived it is right the instant the par
+  is.
+- **So an award stores which contest it was**, not just who won. Par can move *under* a claim, and
+  an award that only said "Dan" would be silently reinterpreted as the other contest when it did.
+  Stored, it stops counting (hole 7 hosts nothing now) without being destroyed, and comes back
+  whole if the par comes back — the same posture as shortening a round to nine.
+- **Points are a second leaderboard, and stay off until asked for.** `PointValues` prices a shot
+  kept, a longest drive and a closest to the pin; `ScrambleTally.points` reads them. When they are
+  on they are the board the Tally tab shows *first*, because a group that sat down and priced a
+  closest to the pin did it to decide something, and the board that decides should not be the one
+  you have to tap to reach. Shots kept is the other half of one segmented control.
+
+Claiming one is a row of names under the hole header on the Round tab — tapping the name already on
+it takes it back, so claim, change and undo are one gesture with no mode to be in. It is drawn on a
+finished hole too, because an award changes no score and the argument about who was closest outlives
+the putt. The **Side games** card on the Tally tab is the separate component: a tile per contest
+hole, dashed while it is open, and every tile is a way back to that tee.
+
+**`ScrambleCard` and `HoleEntry` decode by hand, and every field added to them from here on must
+too.** Swift's synthesised decoder throws on a missing key rather than falling back to the
+property's default, and `CardCatalog.load` turns a throw into an empty catalogue — silently. A
+synthesised decoder on either of them would have deleted every round anybody had ever kept on the
+update that shipped `contests`, `points` and `awards`. `ScrambleTests` pins the old shape.
+
 A round reaches the other three as a **drawn card, not a paragraph** (`ShareCardView` rendered by
 `ImageRenderer` at 3x, previewed in `ShareCardSheet`): a result is text, a trophy is a picture, and
 a picture is what gets re-shared in a thread. It is also the only marketing this feature does, which
