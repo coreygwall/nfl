@@ -55,7 +55,6 @@ struct RoundView: View {
             EmptyState(title: "This card is gone", body: "Pick another from the menu, or start a new one.")
         }
     }
-}
 
     /**
      The hole is in: stamp it, then move on.
