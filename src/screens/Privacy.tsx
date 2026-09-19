@@ -1,4 +1,5 @@
 import { Link } from "react-router";
+import { SUPPORT_EMAIL, supportMailto } from "../../shared/contact.ts";
 
 /**
  * What Tally keeps, said plainly.
@@ -13,13 +14,13 @@ import { Link } from "react-router";
  * password, no analytics, no advertising and no third party to hand anything to. Where something
  * *is* kept — an IP address as a rate-limit key, an Apple push token — it says so and says why.
  *
- * `SUPPORT_EMAIL` is config rather than a constant, and the contact section simply does not draw
- * without it, the same posture as `APPLE_APP_STORE_ID`: better a page with no contact line than a
- * page with an invented one.
+ * The contact line is `shared/contact.ts`, a plain constant. It was a build-time variable first,
+ * which was wrong twice over: `.env` is gitignored, so every production build would have read it
+ * as undefined and shipped this page with no way to reach anybody — and a support address is
+ * published on purpose anyway. Apple asks for one at submission.
  */
 export function Privacy() {
   const updated = "19 September 2026";
-  const support = import.meta.env.VITE_SUPPORT_EMAIL as string | undefined;
 
   return (
     <div className="mx-auto w-full max-w-[720px]">
@@ -103,19 +104,18 @@ export function Privacy() {
           </Item>
           <Item term="Deleting everything">
             Ask your commissioner to remove you. Removing a player deletes that player, their picks, their devices and
-            any entries they manage. It cannot be undone{support ? ", and you can ask Tally directly if the pool is gone" : ""}.
+            any entries they manage. It cannot be undone. If the pool is gone or your commissioner is not reachable,
+            write to the address below and it will be done for you.
           </Item>
         </Section>
 
-        {support && (
-          <Section title="Getting in touch">
-            <Item term="Questions about any of this">
-              <a className="underline decoration-2 underline-offset-2" href={`mailto:${support}`}>
-                {support}
-              </a>
-            </Item>
-          </Section>
-        )}
+        <Section title="Getting in touch">
+          <Item term="Questions about any of this, or anything else">
+            <a className="underline decoration-2 underline-offset-2" href={supportMailto("Tally privacy")}>
+              {SUPPORT_EMAIL}
+            </a>
+          </Item>
+        </Section>
       </div>
 
       <div className="mt-8 flex flex-wrap gap-2">

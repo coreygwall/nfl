@@ -332,8 +332,14 @@ took last week. (A golf card has its own three; see above.)
   template — no email, no password, no analytics, no ad tech, tokens stored only as SHA-256, an IP
   address kept as a rate-limit key that expires. iOS links to the web page rather than keeping its
   own copy: a policy has to live at a public address anyway, and two copies is how one goes stale.
-  The contact section is gated on `VITE_SUPPORT_EMAIL` and simply does not render without it, the
-  same posture as `APPLE_APP_STORE_ID` — better no contact line than an invented one.
+  The support address is `shared/contact.ts` + `Contact.swift`, a plain constant, with
+  `contactParity.test.ts` holding the two together — a Swift build cannot see the TypeScript, and
+  the cost of drift on this particular string is somebody writing in and never being answered,
+  which looks exactly like being ignored. It was a build-time `VITE_SUPPORT_EMAIL` first, which
+  was wrong twice over: `.env` is gitignored, so every production build would have read it as
+  undefined and shipped the page with no way to reach anybody — and a support address is published
+  on purpose anyway, because the App Store listing needs one and a settings page with no way to
+  get help sends people to their commissioner for things that are not their pool's fault.
 - **Signing out is a button that asks first**, and its word is red while its fill is not.
   `.danger` as a *fill* is the app's vocabulary for irreversible — deleting a golf card takes
   every hole with it — and signing out keeps every pick on the board, so spending the loud red

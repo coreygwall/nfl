@@ -723,4 +723,8 @@ test("the privacy page is reachable from the account page and says what is kept"
   await expect(page.getByRole("heading", { name: "Privacy", level: 1 })).toBeVisible();
   await expect(page.getByRole("heading", { name: "What Tally stores" })).toBeVisible();
   await expect(page.getByRole("heading", { name: "What Tally does not do" })).toBeVisible();
+  // A policy with no way to reach anybody is the failure the page exists to avoid, and App Review
+  // asks for a support contact besides.
+  await expect(page.getByRole("heading", { name: "Getting in touch" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /@/ })).toHaveAttribute("href", /^mailto:.+@.+\..+\?subject=/);
 });

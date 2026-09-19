@@ -8,12 +8,13 @@ import { api } from "../api/client.ts";
 import { Sheet } from "../components/AppShell.tsx";
 import { PoolPlays } from "../components/PoolPlays.tsx";
 import { ThemePicker } from "../components/ThemeControl.tsx";
-import { Bank, Cards, Check, ChevronRight, CircleHelp, Device, Key, Palette, Pencil, Shield } from "../components/Icons.tsx";
+import { Bank, Cards, Check, ChevronRight, CircleHelp, Device, Key, Mail, Palette, Pencil, Shield } from "../components/Icons.tsx";
 import { useToast } from "../components/Toast.tsx";
 import { addPasskey, passkeysSupported, wasCancelled } from "../lib/passkey.ts";
 import { CODE_LENGTH, formatCode, normalizeCode } from "../../shared/codes.ts";
 import { poolUrl } from "../lib/basename.ts";
 import { isVulgar, VULGAR_MESSAGE } from "../../shared/profanity.ts";
+import { supportMailto } from "../../shared/contact.ts";
 import type { Identity } from "../lib/identity.ts";
 
 /**
@@ -216,6 +217,14 @@ export function Account() {
           />
           <RowDivider />
           <RowLink to="/privacy" icon={<Shield size={18} />} title="Privacy" detail="What Tally keeps, and what it never asks for" />
+          <RowDivider />
+          <a
+            className="row-hover flex min-h-14 items-center gap-3 rounded-card p-3 hover:bg-paper-2"
+            href={supportMailto(`Tally support · ${__BUILD_ID__.slice(0, 8)}`)}
+          >
+            <RowBody icon={<Mail size={18} />} title="Get help" detail="Something wrong, or an idea — write to Tally" />
+            <ChevronRight size={18} className="shrink-0 text-ink-3" />
+          </a>
           <RowDivider />
           <p className="px-3 py-3 text-xs text-ink-3">Version {__BUILD_ID__.slice(0, 8)}</p>
         </div>

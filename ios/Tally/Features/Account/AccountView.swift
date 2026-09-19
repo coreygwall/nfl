@@ -350,6 +350,14 @@ struct AccountView: View {
                     openURL(model.pool.origin.appending(path: "privacy"))
                 }
                 SettingsDivider()
+                // A settings page with no way to get help sends people to whoever runs their pool
+                // for things that are not their pool's fault — and the App Store listing needs a
+                // support contact anyway. The subject arrives filled in so one inbox rule catches
+                // everything the app sends.
+                SettingsRow(title: "Get help", detail: "Something wrong, or an idea — write to Tally", symbol: "envelope.fill") {
+                    if let url = Contact.supportMailto("Tally support · \(version)") { openURL(url) }
+                }
+                SettingsDivider()
                 HStack(spacing: 12) {
                     Image(systemName: "info.circle").font(.system(size: 15, weight: .bold)).foregroundStyle(Color.ink3).frame(width: 24)
                     Text("Version \(version)").sans(13).foregroundStyle(Color.ink2)
