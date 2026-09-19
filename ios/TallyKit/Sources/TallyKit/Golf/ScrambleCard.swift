@@ -334,6 +334,38 @@ public struct ScrambleCard: Codable, Hashable, Identifiable, Sendable {
         }
     }
 
+    /**
+     Say whose a stroke actually was, after the fact.
+
+     The fix that happens most is not "one too many" but "that was Dan's, not Pete's" — and until
+     this existed the only way to make it was to reopen the hole, undo back past the stroke and
+     re-enter everything after it. A wrong name three strokes back on a par five was a nine-tap
+     repair, made on a tee where the next hole has already started.
+
+     Allowed on a finished hole, the same way an award is: the count does not change, so the score
+     cannot, and the thing this corrects — whose mark it is — is exactly what people notice once
+     the hole is in and the tally has moved. The stroke keeps its id, so it is the same stroke
+     with a different name on it rather than a new one at the end.
+     */
+    public mutating func reassign(strokeId: String, on hole: Int, to kind: StrokeKind, playerId: String? = nil) {
+        guard holeNumbers.contains(hole) else { return }
+        if kind == .shot {
+            guard let playerId, players.contains(where: { $0.id == playerId }) else { return }
+        }
+        update(hole) { entry in
+            guard let index = entry.strokes.firstIndex(where: { $0.id == strokeId }) else { return }
+            entry.strokes[index] = Stroke(id: strokeId, kind: kind, playerId: playerId)
+        }
+    }
+
+    /// Take one stroke out of the middle of an open hole — the one that was logged twice. A
+    /// finished hole is left alone, like `record`: the count is the score, so reopen it first.
+    public mutating func remove(strokeId: String, on hole: Int) {
+        guard holeNumbers.contains(hole), let current = entry(hole), !current.finished else { return }
+        guard current.strokes.contains(where: { $0.id == strokeId }) else { return }
+        update(hole) { $0.strokes.removeAll { $0.id == strokeId } }
+    }
+
     /// Move to the next hole still to play, if there is one.
     public mutating func advance() {
         if let next = nextUnfinishedHole(after: currentHole) { currentHole = next }

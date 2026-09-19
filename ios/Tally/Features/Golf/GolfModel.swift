@@ -84,6 +84,16 @@ final class GolfModel {
         mutate(id) { $0.undo(hole: $0.currentHole) }
     }
 
+    /// A stroke was somebody else's — or nobody's. Same hole the card is standing on.
+    func reassign(strokeId: String, card id: String, to kind: StrokeKind, playerId: String? = nil) {
+        mutate(id) { $0.reassign(strokeId: strokeId, on: $0.currentHole, to: kind, playerId: playerId) }
+    }
+
+    /// One stroke too many, and not the last one.
+    func remove(strokeId: String, card id: String) {
+        mutate(id) { $0.remove(strokeId: strokeId, on: $0.currentHole) }
+    }
+
     func go(card id: String, to hole: Int) {
         mutate(id) { $0.go(to: hole) }
     }

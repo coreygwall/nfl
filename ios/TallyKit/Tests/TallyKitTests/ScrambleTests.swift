@@ -139,6 +139,94 @@ final class ScrambleTests: XCTestCase {
         XCTAssertEqual(c.entry(1)?.score, 0)
     }
 
+    // MARK: Fixing a stroke after the fact
+
+    /// The correction that actually happens: the hole is in, the tally has moved, and that third
+    /// one was Dan's. Two taps, and the score does not move.
+    func testAStrokeCanChangeHandsOnAFinishedHole() {
+        var c = card()
+        c.record(.shot(by: "c"), on: 1)
+        c.record(.shot(by: "d"), on: 1)
+        c.record(.shot(by: "p"), on: 1)
+        c.finish(hole: 1, tapIn: true)
+        let third = c.entry(1)!.strokes[2]
+
+        c.reassign(strokeId: third.id, on: 1, to: .shot, playerId: "d")
+
+        XCTAssertEqual(c.entry(1)?.score, 4, "the count is the score, and nothing about the count changed")
+        XCTAssertTrue(c.entry(1)?.finished ?? false)
+        XCTAssertEqual(c.entry(1)?.strokes[2].playerId, "d")
+        XCTAssertEqual(c.entry(1)?.strokes[2].id, third.id, "the same stroke, with a different name on it")
+        let rows = ScrambleTally.rows(c)
+        XCTAssertEqual(rows.first { $0.id == "d" }?.kept, 2)
+        XCTAssertEqual(rows.first { $0.id == "p" }?.kept, 0)
+    }
+
+    func testTheHoledShotChangesHandsWithTheStroke() {
+        var c = card()
+        c.record(.shot(by: "c"), on: 1)
+        c.record(.shot(by: "p"), on: 1)
+        c.finish(hole: 1, tapIn: false)
+        XCTAssertEqual(c.entry(1)?.holedBy, "p")
+
+        let last = c.entry(1)!.strokes[1]
+        c.reassign(strokeId: last.id, on: 1, to: .shot, playerId: "s")
+        XCTAssertEqual(c.entry(1)?.holedBy, "s")
+        XCTAssertEqual(ScrambleTally.rows(c).first { $0.id == "s" }?.holed, 1)
+        XCTAssertEqual(ScrambleTally.rows(c).first { $0.id == "p" }?.holed, 0)
+    }
+
+    /// A shot logged as somebody's that was really the water: it becomes a penalty, credits nobody,
+    /// and still counts — and the way back is the same tap with a name.
+    func testAStrokeCanBecomeNobodysAndBackAgain() {
+        var c = card()
+        c.record(.shot(by: "c"), on: 1)
+        c.record(.shot(by: "d"), on: 1)
+        let second = c.entry(1)!.strokes[1]
+
+        c.reassign(strokeId: second.id, on: 1, to: .penalty)
+        XCTAssertEqual(c.entry(1)?.strokes[1].kind, .penalty)
+        XCTAssertNil(c.entry(1)?.strokes[1].playerId)
+        XCTAssertEqual(c.entry(1)?.score, 2)
+        XCTAssertEqual(ScrambleTally.rows(c).first { $0.id == "d" }?.kept, 0)
+
+        c.reassign(strokeId: second.id, on: 1, to: .shot, playerId: "d")
+        XCTAssertEqual(c.entry(1)?.strokes[1].playerId, "d")
+    }
+
+    func testAStrokeCannotBeGivenToANameThatIsNotOnTheCard() {
+        var c = card()
+        c.record(.shot(by: "c"), on: 1)
+        let only = c.entry(1)!.strokes[0]
+        c.reassign(strokeId: only.id, on: 1, to: .shot, playerId: "nobody")
+        c.reassign(strokeId: only.id, on: 1, to: .shot, playerId: nil)
+        XCTAssertEqual(c.entry(1)?.strokes[0].playerId, "c")
+        c.reassign(strokeId: "not-a-stroke", on: 1, to: .shot, playerId: "d")
+        XCTAssertEqual(c.entry(1)?.score, 1)
+    }
+
+    /// The other correction: one too many, and not the last one. Off it comes from an open hole;
+    /// on a finished one the count is the score, so the hole has to be reopened first.
+    func testAStrokeInTheMiddleComesOffAnOpenHoleAndNotAFinishedOne() {
+        var c = card()
+        c.record(.shot(by: "c"), on: 1)
+        c.record(.shot(by: "d"), on: 1)
+        c.record(.shot(by: "p"), on: 1)
+        let middle = c.entry(1)!.strokes[1]
+
+        c.remove(strokeId: middle.id, on: 1)
+        XCTAssertEqual(c.entry(1)?.strokes.map(\.playerId), ["c", "p"])
+
+        c.finish(hole: 1, tapIn: false)
+        let first = c.entry(1)!.strokes[0]
+        c.remove(strokeId: first.id, on: 1)
+        XCTAssertEqual(c.entry(1)?.score, 2, "a finished hole keeps its count until it is reopened")
+
+        c.undo(hole: 1)
+        c.remove(strokeId: first.id, on: 1)
+        XCTAssertEqual(c.entry(1)?.strokes.map(\.playerId), ["p"])
+    }
+
     // MARK: Moving round the course
 
     func testAdvanceSkipsFinishedHolesAndWrapsToOneThatWasMissed() {

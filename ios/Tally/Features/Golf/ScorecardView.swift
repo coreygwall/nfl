@@ -20,7 +20,7 @@ struct ScorecardView: View {
             let initials = ScrambleTally.initials(card.players)
             // The hole column only widens when there is a contest badge to fit in it, so a card
             // with no side games is laid out exactly as it always was.
-            let holeWidth: CGFloat = card.contests.any ? 60 : 42
+            let holeWidth: CGFloat = card.contests.any ? 68 : 42
             VStack(alignment: .leading, spacing: 14) {
                 header(card)
                 VStack(spacing: 0) {
@@ -53,7 +53,7 @@ struct ScorecardView: View {
                 VStack(alignment: .leading, spacing: 4) {
                     Text("Initials are whose shots the team kept. A dash is a stroke nobody earned: a tap-in, a penalty, or nobody's ball.")
                     if card.contests.any {
-                        Text("LD and CTP mark the side-game holes — filled in once somebody has taken it. The Tally tab has the winners.")
+                        Text("LD and CTP mark the side-game holes, with the winner's initial once somebody has taken it. The Tally tab has the whole list.")
                     }
                 }
                 .sans(12).foregroundStyle(Color.ink3)
@@ -114,10 +114,13 @@ private struct ScorecardRow: View {
 
     private var entry: HoleEntry? { card.entry(hole) }
     private var standing: Bool { card.currentHole == hole }
-    private var claimed: Bool {
-        guard let contest = card.contest(for: hole) else { return false }
-        return card.winner(of: contest, on: hole) != nil
+    /// Who has the hole's contest, as the same initial the KEPT BY column uses — so "CTP D" on
+    /// the card reads the way the paper one would. Nil while it is still open.
+    private var winnerInitial: String? {
+        guard let contest = card.contest(for: hole), let winner = card.winner(of: contest, on: hole) else { return nil }
+        return initials[winner.id]
     }
+    private var claimed: Bool { winnerInitial != nil }
 
     var body: some View {
         let entry = entry
@@ -133,7 +136,7 @@ private struct ScorecardRow: View {
                     // two characters wide, and the Side games card on the Tally tab is where the
                     // winners live. Solid once it is claimed, outlined while it is open.
                     if let contest = card.contest(for: hole) {
-                        Text(contest.initials)
+                        Text(winnerInitial.map { "\(contest.initials) \($0)" } ?? contest.initials)
                             .font(TallyFont.sans(8, weight: .bold))
                             .foregroundStyle(claimed ? Color.onFill : Color.ink3)
                             .padding(.horizontal, 3)

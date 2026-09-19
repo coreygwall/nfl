@@ -303,21 +303,43 @@ private struct StrokeStrip: View {
                             number: index + 1,
                             stroke: stroke,
                             card: card,
-                            holed: entry.finished && index == entry.strokes.count - 1
+                            holed: entry.finished && index == entry.strokes.count - 1,
+                            open: !entry.finished
                         )
                     }
                 }
+                Text(entry.finished
+                     ? "Tap a stroke to change whose it was."
+                     : "Tap a stroke to change whose it was, or take it off.")
+                    .sans(11).foregroundStyle(Color.ink3)
             }
         }
     }
 }
 
+/**
+ One stroke on the hole, and the menu that corrects it.
+
+ The correction people actually make is "that was Dan's, not Pete's", and it is made after the
+ hole is in — once the tally has moved and somebody notices their number. Until this was a menu
+ the only repair was to reopen the hole, undo back past the stroke and re-enter everything after
+ it, so a wrong name three strokes back on a par five was nine taps on a tee where the next hole
+ had already started. Now it is two: the stroke, and the name.
+
+ Reassigning is allowed on a finished hole because it changes no score; taking a stroke *off* is
+ not, for the same reason `record` refuses a finished hole — the count is the score, so reopen it
+ first. A tap-in is not offered here on purpose: "that was holed, not given" is Reopen and then
+ *Holed it*, which credits the stroke that was already there.
+ */
 private struct StrokePill: View {
+    @Environment(GolfModel.self) private var golf
     let number: Int
     let stroke: Stroke
     let card: ScrambleCard
     /// The stroke that finished the hole. A shot that did earns the turf; a tap-in does not.
     let holed: Bool
+    /// The hole is still open, so the stroke can come off as well as change hands.
+    let open: Bool
 
     private var text: String {
         switch stroke.kind {
@@ -331,21 +353,63 @@ private struct StrokePill: View {
     private var credited: Bool { holed && stroke.kind == .shot }
 
     var body: some View {
-        HStack(spacing: 6) {
-            Text("\(number)")
-                .font(TallyFont.display(12))
-                .foregroundStyle(credited ? Color.onFill : Color.ink3)
-            Text(text).font(TallyFont.display(13, weight: .bold))
-            if credited {
-                Image(systemName: "flag.fill").font(.system(size: 10, weight: .bold))
+        Menu {
+            Section("Stroke \(number) was") {
+                ForEach(card.players) { player in
+                    Button {
+                        Haptics.pick()
+                        golf.reassign(strokeId: stroke.id, card: card.id, to: .shot, playerId: player.id)
+                    } label: {
+                        if stroke.kind == .shot, stroke.playerId == player.id {
+                            Label(player.name, systemImage: "checkmark")
+                        } else {
+                            Text(player.name)
+                        }
+                    }
+                }
             }
+            Section {
+                Button {
+                    Haptics.tap()
+                    golf.reassign(strokeId: stroke.id, card: card.id, to: .penalty)
+                } label: {
+                    Label("Penalty stroke", systemImage: stroke.kind == .penalty ? "checkmark" : "exclamationmark.triangle")
+                }
+                Button {
+                    Haptics.tap()
+                    golf.reassign(strokeId: stroke.id, card: card.id, to: .unclaimed)
+                } label: {
+                    Label("Nobody's ball", systemImage: stroke.kind == .unclaimed ? "checkmark" : "circle.dashed")
+                }
+            }
+            if open {
+                Section {
+                    Button(role: .destructive) {
+                        Haptics.unpick()
+                        golf.remove(strokeId: stroke.id, card: card.id)
+                    } label: {
+                        Label("Take this stroke off", systemImage: "minus.circle")
+                    }
+                }
+            }
+        } label: {
+            HStack(spacing: 6) {
+                Text("\(number)")
+                    .font(TallyFont.display(12))
+                    .foregroundStyle(credited ? Color.onFill : Color.ink3)
+                Text(text).font(TallyFont.display(13, weight: .bold))
+                if credited {
+                    Image(systemName: "flag.fill").font(.system(size: 10, weight: .bold))
+                }
+            }
+            .foregroundStyle(credited ? Color.onFill : Color.ink)
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
+            .background(Capsule().fill(credited ? Color.turf : stroke.kind == .shot ? Color.surface : Color.paper2))
+            .overlay(Capsule().strokeBorder(Color.ink, lineWidth: 2))
+            .contentShape(Capsule())
         }
-        .foregroundStyle(credited ? Color.onFill : Color.ink)
-        .padding(.horizontal, 10)
-        .padding(.vertical, 6)
-        .background(Capsule().fill(credited ? Color.turf : stroke.kind == .shot ? Color.surface : Color.paper2))
-        .overlay(Capsule().strokeBorder(Color.ink, lineWidth: 2))
-        .accessibilityLabel("Stroke \(number), \(text)\(credited ? ", holed" : "")")
+        .accessibilityLabel("Stroke \(number), \(text)\(credited ? ", holed" : ""). Change it")
     }
 }
 
@@ -362,6 +426,14 @@ private struct HoleEntryControls: View {
     /// Each name's running count, so the buttons carry the score they are adding to.
     private var kept: [String: Int] {
         Dictionary(uniqueKeysWithValues: ScrambleTally.rows(card).map { ($0.id, $0.kept) })
+    }
+
+    /// Whoever's mark *Holed it* would be: the last stroke's owner, if the last stroke was a shot.
+    /// After a penalty or nobody's ball there is nobody to credit, and the button says only what
+    /// it does.
+    private var lastShotName: String? {
+        guard let last = entry.strokes.last, last.kind == .shot else { return nil }
+        return card.player(last.playerId)?.name
     }
 
     var body: some View {
@@ -393,13 +465,17 @@ private struct HoleEntryControls: View {
                 }
             }
             HStack(spacing: 10) {
-                Button("Holed it") { finish(tapIn: false) }
+                // The button carries the name it is about to credit, so "Holed it" is never a
+                // surprise about whose putt that was — the one thing a scramble card exists to
+                // get right.
+                Button(lastShotName.map { "\($0) holed it" } ?? "Holed it") { finish(tapIn: false) }
                     .buttonStyle(.tally(.turf, fullWidth: true))
                 Button("Tap-in") { finish(tapIn: true) }
                     .buttonStyle(.tally(.plain, fullWidth: true))
             }
             .disabled(entry.strokes.isEmpty)
-            Text("Holed it: the last shot went in, and it counts for whoever hit it. Tap-in: one more stroke on the card, nobody's.")
+            Text(lastShotName.map { "\($0) holed it: that last shot went in, and it counts for \($0). Tap-in: one more stroke on the card, nobody's." }
+                 ?? "Holed it: the last shot went in, and it counts for whoever hit it. Tap-in: one more stroke on the card, nobody's.")
                 .sans(12).foregroundStyle(Color.ink3)
                 .fixedSize(horizontal: false, vertical: true)
             HStack {

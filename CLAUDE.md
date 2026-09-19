@@ -214,6 +214,16 @@ obvious once the first is true:
   and priced a closest to the pin did it to decide something, and the board that decides should not
   be the one you have to tap to reach. Shots kept is the other half of one segmented control.
 
+**A stroke on the Round tab is a menu, and the correction it makes is the one people actually
+make**: "that was Dan's, not Pete's", noticed once the hole is in and the tally has moved.
+`ScrambleCard.reassign` swaps the name (or makes it a penalty / nobody's) on the same stroke id,
+and is allowed on a finished hole because the count — the score — does not change; `remove` takes a
+stroke out of the middle and is refused on a finished hole for the same reason `record` is, so the
+posture is one rule: anything that moves the score needs Reopen first, anything that only moves a
+mark does not. Before this the fix was Reopen, Undo back past the stroke and re-enter everything
+after it. The finishing button also names who it is about to credit ("Dan holed it") — a bare
+*Holed it* was a guess about the one fact the card exists to get right.
+
 Claiming one is a row of names under the hole header on the Round tab — tapping the name already on
 it takes it back, so claim, change and undo are one gesture with no mode to be in. It is drawn on a
 finished hole too, because an award changes no score and the argument about who was closest outlives
