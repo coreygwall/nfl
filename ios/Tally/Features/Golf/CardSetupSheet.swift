@@ -219,36 +219,55 @@ struct CardSetupSheet: View {
             }
             DashedDivider()
             SideGameSwitch(
-                title: "Keep points",
+                title: "Play for points",
                 symbol: "number",
-                detail: "A second leaderboard, scored your way. The shots-kept board stays either way.",
+                detail: "Everybody puts the same in each time, and whoever wins it takes the lot. The shots-kept board stays either way.",
                 isOn: points.enabled,
                 onChange: { points.enabled = $0 }
             )
-            if points.enabled {
-                VStack(spacing: 10) {
-                    PointStepper(label: "A shot kept", value: $points.perShotKept)
-                    ForEach(SideContest.allCases, id: \.self) { contest in
-                        if contests.runs(contest) {
-                            PointStepper(
-                                label: contest.title,
-                                value: Binding(
-                                    get: { points.value(of: contest) },
-                                    set: { points.setValue($0, of: contest) }
-                                )
-                            )
-                        }
-                    }
-                }
-                .padding(12)
-                .cardFlat(fill: .paper2)
-                if !contests.any {
-                    Text("Nothing but shots kept is being counted — switch on a contest above and it gets a value here too.")
-                        .sans(12).foregroundStyle(Color.ink3)
-                        .fixedSize(horizontal: false, vertical: true)
+            if points.enabled { stakes }
+        }
+    }
+
+    /**
+     What everybody is in for, one row per thing.
+
+     **Each row is a stake, not a prize**, and the row says so twice: the stepper reads "10 each",
+     and the line under it works out what that actually means for the number of people currently
+     on the card — "worth 30 to whoever takes it, 10 from each of the other 3". That second line
+     is the one that settles the argument on the first tee, and it moves as names are added above,
+     because the value of a win is a fact about how many are playing rather than about the bet.
+
+     Every item has its own switch. A group that wants the two contests and nothing on the shots
+     the team keeps simply leaves that one off; it is not a stake of zero, it is not in the game.
+     */
+    private var stakes: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(WagerItem.allCases, id: \.self) { item in
+                // A contest that is switched off above has nothing to stake — the bet does not
+                // exist on this card, so offering a number for it would be offering a number for
+                // nothing.
+                if item.contest.map({ contests.runs($0) }) ?? true {
+                    StakeRow(
+                        item: item,
+                        stake: Binding(get: { points[item] }, set: { points[item] = $0 }),
+                        players: trimmed.count
+                    )
                 }
             }
+            if !contests.any {
+                Text("Only shots kept is in the game — switch a contest on above and it gets a stake here too.")
+                    .sans(12).foregroundStyle(Color.ink3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if points.playing(contests).isEmpty {
+                Text("Nothing is switched on, so the points board will be empty. Put a stake on something above.")
+                    .sans(12, weight: .semibold).foregroundStyle(Color.danger)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
         }
+        .padding(12)
+        .cardFlat(fill: .paper2)
     }
 
     /// How many holes today's pars give a contest. Recomputed as the par grid is edited, which is
@@ -397,29 +416,59 @@ private struct SideGameSwitch: View {
 }
 
 /**
- What one thing is worth.
+ One thing to play for: whether it is in, and what everybody puts in each time.
 
- A stepper rather than a text field: these are small whole numbers, the keyboard on a first tee is
- the enemy, and `PointValues` clamps the range anyway — so the control may as well be the one that
+ A stepper rather than a text field — these are small whole numbers and the keyboard on a first tee
+ is the enemy — and `Stake` clamps the range anyway, so the control may as well be the one that
  cannot produce a number the model would refuse.
+
+ The word is **each**, everywhere, because the difference between "10 to the winner" and "10 from
+ everybody" is the whole feature and a bare "10" reads as the first one. The line underneath does
+ the arithmetic out loud for the number of people currently on the card, which is the number
+ nobody wants to do in their head standing on a tee.
  */
-private struct PointStepper: View {
-    let label: String
-    @Binding var value: Int
+private struct StakeRow: View {
+    let item: WagerItem
+    @Binding var stake: Stake
+    let players: Int
 
     var body: some View {
-        Stepper(value: $value, in: PointValues.range) {
-            HStack(spacing: 8) {
-                Text(label).sans(14, weight: .semibold)
-                Spacer(minLength: 4)
-                Text("\(value)")
-                    .font(TallyFont.display(18))
-                    .monospacedDigit()
-                    .contentTransition(.numericText())
-                Text(value == 1 ? "point" : "points")
-                    .sans(11, weight: .bold).foregroundStyle(Color.ink3)
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                Image(systemName: item.symbol)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(stake.on ? Color.turf : Color.ink3)
+                    .frame(width: 22)
+                Text(item.title).font(TallyFont.display(15)).lineLimit(1)
+                Spacer(minLength: 6)
+                Toggle(item.title, isOn: Binding(get: { stake.on }, set: { value in
+                    Haptics.tap()
+                    stake = Stake(on: value, each: stake.each)
+                }))
+                .labelsHidden()
+                .tint(Color.turf)
+            }
+            if stake.on {
+                Stepper(
+                    value: Binding(get: { stake.each }, set: { stake = Stake(on: stake.on, each: $0) }),
+                    in: Stake.range
+                ) {
+                    HStack(spacing: 6) {
+                        Text("\(stake.each)")
+                            .font(TallyFont.display(20))
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                        Text("each")
+                            .sans(12, weight: .bold).foregroundStyle(Color.ink2)
+                        Spacer(minLength: 4)
+                    }
+                }
+                .accessibilityLabel("\(item.title), \(stake.each) each")
+                Text(ScrambleTally.winningsLine(stake: stake, players: players))
+                    .sans(12).foregroundStyle(Color.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
             }
         }
-        .accessibilityLabel("\(label), \(Format.plural(value, "point"))")
+        .padding(.vertical, 2)
     }
 }
