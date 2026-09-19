@@ -237,11 +237,71 @@ finished hole too, because an award changes no score and the argument about who 
 the putt. The **Side games** card on the Tally tab is the separate component: a tile per contest
 hole, dashed while it is open, and every tile is a way back to that tee.
 
+## A card can leave the phone, and the link is the whole credential
+
+`migrations/0013_golf_cards.sql` is the day a scramble stopped being local. It had to be: three of
+the four people round a card are holding a browser and nothing else, and asking them to install an
+app to find out the score is asking the wrong question. **The app is still the only way to make a
+card**; publishing one (`POST /api/golf/cards`) stores it and hands back a link, and from then on
+the phone and every browser holding that link are keeping the same round — every stroke, every side
+game, the stakes, the pars and the names.
+
+Four things hold it together, and each is load-bearing:
+
+- **The token in the URL authorises everything, and there is no other door.** No session, no
+  account — a person can own a golf card without being in a pool. 24 characters of the claim
+  code's alphabet is 120 bits, so it is found rather than guessed, and there is deliberately **no
+  route that lists cards**: no index, no search, no "recent". What that costs is said out loud
+  rather than papered over — anyone with the link can *edit* the card, because that is what the
+  link is for — and the blast radius is a handful of first names and some golf.
+- **The server merges; its answer is the truth.** `mergeCards` runs on every write, and the hole is
+  the unit: the newer of the two takes it whole, because a hole's strokes and its awards belong
+  together and merging *inside* one would invent a round nobody played. Settings (names, pars,
+  contests, stakes) move as a second unit on `settingsUpdatedAt`, because renaming a player and
+  shortening a round are not changes you would want half of. It has to be the server: two browsers
+  and a phone each hold a version and each thinks its own is current, and only one party sees both.
+  A push therefore comes back carrying holes the pusher never logged, and that is the feature
+  working.
+- **`currentHole` and `shareToken` never cross the wire.** Which tee a device is standing on is a
+  fact about the device — two people on one card are on different holes all afternoon, and syncing
+  it would have them dragging each other backwards — so the phone keeps its own and the browser
+  keeps its own (in the query string, which also makes "look at 7" a link). The token is the
+  server's to know. `GolfService.wire` strips both; `ScrambleCard.merging(_:)` keeps them local.
+- **Not discoverable means two things, not one.** `X-Robots-Tag: noindex` on every `/g/*` answer —
+  including the 404s, or the error page becomes the thing that gets indexed — and `Disallow: /g/`
+  in `public/robots.txt`. They cover different failures: the file stops a well-behaved crawler
+  fetching the page, the header stops one that ignored the file from keeping what it found.
+
+`shared/golf.ts` is the rules in TypeScript, because a browser cannot import a Swift package. That
+makes it the third parity pairing after the live activity and the pool code, and the most dangerous
+of them: the others describe a week or check a string, while these two settle **money** between
+four people who have just spent an afternoon arguing about it. `golfParity.test.ts` holds the two
+together on everything that would drift quietly — which par hosts which contest, the stake range
+and the defaults, the words for a score, the real minus sign, the sentences that do the pot's
+arithmetic out loud, the merge rule's shape and the address a card is shared at.
+
+The card's web shell is its own, not the pool's (`src/screens/GolfCard.tsx`). Same grammar as
+`AppShell` — the mark and the name, tabs inline on a desktop and fixed to the bottom on a phone,
+the same pill sliding under the active one — with the contest's three: **Round · Tally ·
+Scorecard**. There is no Account because there is no account, and no way *out* of a card, because
+a tab bar offering a football pool to somebody who arrived from a group chat is a pop-up. The
+client is local-first: a tap redraws immediately, pushes are coalesced and serialised, and a poll
+never clobbers an unsent edit. **Deleting is not on the web.** The link is a capability, not
+ownership; somebody sent a card so they could keep score should not be able to destroy the round
+for the other three.
+
 **`ScrambleCard` and `HoleEntry` decode by hand, and every field added to them from here on must
 too.** Swift's synthesised decoder throws on a missing key rather than falling back to the
 property's default, and `CardCatalog.load` turns a throw into an empty catalogue — silently. A
 synthesised decoder on either of them would have deleted every round anybody had ever kept on the
 update that shipped `contests`, `points` and `awards`. `ScrambleTests` pins the old shape.
+
+Sharing is now two acts behind one button (`ShareCardSheet`): **Play together**, the link and a QR
+code that gets everybody onto the card *during* the round, and **Poster**, the picture that goes in
+the group chat *after* it. The link leads on a round still being played and the poster on a
+finished one, because a poster of a half-finished round is nobody's trophy. The QR is always drawn
+in the light palette for the same reason the poster is, but a harder one: a camera looks for dark
+modules on a light ground, and an inverted code is one half the phones in the group cannot scan.
 
 A round reaches the other three as a **drawn card, not a paragraph** (`ShareCardView` rendered by
 `ImageRenderer` at 3x, previewed in `ShareCardSheet`): a result is text, a trophy is a picture, and

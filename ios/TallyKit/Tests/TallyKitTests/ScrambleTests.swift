@@ -227,6 +227,134 @@ final class ScrambleTests: XCTestCase {
         XCTAssertEqual(c.entry(1)?.strokes.map(\.playerId), ["p"])
     }
 
+    // MARK: A card that has been shared
+
+    /**
+     Two copies of one afternoon, reconciled.
+
+     The Swift half of `mergeCards` in `shared/golf.ts`, and it has to agree with it exactly: the
+     server runs that one on every write, so a phone that merged differently would draw a round the
+     server does not have and then push it back. These are the three shapes that actually happen.
+     */
+    func testMergingKeepsBothHolesWhenTwoPeoplePlayedDifferentOnes() {
+        var mine = card()
+        var theirs = card()
+        mine.record(.shot(by: "c"), on: 1)
+        mine.finish(hole: 1, tapIn: false)
+        theirs.record(.shot(by: "d"), on: 2)
+        theirs.finish(hole: 2, tapIn: false)
+
+        let merged = mine.merging(theirs)
+        XCTAssertEqual(merged.holes.map(\.hole), [1, 2])
+        XCTAssertEqual(merged.entry(1)?.strokes.first?.playerId, "c")
+        XCTAssertEqual(merged.entry(2)?.strokes.first?.playerId, "d")
+    }
+
+    func testTheLaterWriteWinsTheHoleWhicheverWayRound() {
+        let early = HoleEntry(
+            hole: 1,
+            strokes: [Stroke(id: "a", kind: .shot, playerId: "c")],
+            finished: true,
+            updatedAt: Date(timeIntervalSince1970: 100)
+        )
+        let late = HoleEntry(
+            hole: 1,
+            strokes: [Stroke(id: "b", kind: .shot, playerId: "d")],
+            finished: true,
+            updatedAt: Date(timeIntervalSince1970: 900)
+        )
+        var a = card(); a.holes = [early]
+        var b = card(); b.holes = [late]
+
+        XCTAssertEqual(a.merging(b).entry(1)?.strokes.first?.playerId, "d")
+        XCTAssertEqual(b.merging(a).entry(1)?.strokes.first?.playerId, "d", "order must not decide it")
+    }
+
+    func testTheSettingsMoveAsOneUnitOnTheirOwnClock() {
+        var played = card()
+        played.record(.shot(by: "c"), on: 1)
+        played.finish(hole: 1, tapIn: false)
+
+        var renamed = card()
+        renamed.name = "Sunday"
+        renamed.contests.closestToPin = true
+        renamed.touchSettings(Date(timeIntervalSinceNow: 60))
+
+        let merged = played.merging(renamed)
+        XCTAssertEqual(merged.name, "Sunday")
+        XCTAssertTrue(merged.contests.closestToPin)
+        XCTAssertEqual(merged.holes.map(\.hole), [1], "renaming must not wipe the round")
+    }
+
+    /**
+     The two things that never cross.
+
+     Which tee this phone is standing on is nobody else's business — syncing it would have two
+     people dragging each other backwards all afternoon — and the token is something this device
+     already knows and the wire does not carry.
+     */
+    func testMergingKeepsThisDevicesOwnPlaceAndItsLink() {
+        var mine = card()
+        mine.go(to: 7)
+        mine.shareToken = "TOKEN"
+
+        var theirs = card()
+        theirs.go(to: 2)
+        theirs.shareToken = nil
+        theirs.touchSettings(Date(timeIntervalSinceNow: 60))
+
+        let merged = mine.merging(theirs)
+        XCTAssertEqual(merged.currentHole, 7)
+        XCTAssertEqual(merged.shareToken, "TOKEN")
+        XCTAssertEqual(merged.id, mine.id)
+    }
+
+    /// A card saved before sharing existed has no settings clock, and must not throw for it.
+    func testACardSavedBeforeSharingStillDecodesAndLosesEverySettingsRace() throws {
+        let old = """
+        {"cards":[{"id":"x","name":"Saturday","course":"","createdAt":"2026-09-01T12:00:00Z","players":[{"id":"c","name":"Corey"}],"pars":[4,4,4],"holes":[],"currentHole":1}]}
+        """
+        let catalog = try CardCatalog.decode(Data(old.utf8))
+        let card = try XCTUnwrap(catalog.cards.first)
+        XCTAssertEqual(card.settingsUpdatedAt, card.createdAt, "no clock means the oldest possible clock")
+        XCTAssertNil(card.shareToken)
+
+        var newer = card
+        newer.name = "Sunday"
+        newer.touchSettings()
+        XCTAssertEqual(card.merging(newer).name, "Sunday")
+    }
+
+    /// A card straight off the wire carries neither of the local-only fields, and defaults both.
+    func testACardFromTheServerDefaultsTheFieldsTheWireDoesNotCarry() throws {
+        let wire = """
+        {"cards":[{"id":"x","name":"Saturday","course":"","createdAt":"2026-09-01T12:00:00Z","settingsUpdatedAt":"2026-09-02T12:00:00Z","players":[{"id":"c","name":"Corey"}],"pars":[4,4,4],"holes":[]}]}
+        """
+        let catalog = try CardCatalog.decode(Data(wire.utf8))
+        let card = try XCTUnwrap(catalog.cards.first)
+        XCTAssertEqual(card.currentHole, 1)
+        XCTAssertNil(card.shareToken)
+        XCTAssertGreaterThan(card.settingsUpdatedAt, card.createdAt)
+    }
+
+    func testTheShareLinkAndItsInverseAgree() throws {
+        let url = try XCTUnwrap(GolfShare.url(token: "ABCDEFGHJKMNPQRSTUVWXYZ2"))
+        XCTAssertEqual(url.absoluteString, "https://playtally.app/g/ABCDEFGHJKMNPQRSTUVWXYZ2")
+        XCTAssertEqual(GolfShare.token(in: url), "ABCDEFGHJKMNPQRSTUVWXYZ2")
+        // A pool link is not a card link, and neither is the bare domain.
+        XCTAssertNil(GolfShare.token(in: URL(string: "https://playtally.app/p/high-five")!))
+        XCTAssertNil(GolfShare.token(in: URL(string: "https://playtally.app/")!))
+        XCTAssertNil(GolfShare.token(in: URL(string: "https://playtally.app/g/a/b")!))
+    }
+
+    /// Correcting a par is a settings change, so a shared card has to say so or keep losing it.
+    func testCorrectingAParMovesTheSettingsClock() {
+        var c = card()
+        let before = c.settingsUpdatedAt
+        c.setPar(3, on: 1)
+        XCTAssertGreaterThan(c.settingsUpdatedAt, before)
+    }
+
     // MARK: Moving round the course
 
     func testAdvanceSkipsFinishedHolesAndWrapsToOneThatWasMissed() {

@@ -1,6 +1,7 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
+  SHARED_CARD_PREFIX,
   STAKE_MAX,
   STAKE_MIN,
   STANDARD_PARS,
@@ -10,6 +11,7 @@ import {
   contestTook,
   holeLabel,
   netText,
+  parseCard,
   standardPoints,
   toParText,
   wagerUnit,
@@ -35,6 +37,7 @@ const root = new URL("../../ios/TallyKit/Sources/TallyKit/Golf/", import.meta.ur
 const sideContests = readFileSync(new URL("SideContests.swift", root), "utf8");
 const tally = readFileSync(new URL("ScrambleTally.swift", root), "utf8");
 const scrambleCard = readFileSync(new URL("ScrambleCard.swift", root), "utf8");
+const service = readFileSync(new URL("GolfService.swift", root), "utf8");
 const setupSheet = readFileSync(new URL("../../ios/Tally/Features/Golf/CardSetupSheet.swift", import.meta.url), "utf8");
 
 /** Comments quote the sentences they explain, so they are stripped before anything is matched. */
@@ -46,6 +49,7 @@ const swift = {
   sideContests: stripComments(sideContests),
   tally: stripComments(tally),
   card: stripComments(scrambleCard),
+  service: stripComments(service),
   setup: stripComments(setupSheet),
 };
 
@@ -208,5 +212,61 @@ describe("the two implementations agree about the round", () => {
   /** Clamped identically, or a par corrected on one surface is a different hole on the other. */
   it("clamps par to the same range", () => {
     expect(swift.card).toContain("pars[hole - 1] = min(max(par, 3), 6)");
+  });
+
+  /**
+   * The merge is the most dangerous pairing of the lot.
+   *
+   * The server runs the TypeScript on every write, so a phone that merged differently would draw a
+   * round the server does not have and then push it back over the one it does. What is checked is
+   * the *shape* of the rule rather than its output, because only one of the two can be run here:
+   * the hole is the unit, the settings move on their own clock, and the two local-only fields
+   * never cross. Each of those is a line of Swift that can be deleted without anything failing to
+   * compile.
+   */
+  it("reconciles two copies of a card by the same rule", () => {
+    const merging = swift.card.slice(swift.card.indexOf("public func merging("));
+    expect(merging, "ScrambleCard should have a merging(_:)").toContain("func merging(");
+    // Settings move as one unit, newest wins.
+    expect(merging).toContain("other.settingsUpdatedAt > settingsUpdatedAt ? other : self");
+    // The hole is the unit, and the newer of the two takes it whole.
+    expect(merging).toMatch(/mine\.updatedAt >= hole\.updatedAt/);
+    // And the two things that are this device's own business never cross.
+    expect(merging).toContain("merged.currentHole = currentHole");
+    expect(merging).toContain("merged.shareToken = shareToken");
+    expect(merging).toContain("merged.id = id");
+  });
+
+  /**
+   * The address a card is shared at, which three separate things have to agree about: the Worker
+   * (which requests get the noindex header), `robots.txt` (which a crawler may fetch), and the app
+   * (the link that goes in the QR code). A card reachable at a prefix one of them has not heard of
+   * is a card that gets indexed.
+   */
+  it("shares a card at the same address", () => {
+    const prefix = swift.service.match(/public static let prefix = "([^"]*)"/);
+    expect(prefix, "GolfShare should declare its prefix").not.toBeNull();
+    expect(prefix![1]).toBe(SHARED_CARD_PREFIX);
+  });
+
+  /**
+   * The two fields the wire does not carry. `currentHole` is a fact about a device — syncing it
+   * would have two people dragging each other backwards all afternoon — and `shareToken` is the
+   * server's to know. The app strips both before sending; the TypeScript never reads them.
+   */
+  it("keeps the same two fields off the wire", () => {
+    const wire = swift.service.slice(swift.service.indexOf("private func wire("));
+    expect(wire).toContain("out.shareToken = nil");
+    expect(wire).toContain("out.currentHole = 1");
+    // And the parser on the other end has no idea they exist.
+    const parsed = parseCard({
+      id: "x",
+      players: [{ id: "c", name: "Corey" }],
+      pars: [4],
+      currentHole: 12,
+      shareToken: "LEAKED",
+    })!;
+    expect(parsed).not.toHaveProperty("currentHole");
+    expect(parsed).not.toHaveProperty("shareToken");
   });
 });

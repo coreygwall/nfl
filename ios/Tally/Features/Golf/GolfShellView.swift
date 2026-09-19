@@ -37,6 +37,21 @@ struct GolfShellView: View {
                 GolfScreen(cardId: cardId) { AccountView(inPool: false) }
             }
         }
+        /**
+         Take whatever everybody else has played, while this card is on screen.
+
+         Only a shared card does anything here — `refresh` returns immediately for one that has
+         never left the phone. It is slow on purpose: a push already answers with the merge, so
+         this is only for the case a push cannot cover, which is *this* phone sitting in a cart
+         holder while three other people tap. It stops when the shell does, because a timer that
+         outlives the screen it belongs to is a timer nobody remembers writing.
+         */
+        .task(id: cardId) {
+            while !Task.isCancelled {
+                await golf.refresh(cardId: cardId)
+                try? await Task.sleep(for: .seconds(15))
+            }
+        }
     }
 }
 
@@ -59,6 +74,11 @@ struct GolfScreen<Content: View>: View {
                             ScreenHeader(mark: "TallyMark", title: "Tally")
                         } else {
                             ScreenHeader(mark: "GolfMark", title: golf.card(cardId)?.name ?? "Golf")
+                            // Only ever drawn when there is something to say. A permanent "synced"
+                            // badge is decoration, and decoration is what makes a warning invisible.
+                            if golf.unsynced.contains(cardId) {
+                                SyncWarning()
+                            }
                         }
                         content
                     }
@@ -74,6 +94,32 @@ struct GolfScreen<Content: View>: View {
             }
             .toolbarTitleDisplayMode(.inline)
         }
+    }
+}
+
+/**
+ The card is shared, and the last attempt to say so did not land.
+
+ Worth a line rather than a silent retry: a group that has the link open in three browsers is
+ entitled to know that the phone keeping the card has drifted out of signal. The round itself is
+ never at risk — every tap is on disk before it is a request — so the wording is about *them*
+ rather than about the data.
+ */
+private struct SyncWarning: View {
+    var body: some View {
+        HStack(spacing: 8) {
+            Image(systemName: "wifi.exclamationmark")
+                .font(.system(size: 13, weight: .bold))
+                .foregroundStyle(Color.ink2)
+            Text("Saved here, but the shared card hasn't caught up. It'll send itself when you're back in signal.")
+                .sans(12).foregroundStyle(Color.ink2)
+                .fixedSize(horizontal: false, vertical: true)
+            Spacer(minLength: 0)
+        }
+        .padding(10)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardFlat(fill: .paper2)
+        .padding(.bottom, 10)
     }
 }
 

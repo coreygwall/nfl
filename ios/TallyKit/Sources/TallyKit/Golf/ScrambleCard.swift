@@ -138,7 +138,7 @@ public struct HoleEntry: Codable, Hashable, Sendable {
 }
 
 public struct ScrambleCard: Codable, Hashable, Identifiable, Sendable {
-    public let id: String
+    public private(set) var id: String
     public var name: String
     public var course: String
     public let createdAt: Date
@@ -152,6 +152,24 @@ public struct ScrambleCard: Codable, Hashable, Identifiable, Sendable {
     public var contests: ContestRules
     /// What a shot and an award are worth, and whether anybody is counting.
     public var points: PointValues
+    /**
+     When the names, the pars, the contests or the stakes last changed.
+
+     The second half of the merge rule (`merging(_:)`), and the reason it is separate from a hole's
+     `updatedAt`: renaming a player and playing the seventh are different kinds of change, and a
+     rule that moved them together would have one overwrite the other. Defaults to `createdAt` for
+     every card saved before this existed, which makes those cards lose every settings race — the
+     right answer, since a card that has never been shared has nothing to race with.
+     */
+    public var settingsUpdatedAt: Date
+    /**
+     The link this card was published under, once somebody has shared it.
+
+     Local to the phone and deliberately **not** on the wire: the server assigns it and knows it,
+     so a client sending it back would be telling the server something it decided. Nil means this
+     card has never left the device, which is the state every card starts in and most stay in.
+     */
+    public var shareToken: String?
 
     public init(
         id: String = UUID().uuidString,
@@ -163,7 +181,9 @@ public struct ScrambleCard: Codable, Hashable, Identifiable, Sendable {
         holes: [HoleEntry] = [],
         currentHole: Int = 1,
         contests: ContestRules = .off,
-        points: PointValues = .standard
+        points: PointValues = .standard,
+        settingsUpdatedAt: Date? = nil,
+        shareToken: String? = nil
     ) {
         self.id = id
         self.name = name
@@ -175,14 +195,21 @@ public struct ScrambleCard: Codable, Hashable, Identifiable, Sendable {
         self.currentHole = currentHole
         self.contests = contests
         self.points = points
+        self.settingsUpdatedAt = settingsUpdatedAt ?? createdAt
+        self.shareToken = shareToken
     }
 
     private enum CodingKeys: String, CodingKey {
         case id, name, course, createdAt, players, pars, holes, currentHole, contests, points
+        case settingsUpdatedAt, shareToken
     }
 
     /// Hand-written for the same reason as `HoleEntry`'s: a card saved before side contests
     /// existed has neither key, and a throw here is a wiped catalogue rather than an error.
+    ///
+    /// It is also what lets a card come straight off the wire. The server's copy carries neither
+    /// `currentHole` (which is a fact about a device, not a round) nor `shareToken` (which is the
+    /// server's to know), and both default here rather than throwing.
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         id = try c.decode(String.self, forKey: .id)
@@ -192,9 +219,11 @@ public struct ScrambleCard: Codable, Hashable, Identifiable, Sendable {
         players = try c.decode([GolfPlayer].self, forKey: .players)
         pars = try c.decode([Int].self, forKey: .pars)
         holes = try c.decode([HoleEntry].self, forKey: .holes)
-        currentHole = try c.decode(Int.self, forKey: .currentHole)
+        currentHole = try c.decodeIfPresent(Int.self, forKey: .currentHole) ?? 1
         contests = try c.decodeIfPresent(ContestRules.self, forKey: .contests) ?? .off
         points = try c.decodeIfPresent(PointValues.self, forKey: .points) ?? .standard
+        settingsUpdatedAt = try c.decodeIfPresent(Date.self, forKey: .settingsUpdatedAt) ?? createdAt
+        shareToken = try c.decodeIfPresent(String.self, forKey: .shareToken)
     }
 
     // MARK: Reading
@@ -381,6 +410,13 @@ public struct ScrambleCard: Codable, Hashable, Identifiable, Sendable {
     public mutating func setPar(_ par: Int, on hole: Int) {
         guard holeNumbers.contains(hole), hole <= pars.count else { return }
         pars[hole - 1] = min(max(par, 3), 6)
+        touchSettings()
+    }
+
+    /// Mark the names, pars, contests or stakes as changed now. Every write to one of those has to
+    /// call this, or a shared card will keep losing that change to an older copy on another phone.
+    public mutating func touchSettings(_ now: Date = Date()) {
+        settingsUpdatedAt = now
     }
 
     public mutating func go(to hole: Int) {
@@ -400,6 +436,37 @@ public struct ScrambleCard: Codable, Hashable, Identifiable, Sendable {
      par here — an award changes no score — and the closest to the pin is usually settled while
      somebody is already writing the hole down.
      */
+    /**
+     This card and another copy of it, reconciled.
+
+     The Swift half of `mergeCards` in `shared/golf.ts`, and it has to agree with it exactly: the
+     server runs that one on every write, so a phone that merged differently would show a round
+     the server does not have and then quietly push it back.
+
+     **The hole is the unit**, and the newer of the two wins it outright — its strokes and its
+     awards belong together, and merging *inside* one would invent a round nobody played. The
+     settings move as a second unit on `settingsUpdatedAt`, because renaming a player and
+     shortening a round are not changes you would want half of.
+
+     Two things never cross: `currentHole`, because which tee this phone is standing on is nobody
+     else's business, and `shareToken`, which this device already knows and the wire does not
+     carry. Keeping them local is what stops a sync dragging somebody back three holes.
+     */
+    public func merging(_ other: ScrambleCard) -> ScrambleCard {
+        var merged = other.settingsUpdatedAt > settingsUpdatedAt ? other : self
+        merged.id = id
+        merged.currentHole = currentHole
+        merged.shareToken = shareToken ?? other.shareToken
+        var byHole: [Int: HoleEntry] = [:]
+        for hole in holes { byHole[hole.hole] = hole }
+        for hole in other.holes {
+            if let mine = byHole[hole.hole], mine.updatedAt >= hole.updatedAt { continue }
+            byHole[hole.hole] = hole
+        }
+        merged.holes = byHole.values.sorted { $0.hole < $1.hole }
+        return merged
+    }
+
     public mutating func award(_ contest: SideContest, on hole: Int, to playerId: String?) {
         guard holeNumbers.contains(hole) else { return }
         let known = playerId.flatMap { id in players.first { $0.id == id }?.id }

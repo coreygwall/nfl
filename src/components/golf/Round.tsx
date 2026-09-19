@@ -163,7 +163,7 @@ function HoleHeader({
     <div className="card flex items-center gap-2 p-3">
       <StepButton direction="prev" disabled={hole <= 1} onClick={() => onGo(hole - 1)} />
       <div className="min-w-0 flex-1">
-        <p className="font-display text-2xl font-extrabold leading-none">Hole {hole}</p>
+        <h1 className="font-display text-2xl font-extrabold leading-none">Hole {hole}</h1>
         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
           {/*
             Par is corrected from the tee you are standing on, because nobody fills in eighteen
@@ -616,19 +616,32 @@ function HoleReview({
         </p>
       )}
 
-      <SlideToLock
-        disabled={false}
-        pending={false}
-        onSubmit={onConfirm}
-        words={{
-          idle: "Slide to finish the hole",
-          keep: "Keep sliding →",
-          release: "Release to finish it",
-          pending: "Finishing…",
-          tap: "Or tap to finish the hole",
-          help: "Hold the arrow and slide right to finish this hole",
-        }}
-      />
+      {/*
+        The same pair the pick flow uses: a slide on a touch phone, a button everywhere else.
+        `.mobile-lock` and `.desktop-lock` are the CSS that picks between them, so this reads as
+        one control and only ever draws one — a slider on a trackpad is a chore, and a tap is too
+        cheap for the one gesture that closes a hole in front of three other people.
+      */}
+      <div className="flex gap-2">
+        <SlideToLock
+          disabled={false}
+          pending={false}
+          onSubmit={onConfirm}
+          words={{
+            idle: "Slide to finish the hole",
+            keep: "Keep sliding →",
+            release: "Release to finish it",
+            pending: "Finishing…",
+            tap: "Or tap to finish the hole",
+            help: "Hold the arrow and slide right to finish this hole",
+          }}
+        />
+        <div className="desktop-lock flex-1">
+          <button type="button" className="btn btn-turf w-full text-lg" onClick={onConfirm}>
+            Finish the hole
+          </button>
+        </div>
+      </div>
       <button type="button" className="min-h-11 w-full text-sm font-semibold underline" onClick={onBack}>
         Back to the strokes
       </button>
