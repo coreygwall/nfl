@@ -590,6 +590,27 @@ final class AppModel {
         Task { await self.refreshBootstrap() }
     }
 
+    /**
+     A name changed, on the account itself or on one of its entries.
+
+     The server is the record, so the bootstrap is what everything ends up reading — but the
+     Keychain cache is what the picker draws from until that lands, and a phone that shows the old
+     name for a second after saving looks like the save failed. So both move, in that order, and
+     the refresh confirms it.
+     */
+    func renamed(id: String, to name: String) {
+        var next = session
+        if var identity = next.people.first(where: { $0.id == id }) {
+            identity.name = name
+            next.save(identity)
+            // `save` makes the saved identity active, which a rename must not do: renaming a
+            // child entry from the account page should not quietly start picking as them.
+            if let active = player?.id, active != id { next.setActive(active) }
+            commit(next)
+        }
+        Task { await self.refreshBootstrap() }
+    }
+
     func switchTo(_ id: String) {
         var next = session
         if next.people.contains(where: { $0.id == id }) {

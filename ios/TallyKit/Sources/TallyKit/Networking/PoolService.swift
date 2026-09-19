@@ -64,6 +64,12 @@ public struct PoolService: Sendable {
         try await client.post("/entries", body: NameBody(name: name))
     }
 
+    /// Rename a name this account is responsible for: its own, or one of the entries it manages.
+    /// The server decides which of those the id is; anything else comes back 403.
+    public func renameMine(playerId: String, name: String) async throws -> RenameResponse {
+        try await client.patch("/players/\(playerId)/name", body: NameBody(name: name))
+    }
+
     private struct AttachEntryBody: Encodable { let name: String; let code: String }
 
     /// Brings a name that already joined the pool on its own into this account — the self-service

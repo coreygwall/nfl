@@ -12,6 +12,7 @@ import { Account } from "./screens/Account.tsx";
 import { Commissioner } from "./screens/Commissioner.tsx";
 import { League } from "./screens/League.tsx";
 import { Rules } from "./screens/Rules.tsx";
+import { Privacy } from "./screens/Privacy.tsx";
 import { Landing } from "./screens/Landing.tsx";
 import { POOL_SLUG } from "./lib/basename.ts";
 import { Announcements } from "./components/Announcements.tsx";
@@ -69,6 +70,7 @@ export default function App() {
           <Route index element={<PoolHome />} />
           <Route path="welcome" element={<Welcome />} />
           <Route path="rules" element={<Rules />} />
+          <Route path="privacy" element={<Privacy />} />
           <Route path="announcements" element={<Announcements />} />
           <Route
             path="week/:week"

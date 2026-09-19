@@ -3,20 +3,24 @@ import TallyKit
 import UIKit
 
 /**
- Your account, grouped the way Settings groups things: who you are, what you run, what you have
- switched on, and the doors out.
+ Your account, in sections that each name what they are.
 
- It used to be one long column in which "add an entry", "set up Face ID", the appearance control
- and a row of small office buttons all carried the same weight, and the two things a commissioner
- opens most were the smallest controls on the page. The order here is how often each thing is
- touched: entries (mid-week, often), the offices (weekly, for the few who hold one), settings
- (once), the other-device link (once per device), and everything about Tally itself last. Every
- door is a full-width row with a chevron, so the page reads as a list of places rather than a
- form.
+ The order is how often a thing is touched: who you are and the entries you pick for (mid-week,
+ often), the offices (weekly, for the few who hold one), your preferences (once), how you get onto
+ another device (once per device), and Tally itself last. Every door is a full-width row with a
+ chevron, so the page reads as a list of places rather than a form.
 
- Two things are deliberately elsewhere. *Which entry am I picking as* is the row of names above the
- picks (`EntryPicker`); here the entries are managed, not chosen. And *which pool* is the chip in
- the navigation bar, so the entries section is named after the pool to say whose entries these are.
+ **There is no section called "Settings".** There was, and it was a tautology on a page that is
+ entirely settings — and worse, it was a drawer: notifications, the appearance control and two
+ feature flags shared one heading because none of them had a better one. They are different kinds
+ of thing and they say so now. *Preferences* is what you have chosen; *Signing in* is how you get
+ back to this account, which is why `PasskeyRow` moved down here out of the page header, where it
+ was a caption under your name rather than the security control it is.
+
+ Three things are deliberately elsewhere. *Which entry am I picking as* is the row of names above
+ the picks (`EntryPicker`); here the entries are managed, not chosen. *Which pool* is Home. And
+ *how this pool scores* is the question mark in the pool's own bar — it was the first row under
+ "About Tally", which filed a fact about one pool under a heading about the app.
  */
 struct AccountView: View {
     @Environment(AppModel.self) private var model
@@ -25,6 +29,8 @@ struct AccountView: View {
     @State private var adding = false
     @State private var attaching = false
     @State private var confirmSignOut = false
+    @State private var renaming: Identity?
+    @State private var showLabs = false
     /// Drawn from the pool's shell, or from a golf card's. The account is the same person either
     /// way; the entries and the offices are the pool's, so from a card they are not on the page.
     let inPool: Bool
@@ -44,21 +50,49 @@ struct AccountView: View {
                 entriesSection
                 if model.isCommissioner || model.isLeagueAdmin || model.legacyPin != nil { officeSection }
             }
-            settingsSection
-            deviceSection
+            preferencesSection
+            signingInSection
             aboutSection
         }
         .task { await model.push.refreshPermission() }
+        .sheet(isPresented: $showLabs) { LabsSheet() }
     }
 
     // MARK: Who
 
+    /**
+     Who you are, and the one field that is unambiguously yours to fix.
+
+     The page showed your name and let you change nothing about it, so a typo in your own name was
+     a message to whoever runs the pool — an absurd errand, and one people simply do not run, which
+     is why pools fill up with names nobody meant. `PasskeyRow` used to sit under here as a caption;
+     it is a way back into your account, so it is in *Signing in* with the other one.
+     */
     private var header: some View {
         VStack(alignment: .leading, spacing: 8) {
             SectionLabel(text: "Signed in as")
-            Text(accountName).display(28)
-            PasskeyRow(hasPasskey: (boot?.myPasskeys ?? 0) > 0)
+            if let account = accountIdentity, renaming?.id == account.id {
+                RenameForm(identity: account, onDone: { renaming = nil }, onCancel: { renaming = nil })
+            } else {
+                HStack(spacing: 10) {
+                    Text(accountName).display(28).lineLimit(1).minimumScaleFactor(0.7)
+                    if let account = accountIdentity {
+                        Button("Edit") { renaming = account }
+                            .buttonStyle(.tally(.plain, size: .small))
+                            .accessibilityLabel("Change your name")
+                    }
+                    Spacer(minLength: 0)
+                }
+            }
         }
+    }
+
+    /// The account's own player, as something the rename form can take. Nil before the first
+    /// bootstrap lands, which is the one moment the name on screen is the cache's rather than the
+    /// server's — and a rename of a name the server has not confirmed is not an edit worth offering.
+    private var accountIdentity: Identity? {
+        guard let account = boot?.account else { return nil }
+        return entries.first { $0.id == account.id }
     }
 
     // MARK: Entries
@@ -84,21 +118,48 @@ struct AccountView: View {
             }
             ForEach(entries) { p in
                 let active = p.id == model.player?.id
-                Button {
-                    if !active { model.switchTo(p.id) }
-                } label: {
+                if renaming?.id == p.id, p.id != boot?.account?.id {
+                    RenameForm(identity: p, onDone: { renaming = nil }, onCancel: { renaming = nil })
+                        .padding(12)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .cardFlat()
+                } else {
                     HStack(spacing: 10) {
-                        Text(p.name).font(TallyFont.display(16))
-                        if p.isManagedEntry { Chip(text: "you manage", size: 10) }
-                        Spacer()
-                        if active { Chip(text: "picking", fill: .flag, size: 10, label: .onAccent) }
+                        Button {
+                            if !active { model.switchTo(p.id) }
+                        } label: {
+                            HStack(spacing: 10) {
+                                Text(p.name).font(TallyFont.display(16)).lineLimit(1)
+                                if p.isManagedEntry { Chip(text: "you manage", size: 10) }
+                                Spacer(minLength: 4)
+                                if active { Chip(text: "picking", fill: .flag, size: 10, label: .onAccent) }
+                            }
+                            .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        // Renaming is a second thing this row does, so it is a second target
+                        // rather than a long press: a hidden gesture on the row that also
+                        // switches who you are picking as is a gesture nobody finds and
+                        // everybody triggers by accident.
+                        Button {
+                            Haptics.tap()
+                            renaming = p
+                        } label: {
+                            Image(systemName: "pencil")
+                                .font(.system(size: 13, weight: .bold))
+                                .foregroundStyle(Color.ink3)
+                                .frame(width: 32, height: 32)
+                                .contentShape(Rectangle())
+                        }
+                        .buttonStyle(.plain)
+                        .accessibilityLabel("Rename \(p.name)")
                     }
-                    .padding(12)
+                    .padding(.leading, 12)
+                    .padding(.trailing, 6)
+                    .padding(.vertical, 12)
                     .frame(maxWidth: .infinity, alignment: .leading)
-                    .contentShape(Rectangle())
+                    .modifier(TallyCard(hard: active, fill: .surface, border: .cardBorder, radius: TallyRadius.card, dashed: false))
                 }
-                .buttonStyle(.cardPress)
-                .modifier(TallyCard(hard: active, fill: .surface, border: .cardBorder, radius: TallyRadius.card, dashed: false))
             }
             if adding {
                 AddEntryForm(onDone: { identity in
@@ -151,11 +212,19 @@ struct AccountView: View {
         }
     }
 
-    // MARK: Settings
+    // MARK: Preferences
 
-    private var settingsSection: some View {
+    /**
+     What you have chosen, as opposed to what you are.
+
+     Three rows, and Labs is one of them rather than two switches and two paragraphs sitting open
+     in the middle of the page — which is what pushed *Another device* and everything about Tally
+     below the fold on a phone. Appearance stays inline because a segmented control *is* the
+     control; a row that opens a sheet to show three words would be a tap for nothing.
+     */
+    private var preferencesSection: some View {
         VStack(alignment: .leading, spacing: 10) {
-            SectionLabel(text: "Settings")
+            SectionLabel(text: "Preferences")
             SettingsGroup {
                 notificationsRow
                 SettingsDivider()
@@ -173,50 +242,57 @@ struct AccountView: View {
                 }
                 .padding(12)
                 SettingsDivider()
-                labsRow
+                SettingsRow(title: "Labs", detail: labsDetail, symbol: "flask.fill", tint: labsOn > 0 ? .turf : .ink) {
+                    showLabs = true
+                }
             }
         }
     }
+
+    private var labsOn: Int { (model.golfCards ? 1 : 0) + (model.poolPager ? 1 : 0) }
+
+    private var labsDetail: String {
+        labsOn == 0 ? "Things Tally is still working on. Nothing on." : "\(labsOn) of \(LabsSheet.count) on"
+    }
+
+    // MARK: Signing in
 
     /**
-     Labs: built, and not yet on for everyone. Off by default, and off is not a reset — the cards
-     stay on the phone for when golf comes back on.
-     */
-    private var labsRow: some View {
-        VStack(alignment: .leading, spacing: 12) {
-            labsSwitch(
-                title: "Golf cards",
-                symbol: "flask.fill",
-                on: Binding(get: { model.golfCards }, set: { model.golfCards = $0 }),
-                detail: "A tally of whose shots your scramble team kept, hole by hole. Adds your cards to Home. Early: one phone keeps the card."
-            )
-            labsSwitch(
-                title: "Pool pager",
-                symbol: "arrow.left.arrow.right",
-                on: Binding(get: { model.poolPager }, set: { model.poolPager = $0 }),
-                detail: "A row at the top of the Pool tab to flick between your pools, when you have more than one. Home still switches too."
-            )
-        }
-        .padding(12)
-    }
+     How you get back to this account — on this phone, and on the next one.
 
-    private func labsSwitch(title: String, symbol: String, on: Binding<Bool>, detail: String) -> some View {
-        VStack(alignment: .leading, spacing: 8) {
-            HStack(spacing: 12) {
-                Image(systemName: symbol).font(.system(size: 15, weight: .bold)).frame(width: 24)
-                Text(title).font(TallyFont.display(16))
-                Chip(text: "labs", size: 10)
-                Spacer()
-                Toggle(title, isOn: Binding(get: { on.wrappedValue }, set: { value in
-                    Haptics.tap()
-                    on.wrappedValue = value
-                }))
-                .labelsHidden()
-                .tint(.turf)
+     Both rows answer the same question, and they were in two different places: the passkey offer
+     was a caption under your name at the top of the page, and the device link was a section of its
+     own near the bottom. A caption is not where somebody looks for the security control, and a
+     section with one row in it is a heading doing no work.
+     */
+    private var signingInSection: some View {
+        let hasPasskey = (boot?.myPasskeys ?? 0) > 0
+        return VStack(alignment: .leading, spacing: 10) {
+            SectionLabel(text: "Signing in")
+            SettingsGroup {
+                VStack(alignment: .leading, spacing: 8) {
+                    HStack(spacing: 12) {
+                        Image(systemName: Biometry.symbolName)
+                            .font(.system(size: 15, weight: .bold))
+                            .foregroundStyle(hasPasskey ? Color.turf : Color.ink)
+                            .frame(width: 24)
+                        Text(Biometry.label).font(TallyFont.display(16))
+                        Spacer(minLength: 4)
+                    }
+                    PasskeyRow(hasPasskey: hasPasskey)
+                }
+                .padding(12)
+                SettingsDivider()
+                SettingsRow(title: "Sign in on another device", detail: "A one-tap link to text yourself, and the code to type if you'd rather", symbol: "iphone.and.arrow.forward") {
+                    showCode = true
+                }
+                .disabled(boot?.myCode == nil)
             }
-            Text(detail)
-                .sans(12).foregroundStyle(Color.ink2)
-                .fixedSize(horizontal: false, vertical: true)
+            // Below the group rather than inside it: the card draws its own ground, and a card
+            // inside a card is how a page starts looking like a stack of receipts.
+            if showCode, let code = boot?.myCode {
+                DeviceCodeCard(code: code, name: accountName, accountId: boot?.account?.id)
+            }
         }
     }
 
@@ -244,24 +320,6 @@ struct AccountView: View {
         }
     }
 
-    // MARK: Another device
-
-    private var deviceSection: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            SectionLabel(text: "Another device")
-            if showCode, let code = boot?.myCode {
-                DeviceCodeCard(code: code, name: accountName, accountId: boot?.account?.id)
-            } else {
-                SettingsGroup {
-                    SettingsRow(title: "Sign in on another device", detail: "A one-tap link to text yourself, and the code to type if you'd rather", symbol: "iphone.and.arrow.forward") {
-                        showCode = true
-                    }
-                    .disabled(boot?.myCode == nil)
-                }
-            }
-        }
-    }
-
     // MARK: About
 
     private var version: String {
@@ -284,6 +342,13 @@ struct AccountView: View {
             SectionLabel(text: "About Tally")
             SettingsGroup {
                 SettingsRow(title: "Join or start a pool", detail: "And what else Tally plays", symbol: "square.grid.2x2.fill") { model.showPools = true }
+                SettingsDivider()
+                // One page, on the web, rather than a copy in the app: a privacy policy has to
+                // live at a public address anyway — Apple asks for one at submission — and two
+                // copies of it is how one of them goes stale.
+                SettingsRow(title: "Privacy", detail: "What Tally keeps, and what it never asks for", symbol: "hand.raised.fill") {
+                    openURL(model.pool.origin.appending(path: "privacy"))
+                }
                 SettingsDivider()
                 HStack(spacing: 12) {
                     Image(systemName: "info.circle").font(.system(size: 15, weight: .bold)).foregroundStyle(Color.ink3).frame(width: 24)
@@ -504,14 +569,18 @@ struct PasskeyRow: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             if done || hasPasskey {
-                Label("\(Biometry.label) is on — it opens this app and the website.", systemImage: Biometry.symbolName)
-                    .sans(14).foregroundStyle(Color.ink2)
+                // The row above already says "Face ID", so this says what it does rather than
+                // its own name for the second time.
+                Text("On. Opens this app and playtally.app without a code.")
+                    .sans(13).foregroundStyle(Color.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
             } else if Biometry.available {
                 Button(busy ? "Waiting…" : "Set up \(Biometry.label)") { Task { await turnOn() } }
                     .buttonStyle(.tally(.plain, size: .small))
                     .disabled(busy)
                 Text("Optional. Opens your account on a new phone, a laptop, or playtally.app without a code.")
                     .sans(12).foregroundStyle(Color.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
             } else {
                 Text("This device has no biometrics, so your code is the way onto another one.")
                     .sans(12).foregroundStyle(Color.ink2)
@@ -612,5 +681,169 @@ struct FlowLayout: Layout {
             x += size.width + spacing
             rowHeight = max(rowHeight, size.height)
         }
+    }
+}
+
+// MARK: Renaming
+
+/**
+ Changing a name you are responsible for: your own, or one of the entries you manage.
+
+ Inline rather than a sheet, because it is one field and the thing it changes is directly above it
+ — the same shape `AddEntryForm` and `AttachEntryForm` already use on this page. The server is the
+ one that decides whether the id is yours; the client only shows the control for names it already
+ lists, which is the same set.
+
+ The new name goes everywhere at once because `refreshBootstrap` is what every screen reads, and
+ the session cache is updated in step so the picker above the picks does not keep the old one
+ until the next launch.
+ */
+private struct RenameForm: View {
+    @Environment(AppModel.self) private var model
+    let identity: Identity
+    let onDone: () -> Void
+    let onCancel: () -> Void
+
+    @State private var name = ""
+    @State private var busy = false
+    @State private var error: String?
+    @FocusState private var focused: Bool
+
+    private var trimmed: String { name.trimmingCharacters(in: .whitespaces) }
+    private var ready: Bool { trimmed.count >= 2 && trimmed != identity.name }
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            TextField("Name", text: $name)
+                .tallyField()
+                .textInputAutocapitalization(.words)
+                .autocorrectionDisabled()
+                .focused($focused)
+                .disabled(busy)
+                .submitLabel(.done)
+                .onSubmit { if ready { Task { await submit() } } }
+            if let error {
+                Text(error).sans(13, weight: .semibold).foregroundStyle(Color.danger)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            HStack(spacing: 10) {
+                Button(busy ? "Saving…" : "Save") { Task { await submit() } }
+                    .buttonStyle(.tally(.primary, size: .small))
+                    .disabled(busy || !ready)
+                Button("Cancel", action: onCancel)
+                    .buttonStyle(.tally(.plain, size: .small))
+                    .disabled(busy)
+            }
+            Text("This is the name on the board, so everybody in the pool sees it change.")
+                .sans(12).foregroundStyle(Color.ink3)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .onAppear {
+            name = identity.name
+            focused = true
+        }
+    }
+
+    private func submit() async {
+        busy = true
+        error = nil
+        do {
+            let r = try await model.service.renameMine(playerId: identity.id, name: trimmed)
+            model.renamed(id: r.player.id, to: r.player.name)
+            model.toast("Now \(r.player.name).", kind: .success)
+            onDone()
+        } catch {
+            self.error = error.asAPIError.message
+            busy = false
+        }
+    }
+}
+
+// MARK: Labs
+
+/**
+ What Tally is still working on, behind one door.
+
+ It used to be two switches with a paragraph each, sitting open in the middle of the account page
+ — about two hundred points of experiments between the appearance control and everything about
+ Tally, which is how *Another device* ended up below the fold on a phone. Labs is by nature the
+ least-visited thing on a settings page and was taking the most room on it.
+
+ Off is not a reset, in either case: the golf cards stay on the phone and the pager's pools stay
+ in the catalogue, so a switch flicked to see what it does costs nothing to flick back.
+ */
+struct LabsSheet: View {
+    @Environment(AppModel.self) private var model
+    @Environment(\.dismiss) private var dismiss
+
+    /// How many there are, so the row that opens this can say "1 of 2 on" without counting twice.
+    static let count = 2
+
+    var body: some View {
+        NavigationStack {
+            ZStack {
+                PaperBackground()
+                ScrollView {
+                    VStack(alignment: .leading, spacing: 14) {
+                        Text("Built, working, and not switched on for everybody yet. Turning one off leaves everything it made on your phone.")
+                            .sans(13).foregroundStyle(Color.ink2)
+                            .fixedSize(horizontal: false, vertical: true)
+                        SettingsGroup {
+                            LabsSwitch(
+                                title: "Golf cards",
+                                symbol: "figure.golf",
+                                on: Binding(get: { model.golfCards }, set: { model.golfCards = $0 }),
+                                detail: "A tally of whose shots your scramble team kept, hole by hole, with longest drive and closest to the pin beside it. Adds your cards to Home. Early: one phone keeps the card."
+                            )
+                            SettingsDivider()
+                            LabsSwitch(
+                                title: "Pool pager",
+                                symbol: "arrow.left.arrow.right",
+                                on: Binding(get: { model.poolPager }, set: { model.poolPager = $0 }),
+                                detail: "A row at the top of the Pool tab to flick between your pools, when you have more than one. Home still switches too."
+                            )
+                        }
+                    }
+                    .padding(16)
+                    .padding(.bottom, 24)
+                }
+            }
+            .noZoom()
+            .navigationTitle("Labs")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Done") { dismiss() } } }
+        }
+        .presentationDetents([.medium, .large])
+        .presentationDragIndicator(.visible)
+    }
+}
+
+private struct LabsSwitch: View {
+    let title: String
+    let symbol: String
+    @Binding var on: Bool
+    let detail: String
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            HStack(spacing: 12) {
+                Image(systemName: symbol)
+                    .font(.system(size: 15, weight: .bold))
+                    .foregroundStyle(on ? Color.turf : Color.ink)
+                    .frame(width: 24)
+                Text(title).font(TallyFont.display(16))
+                Spacer(minLength: 8)
+                Toggle(title, isOn: Binding(get: { on }, set: { value in
+                    Haptics.tap()
+                    on = value
+                }))
+                .labelsHidden()
+                .tint(Color.turf)
+            }
+            Text(detail)
+                .sans(12).foregroundStyle(Color.ink2)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(12)
     }
 }

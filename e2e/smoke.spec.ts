@@ -677,3 +677,50 @@ test("Face ID: turn it on, lose the device's memory, and sign back in with no ty
   await page.getByRole("button", { name: "Lock it in" }).click();
   await expect(page.getByText("Locked in")).toBeVisible();
 });
+
+/**
+ * The account page listed your name and let you change nothing about it.
+ *
+ * A typo in your own name was a message to whoever runs the pool — an errand nobody runs, which is
+ * how pools fill up with names nobody meant. The interesting part is not the form; it is that the
+ * name is the one on the *board*, so the edit has to reach it.
+ */
+test("you can fix your own name, and the board follows", async ({ page }) => {
+  const original = `Typo ${Date.now().toString(36)}`;
+  const fixed = `${original} Fixed`;
+  await enablePlatformBiometrics(page);
+  await page.goto(`/welcome?now=${BEFORE}`);
+  await page.getByPlaceholder("Your name").fill(original);
+  await page.getByRole("button", { name: "Let's go" }).click();
+  await page.getByRole("dialog", { name: "You’re all set" }).getByRole("button", { name: "Not now — start picking →" }).click();
+
+  await openAccount(page);
+  await expect(page.getByRole("heading", { name: original, level: 1 })).toBeVisible();
+  await page.getByRole("button", { name: "Edit" }).first().click();
+  const field = page.getByRole("textbox").first();
+  await field.fill(fixed);
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("heading", { name: fixed, level: 1 })).toBeVisible();
+
+  // The name everyone else reads is the same name.
+  await page.goto(`/p/high-five/board/season?now=${BEFORE}`);
+  await expect(page.getByText(fixed, { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(original, { exact: true })).toHaveCount(0);
+});
+
+/** Apple asks for a privacy policy at a public address, and a pool that keeps picks forever should
+ *  say so somewhere. It is reachable from the account page rather than only by URL. */
+test("the privacy page is reachable from the account page and says what is kept", async ({ page }) => {
+  await enablePlatformBiometrics(page);
+  await page.goto(`/welcome?now=${BEFORE}`);
+  await page.getByPlaceholder("Your name").fill(`Reader ${Date.now().toString(36)}`);
+  await page.getByRole("button", { name: "Let's go" }).click();
+  await page.getByRole("dialog", { name: "You’re all set" }).getByRole("button", { name: "Not now — start picking →" }).click();
+
+  await openAccount(page);
+  await page.getByRole("link", { name: /Privacy/ }).click();
+  await expect(page).toHaveURL(/\/privacy$/);
+  await expect(page.getByRole("heading", { name: "Privacy", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What Tally stores" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What Tally does not do" })).toBeVisible();
+});
