@@ -1,5 +1,6 @@
 import { SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
+import { uniqueName } from "./names.ts";
 
 const BEFORE = "2026-09-09T12:00:00.000Z"; // Wed morning, nothing started
 const AFTER_OPENER = "2026-09-10T03:00:00.000Z"; // NE @ SEA has kicked off, nothing else has
@@ -28,10 +29,9 @@ async function api<T = any>(path: string, opts: Opts = {}): Promise<{ status: nu
   return { status: res.status, body: (await res.json()) as T };
 }
 
-let seq = 0;
 /** A player plus the token their first device holds; `id` stays for board assertions. */
 async function newPlayer(prefix = "Player"): Promise<{ id: string; name: string; token: string; code: string }> {
-  const name = `${prefix} ${Date.now().toString(36)}${(seq++).toString(36)}`;
+  const name = uniqueName(prefix);
   const { status, body } = await api("/players", { body: { name } });
   expect(status).toBe(201);
   return { ...body.player, token: body.token, code: body.code };
@@ -56,7 +56,7 @@ describe("bootstrap & players", () => {
   });
 
   it("creates players once per case-insensitive name", async () => {
-    const name = `Corey ${Date.now()}`;
+    const name = uniqueName("Corey");
     const first = await api("/players", { body: { name } });
     expect(first.status).toBe(201);
     expect(first.body).toMatchObject({ created: true, player: { name } });

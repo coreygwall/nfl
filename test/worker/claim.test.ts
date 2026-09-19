@@ -1,6 +1,7 @@
 import { env, SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { MAX_CLAIM_ATTEMPTS } from "../../worker/auth.ts";
+import { uniqueName } from "./names.ts";
 
 const BEFORE = "2026-09-09T12:00:00.000Z";
 
@@ -32,7 +33,7 @@ async function api<T = any>(path: string, opts: Opts = {}): Promise<{ status: nu
 let seq = 0;
 async function join(prefix = "Claimer") {
   const n = seq++;
-  const name = `${prefix} ${Date.now().toString(36)}${n.toString(36)}`;
+  const name = uniqueName(prefix);
   const { status, body } = await api("/players", { body: { name }, ip: `198.51.100.${(n % 250) + 1}` });
   expect(status).toBe(201);
   return { id: body.player.id as string, name, token: body.token as string, code: body.code as string };
@@ -101,7 +102,7 @@ describe("claiming a name on another device", () => {
     // A roster name from before devices existed: no code, nobody signed in. The first device in
     // takes it, and gets a code for the one after.
     const id = crypto.randomUUID();
-    const name = `Legacy ${id.slice(0, 8)}`;
+    const name = uniqueName("Legacy");
     await env.DB.prepare("INSERT INTO players (id, name, name_key, created_at, last_seen_at) VALUES (?, ?, ?, ?, ?)")
       .bind(id, name, name.toLowerCase(), BEFORE, BEFORE)
       .run();
@@ -149,7 +150,7 @@ describe("claiming a name on another device", () => {
 
 describe("staying signed in and picking for the family", () => {
   it("sets a session cookie, and that cookie alone is enough to be recognised", async () => {
-    const name = `Cookie ${Date.now().toString(36)}`;
+    const name = uniqueName("Cookie");
     const created = await SELF.fetch("http://pool.test/api/players", {
       method: "POST",
       headers: { "content-type": "application/json" },
