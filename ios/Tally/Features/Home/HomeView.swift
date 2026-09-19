@@ -14,19 +14,21 @@ struct HomeView: View {
     @Environment(AppModel.self) private var model
     @State private var week: Loadable<WeekBoardResponse> = .idle
     @State private var season: Loadable<SeasonBoardResponse> = .idle
-    /// The last week with every result in — usually not the week being picked, so its own request.
+    /// The week the card previews — usually the one being picked, sometimes last week, so it
+    /// gets its own request. See `PoolHome.previewWeek`.
     @State private var completed: Loadable<WeekBoardResponse> = .idle
 
     private var boot: BootstrapResponse? { model.boot.value }
-    private var completedWeek: Int? { PoolHome.latestCompletedWeek(boot?.weeks ?? []) }
-    /// Changes when the pool changes, when bootstrap finally says which week it is, *and* when a
-    /// week finishes. That last one is its own trigger rather than a consequence of the first:
-    /// bootstrap re-polls every five minutes, and the last result of a week routinely lands after
-    /// the pick week has already rolled over — a Monday night game settling on Tuesday. Keyed on
-    /// the pick week alone, that poll would advance this card's heading and links to the newly
-    /// finished week while the rows underneath stayed on the week before.
+    private var preview: PoolHome.PreviewWeek? { PoolHome.previewWeek(boot?.weeks ?? []) }
+    /// Changes when the pool changes, when bootstrap finally says which week it is, *and* when
+    /// the previewed week changes — either because a new week kicked off or because the one on
+    /// show settled. Those last two are their own trigger rather than a consequence of the first:
+    /// bootstrap re-polls every five minutes, and a week's last result routinely lands after the
+    /// pick week has already rolled over — a Monday night game settling on Tuesday. Keyed on the
+    /// pick week alone, that poll would advance this card's heading and links while the rows
+    /// underneath stayed on the week before.
     private var loadKey: String {
-        "\(model.pool.host)/\(model.pool.slug)#\(boot?.currentWeek ?? 0)#\(completedWeek ?? 0)"
+        "\(model.pool.host)/\(model.pool.slug)#\(boot?.currentWeek ?? 0)#\(preview?.week ?? 0)#\(preview?.final == true)"
     }
 
     var body: some View {
@@ -73,7 +75,7 @@ struct HomeView: View {
                 Spacer()
                 Text("No picks required").sans(11).foregroundStyle(Color.ink3)
             }
-            LatestWeekCard(completedWeek: completedWeek, board: completed, pastWeeks: pastWeeks)
+            LatestWeekCard(preview: preview, board: completed, pastWeeks: pastWeeks)
             SeasonPreviewCard(season: season)
         }
     }
@@ -82,7 +84,7 @@ struct HomeView: View {
     /// offers the rest, rather than listing the featured week twice.
     private var pastWeeks: [Int] {
         (boot?.weeks ?? [])
-            .filter { $0.gameCount > 0 && $0.finalCount == $0.gameCount && $0.week != completedWeek }
+            .filter { $0.gameCount > 0 && $0.finalCount == $0.gameCount && $0.week != preview?.week }
             .map(\.week)
             .sorted(by: >)
     }
@@ -113,15 +115,15 @@ struct HomeView: View {
         guard let boot else { return }
         if week.value == nil { week = .loading }
         if season.value == nil { season = .loading }
-        let done = PoolHome.latestCompletedWeek(boot.weeks)
+        let done = PoolHome.previewWeek(boot.weeks)?.week
         if done != nil, completed.value == nil { completed = .loading }
         async let w = model.service.weekBoard(boot.currentWeek)
         async let s = model.service.seasonBoard()
         do { week = .loaded(try await w) } catch { week = .failed(error.asAPIError) }
         do { season = .loaded(try await s) } catch { season = .failed(error.asAPIError) }
 
-        // In the hours between the last game of a week landing and the pick week rolling over,
-        // the finished week *is* the current one, and the board just fetched is already it.
+        // Most of the time the week on show *is* the one being picked — always, once it has
+        // kicked off — and the board just fetched is already it.
         guard let done else { completed = .idle; return }
         if done == boot.currentWeek {
             completed = week
@@ -297,13 +299,29 @@ private struct ActivePoolCard: View {
                 } else if owing.isEmpty {
                     Label(entries.count > 1 ? "All \(entries.count) sets of picks are in." : "Your picks are in.", systemImage: "checkmark.circle.fill")
                         .sans(14, weight: .semibold).foregroundStyle(Color.turf)
+                    // Somebody who has already picked opens this to ask one question, and it is
+                    // not "did I pick". It is "can I still change it", so the answer sits next to
+                    // the way to do it rather than in the rules.
+                    Button("Review or change your picks") { model.tab = .picks }
+                        .buttonStyle(.tally(.plain, size: .small))
+                    Text("Each pick stays editable until that game kicks off.")
+                        .sans(12).foregroundStyle(Color.ink2)
                 } else {
-                    Text(owingText).sans(14, weight: .semibold)
+                    Text(owingText).display(19)
+                    // What the task actually is. Somebody who plays once a week does not carry
+                    // the rules around in their head, and the button alone does not say what it
+                    // asks of them or how long it takes.
+                    Text("Pick \(Scoring.maxPicks) winners and rank them — your surest call is worth \(Scoring.maxPicks) points, your shakiest 1.")
+                        .sans(13).foregroundStyle(Color.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
                     Button("Make \(owing.count == 1 && entries.count > 1 ? "\(owing[0].name)'s" : "your") picks") {
                         if let first = owing.first, first.id != model.player?.id { model.switchTo(first.id) }
                         model.tab = .picks
                     }
-                    .buttonStyle(.tally(.primary, size: .small))
+                    .buttonStyle(.tally(.primary, size: .regular, fullWidth: true))
+                    Text("Takes a minute, and there's no deadline for the week — each game locks at its own kickoff.")
+                        .sans(12).foregroundStyle(Color.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
             }
         } else {
@@ -359,16 +377,18 @@ private struct ActivePoolCard: View {
 }
 
 /**
- Who took the last week that actually finished.
+ Where the week being played stands, or who took the last one if this one has not started.
 
- "Finished" is doing real work in that sentence: a week with one game still running has a top three
- that can change, and a `Final` chip over a table that is going to move is a small lie. So this
- shows the last week with every result in, which during a Sunday afternoon means last week rather
- than this one — the live week is the board tab's job, and it says so itself.
+ It used to show only the last week with *every* result in, out of a fear of putting a `Final`
+ chip over a table that is going to move. The chip was the problem, not the week: from Thursday
+ night until Sunday afternoon that rule leads with a week nobody is thinking about any more, while
+ the game everybody just watched goes unmentioned. So `PoolHome.previewWeek` picks the newest week
+ that has kicked off anything, and `final` stays a separate fact — the chip says "In progress"
+ until every result is in, which is the honest version of the thing the old rule was protecting.
  */
 private struct LatestWeekCard: View {
     @Environment(AppModel.self) private var model
-    let completedWeek: Int?
+    let preview: PoolHome.PreviewWeek?
     let board: Loadable<WeekBoardResponse>
     let pastWeeks: [Int]
     @State private var open: String?
@@ -387,33 +407,40 @@ private struct LatestWeekCard: View {
     private var header: some View {
         HStack(alignment: .top, spacing: 8) {
             VStack(alignment: .leading, spacing: 2) {
-                Text("Latest weekly winner")
+                Text(preview?.final == true ? "Latest weekly winner" : "This week so far")
                     .sans(11, weight: .bold).tracking(0.8).foregroundStyle(Color.ink3)
-                Text(completedWeek.map { "Week \($0) results" } ?? "Weekly standings").display(19)
+                Text(preview.map { "Week \($0.week) \($0.final ? "results" : "standings")" } ?? "Weekly standings")
+                    .display(19)
             }
             Spacer()
-            if completedWeek != nil { Chip(text: "Final", fill: .turfSoft, size: 10) }
+            if let preview {
+                Chip(
+                    text: preview.final ? "Final" : "In progress",
+                    fill: preview.final ? .turfSoft : .flagSoft,
+                    size: 10
+                )
+            }
         }
     }
 
     @ViewBuilder private var content: some View {
-        if let completedWeek {
+        if let preview {
             if board.error != nil {
-                Text("Couldn't load the latest results.").sans(13).foregroundStyle(Color.ink2)
+                Text("Couldn't load this week's standings.").sans(13).foregroundStyle(Color.ink2)
             // The response says which week it is, so it can only ever draw under that week's
             // heading. Re-keying the load above is what fetches the new week; this is what stops
             // the old rows showing under the new title in the seconds before it lands.
-            } else if let loaded = board.value, loaded.week == completedWeek {
-                rows(loaded, week: completedWeek)
-                Button("See the full Week \(completedWeek) leaderboard") { openBoard(week: completedWeek) }
+            } else if let loaded = board.value, loaded.week == preview.week {
+                rows(loaded, week: preview.week)
+                Button("See the full Week \(preview.week) leaderboard") { openBoard(week: preview.week) }
                     .buttonStyle(.tally(.plain, size: .small, fullWidth: true))
             } else {
                 BoardSkeleton(rows: 3)
             }
         } else {
-            // Week 1 is not over yet, so there is no winner to name. Saying where the first one
-            // will appear is more use than an empty card, and the live week is still one tap away.
-            Text("The first top three will appear here when Week 1 is final.")
+            // Nothing has kicked off yet, so there is no top three to show. Saying where the first
+            // one will appear is more use than an empty card, and the board is still one tap away.
+            Text("The first top three will appear here once Week 1 kicks off.")
                 .sans(13).foregroundStyle(Color.ink2)
                 .fixedSize(horizontal: false, vertical: true)
             Button("Week \(model.boot.value?.boardWeek ?? 1)") { openBoard(week: model.boot.value?.boardWeek ?? 1) }

@@ -180,6 +180,37 @@ score is the count, a **tap-in** counts on the card and credits nobody, a **pena
 distinction the whole feature exists for. One phone keeps the card today; every hole carries
 `updatedAt` so sharing is a merge rule rather than a rewrite.
 
+Beside the round are **the two bets** (`SideContests.swift`): longest drive and closest to the pin,
+each switched on per card. Three rules hold the feature together, and the second and third are only
+obvious once the first is true:
+
+- **Par decides where a contest runs, and nothing else does.** A par five hosts a longest drive, a
+  par three a closest to the pin; there is no stored list of contest holes. There cannot be, because
+  par is corrected from the tee you are standing on (`ParChip`) — a list written at setup would be
+  wrong the moment the fourth turned out to be a three, and derived it is right the instant the par
+  is.
+- **So an award stores which contest it was**, not just who won. Par can move *under* a claim, and
+  an award that only said "Dan" would be silently reinterpreted as the other contest when it did.
+  Stored, it stops counting (hole 7 hosts nothing now) without being destroyed, and comes back
+  whole if the par comes back — the same posture as shortening a round to nine.
+- **Points are a second leaderboard, and stay off until asked for.** `PointValues` prices a shot
+  kept, a longest drive and a closest to the pin; `ScrambleTally.points` reads them. When they are
+  on they are the board the Tally tab shows *first*, because a group that sat down and priced a
+  closest to the pin did it to decide something, and the board that decides should not be the one
+  you have to tap to reach. Shots kept is the other half of one segmented control.
+
+Claiming one is a row of names under the hole header on the Round tab — tapping the name already on
+it takes it back, so claim, change and undo are one gesture with no mode to be in. It is drawn on a
+finished hole too, because an award changes no score and the argument about who was closest outlives
+the putt. The **Side games** card on the Tally tab is the separate component: a tile per contest
+hole, dashed while it is open, and every tile is a way back to that tee.
+
+**`ScrambleCard` and `HoleEntry` decode by hand, and every field added to them from here on must
+too.** Swift's synthesised decoder throws on a missing key rather than falling back to the
+property's default, and `CardCatalog.load` turns a throw into an empty catalogue — silently. A
+synthesised decoder on either of them would have deleted every round anybody had ever kept on the
+update that shipped `contests`, `points` and `awards`. `ScrambleTests` pins the old shape.
+
 A round reaches the other three as a **drawn card, not a paragraph** (`ShareCardView` rendered by
 `ImageRenderer` at 3x, previewed in `ShareCardSheet`): a result is text, a trophy is a picture, and
 a picture is what gets re-shared in a thread. It is also the only marketing this feature does, which
@@ -238,12 +269,14 @@ took last week. (A golf card has its own three; see above.)
   catalogue's last-opened order, or the pool you just switched to would jump to the front and
   left/right would shuffle under your thumb. The page reloads rather than slides: a pool is a
   session and a bootstrap, not a page.
-- **The web has no switcher, and stopped pretending to.** A pool *is* an address there: the Worker
-  serving a page serves exactly one, so a second pool is a second host, and browser storage is per
-  origin — a catalogue of them is not something a tab can hold. `PoolSheet` off the lockup names
-  the pool you are standing in and hands over to `PoolPlays` (join / start / what Tally plays),
-  which is one component behind three doors: that sheet, the account page and the fold at the
-  bottom of Home. The iOS app keeps a catalogue because it can talk to each host in turn.
+- **The web has no switcher at all, and the lockup opens nothing.** A pool *is* an address there:
+  the Worker serving a page serves exactly one, so a second pool is a second host, and browser
+  storage is per origin — a catalogue of them is not something a tab can hold. The lockup used to
+  open a sheet that named the one pool this origin serves and then offered to join another, which
+  is a switcher with nothing to switch to; it is a label now, the mark over the pool's name.
+  `PoolPlays` (join / start / what Tally plays) is one component behind the two doors that mean
+  something here: the account page, and the fold at the bottom of Home. The iOS app keeps a
+  catalogue because it can talk to each host in turn.
 - **The entry switcher is not in the navigation bar, on either surface.** It is `EntryPicker`, a
   row of names above the picks and above the board — the two places the answer changes anything —
   drawn only when there is more than one name. Home shows every entry already and Account manages
@@ -371,6 +404,16 @@ implementations phrase by phrase in both directions — reword one and it fails 
 It strips comments first, because the comments quote the sentences they explain. The same test
 holds the pairing on the number: before anything settles the *stake* leads ("15 to play"), because
 a big honest 0 is discouraging; after that the points lead with what is still out there behind them.
+
+The home page's weekly card follows the same instinct one level up. `previewWeek`
+(`src/lib/poolHome.ts`, mirrored by `PoolHome.previewWeek` in TallyKit) picks **the newest week
+that has kicked off**, not the newest week that has finished: `latestCompletedWeek` led with Week 1
+for the four days between Thursday night and Sunday afternoon of Week 2, so the game everybody had
+just watched went unmentioned on the page that exists to mention it. `final` is a separate fact —
+every game has a result — and only it may wear the `Final` chip and the words "results" and
+"Latest weekly winner"; a week in flight says "This week so far" behind an `In progress` chip. The
+chip was always the problem, not the week: a live board under a `Final` chip is a lie, a live board
+under an honest one is the most interesting thing on the page.
 
 ## Two offices, one PIN that is no longer a login
 

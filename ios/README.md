@@ -159,10 +159,40 @@ got picked. So the card is a list of strokes with a name on each, and the score 
   is right in a cart and wrong for the three seconds afterwards when somebody says that last one was
   Dan's. Tapping it stands you back on that hole, where *Reopen* is waiting.
 
+#### The two bets beside the round
+
+Switched on per card, in the setup sheet under *Side games* — **longest drive** on the par fives,
+**closest to the pin** on the par threes, each switch saying how many holes today's pars give it.
+A card with both off behaves exactly as it did before they existed.
+
+- **Which holes host one is decided by par, live.** There is no list of contest holes to fill in;
+  correcting the fourth to a three on the fourth tee makes it a closest-to-the-pin hole there and
+  then. Switching a contest off does not clear what was already claimed, and neither does a par
+  correction — the record survives and comes back with the par.
+- **Claiming one is a row of names under the hole header**, on the Round tab. Tapping the name
+  already on it takes it back, so claim, change and undo are the same gesture. Yellow while it is
+  unclaimed, green once it is. It is there on a finished hole too, because an award changes no
+  score and the argument outlives the putt.
+- **Points are a second leaderboard**, off until somebody switches it on, priced in the same
+  sheet: so much a shot kept, so much a longest drive, so much a closest to the pin. Zero is a
+  real value — set the shot to nothing and the board is purely the bets. When points are on the
+  Tally tab shows them first, with *Shots kept* one tap away on the same segmented control.
+- **Side games is its own card** under the leaderboard: a tile per contest hole, dashed while it
+  is open, solid with a name once it is taken, and every tile is a way back to that tee. The
+  scorecard marks the same holes `LD` / `CTP`, and the poster carries whoever took the most of
+  each.
+
 `TallyKit/Golf/` holds all of it and none of it draws: `ScrambleCard` (the record and every
-mutation), `ScrambleTally` (the leaderboard, initials, the word for a score, the shareable
-summary), `CardCatalog` (`UserDefaults`, plain JSON, ISO dates) and `RoundActivity` (what the lock
-screen shows). `ScrambleTests.swift` pins every rule above.
+mutation), `SideContests` (the two bets, their point values and a hole's award), `ScrambleTally`
+(both leaderboards, initials, the word for a score, the shareable summary), `CardCatalog`
+(`UserDefaults`, plain JSON, ISO dates) and `RoundActivity` (what the lock screen shows).
+`ScrambleTests.swift` pins every rule above.
+
+> **Adding a field to `ScrambleCard` or `HoleEntry`?** Decode it by hand with `decodeIfPresent`,
+> the way the ones already there do. Swift's synthesised decoder throws on a missing key instead
+> of using the property's default, and `CardCatalog.load` turns a throw into an empty catalogue —
+> so a synthesised decoder deletes every round on every phone, silently, on the update that ships
+> the field.
 
 **The round has a lock screen, and it needs no key.** `RoundLiveActivity` draws the hole, the team's
 score to par and the tally, and `RoundActivityService` starts it on the first stroke and ends it

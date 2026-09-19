@@ -26,6 +26,9 @@ struct RoundView: View {
                     LastHoleStrip(card: card, entry: last)
                 }
                 HoleHeader(card: card)
+                if let side = card.standing(on: card.currentHole) {
+                    ContestStrip(card: card, contest: side.contest, winner: side.winner)
+                }
                 StrokeStrip(card: card, entry: entry)
                 if entry.finished {
                     FinishedHoleCard(card: card, entry: entry)
@@ -164,6 +167,94 @@ private struct LastHoleStrip: View {
         .buttonStyle(.plain)
         .cardFlat(fill: .paper2)
         .accessibilityLabel("Hole \(entry.hole) is in: \(detail). Go back to it")
+    }
+}
+
+/**
+ The hole's side bet, claimed in one tap.
+
+ It sits directly under the hole header, above the strokes, because it is settled *before* the
+ team decides whose ball to play — everybody tees off, you walk up, and one drive is furthest.
+ Putting it below the name grid would have meant scrolling past the thing you are about to do.
+
+ One control, no modes: the names are always drawn and the claimed one is filled, so claiming,
+ changing your mind and taking it back are the same gesture. It is drawn on a finished hole too,
+ because an award changes no score — the argument about who was closest often outlives the putt.
+
+ Yellow while it is unclaimed and green once it is, which is the app's whole vocabulary for *wants
+ you* and *settled*, so the tee tells you at a glance whether anything is owed here.
+ */
+private struct ContestStrip: View {
+    @Environment(GolfModel.self) private var golf
+    let card: ScrambleCard
+    let contest: SideContest
+    let winner: GolfPlayer?
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(spacing: 8) {
+                Image(systemName: contest.symbol)
+                    .font(.system(size: 13, weight: .bold))
+                    .foregroundStyle(winner == nil ? Color.ink2 : Color.turf)
+                SectionLabel(text: contest.title)
+                Spacer(minLength: 4)
+                if winner != nil {
+                    Button("Clear") {
+                        Haptics.unpick()
+                        golf.award(contest, card: card.id, hole: card.currentHole, to: nil)
+                    }
+                    .buttonStyle(.tally(.ghost, size: .small))
+                }
+            }
+            Text(winner.map { "\($0.name) \(contest.took)." } ?? contest.prompt)
+                .sans(13, weight: winner == nil ? .semibold : .regular)
+                .foregroundStyle(winner == nil ? Color.ink : Color.ink2)
+                .fixedSize(horizontal: false, vertical: true)
+            FlowRow(spacing: 6, rowSpacing: 6) {
+                ForEach(card.players) { player in
+                    ContestPill(name: player.name, taken: player.id == winner?.id) {
+                        Haptics.pick()
+                        // Tapping the name already on it takes it back, so one control does
+                        // claim, change and undo without a mode to be in.
+                        let next: String? = player.id == winner?.id ? nil : player.id
+                        golf.award(contest, card: card.id, hole: card.currentHole, to: next)
+                    }
+                }
+            }
+        }
+        .padding(12)
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .cardFlat(fill: winner == nil ? .flagSoft : .turfSoft)
+        .animation(Motion.settle, value: winner?.id)
+    }
+}
+
+private struct ContestPill: View {
+    let name: String
+    let taken: Bool
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            HStack(spacing: 5) {
+                if taken {
+                    Image(systemName: "checkmark").font(.system(size: 10, weight: .black))
+                }
+                Text(name)
+                    .font(TallyFont.display(14, weight: .bold))
+                    .lineLimit(1)
+            }
+            .foregroundStyle(taken ? Color.onFill : Color.ink)
+            .padding(.horizontal, 12)
+            .padding(.vertical, 8)
+            .background(Capsule().fill(taken ? Color.turf : Color.surface))
+            .overlay(Capsule().strokeBorder(Color.ink, lineWidth: 2))
+            .contentShape(Capsule())
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel(name)
+        .accessibilityAddTraits(taken ? .isSelected : [])
+        .accessibilityHint(taken ? "Has it. Tap to take it back" : "Give it to them")
     }
 }
 

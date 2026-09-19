@@ -27,6 +27,8 @@ struct CardSetupSheet: View {
     @State private var pars: [Int] = CardSetupSheet.standardPars
     @State private var holeCount = 18
     @State private var showPars = false
+    @State private var contests = ContestRules.off
+    @State private var points = PointValues.standard
     @State private var loaded = false
     @State private var confirmDelete = false
 
@@ -59,6 +61,7 @@ struct CardSetupSheet: View {
                         players
                         round
                         if showPars { parGrid }
+                        sideGames
                         details
                         if !canSave {
                             Text(trimmed.count < 2
@@ -189,6 +192,71 @@ struct CardSetupSheet: View {
         }
     }
 
+    /**
+     The two bets beside the round, and what everything is worth.
+
+     Each switch says how many holes *today's pars* give it, which is the one number that makes
+     this decidable on a first tee: "on every par 5" is abstract, "4 holes today" is not, and it
+     moves as the pars are corrected. Turning a contest off is not a reset — the holes already
+     claimed keep their winners, exactly the way shortening a round to nine keeps the back — so a
+     switch flicked by accident costs nothing.
+
+     Points are their own switch because a second leaderboard is a second answer to "who won", and
+     a group that has not asked for one should not be handed it. The values survive the switch, so
+     turning it off to settle an argument and back on again does not lose what somebody typed.
+     */
+    private var sideGames: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionLabel(text: "Side games")
+            ForEach(SideContest.allCases, id: \.self) { contest in
+                SideGameSwitch(
+                    title: contest.title,
+                    symbol: contest.symbol,
+                    detail: "\(contest.runsOn) \(Format.plural(holesAtPar(contest.par), "hole")) today.",
+                    isOn: contests.runs(contest),
+                    onChange: { contests.set(contest, $0) }
+                )
+            }
+            DashedDivider()
+            SideGameSwitch(
+                title: "Keep points",
+                symbol: "number",
+                detail: "A second leaderboard, scored your way. The shots-kept board stays either way.",
+                isOn: points.enabled,
+                onChange: { points.enabled = $0 }
+            )
+            if points.enabled {
+                VStack(spacing: 10) {
+                    PointStepper(label: "A shot kept", value: $points.perShotKept)
+                    ForEach(SideContest.allCases, id: \.self) { contest in
+                        if contests.runs(contest) {
+                            PointStepper(
+                                label: contest.title,
+                                value: Binding(
+                                    get: { points.value(of: contest) },
+                                    set: { points.setValue($0, of: contest) }
+                                )
+                            )
+                        }
+                    }
+                }
+                .padding(12)
+                .cardFlat(fill: .paper2)
+                if !contests.any {
+                    Text("Nothing but shots kept is being counted — switch on a contest above and it gets a value here too.")
+                        .sans(12).foregroundStyle(Color.ink3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+        }
+    }
+
+    /// How many holes today's pars give a contest. Recomputed as the par grid is edited, which is
+    /// the point: the answer changes under you and the switch should say so.
+    private func holesAtPar(_ par: Int) -> Int {
+        pars.prefix(holeCount).filter { $0 == par }.count
+    }
+
     private var details: some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Details")
@@ -241,6 +309,8 @@ struct CardSetupSheet: View {
         course = editing.course
         rows = editing.players.map { PlayerDraft(player: $0.id, name: $0.name) }
         holeCount = editing.holeCount
+        contests = editing.contests
+        points = editing.points
         // The pars of a round that was shortened are kept, so lengthening it again finds them.
         pars = editing.pars.count >= 18 ? editing.pars : editing.pars + Array(CardSetupSheet.standardPars.dropFirst(editing.pars.count))
     }
@@ -270,6 +340,8 @@ struct CardSetupSheet: View {
             card.name = finalName
             card.course = course.trimmingCharacters(in: .whitespaces)
             card.pars = finalPars
+            card.contests = contests
+            card.points = points
             if !card.holeNumbers.contains(card.currentHole) { card.go(to: 1) }
             golf.save(card)
         } else {
@@ -277,7 +349,9 @@ struct CardSetupSheet: View {
                 name: finalName,
                 course: course.trimmingCharacters(in: .whitespaces),
                 players: trimmed.map { GolfPlayer(name: $0) },
-                pars: finalPars
+                pars: finalPars,
+                contests: contests,
+                points: points
             )
             golf.save(card)
             golf.tab = .round
@@ -285,5 +359,67 @@ struct CardSetupSheet: View {
             Haptics.lockedIn()
         }
         dismiss()
+    }
+}
+
+/// A labelled switch with the sentence that says what it actually does — the same shape the
+/// notification settings use, because a switch without its consequence beside it is a guess.
+private struct SideGameSwitch: View {
+    let title: String
+    let symbol: String
+    let detail: String
+    let isOn: Bool
+    let onChange: (Bool) -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: symbol)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(isOn ? Color.turf : Color.ink3)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(TallyFont.display(16))
+                Text(detail)
+                    .sans(12).foregroundStyle(Color.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            Toggle("", isOn: Binding(get: { isOn }, set: { value in
+                Haptics.tap()
+                onChange(value)
+            }))
+            .labelsHidden()
+            .tint(Color.turf)
+            .accessibilityLabel(title)
+            .accessibilityHint(detail)
+        }
+    }
+}
+
+/**
+ What one thing is worth.
+
+ A stepper rather than a text field: these are small whole numbers, the keyboard on a first tee is
+ the enemy, and `PointValues` clamps the range anyway — so the control may as well be the one that
+ cannot produce a number the model would refuse.
+ */
+private struct PointStepper: View {
+    let label: String
+    @Binding var value: Int
+
+    var body: some View {
+        Stepper(value: $value, in: PointValues.range) {
+            HStack(spacing: 8) {
+                Text(label).sans(14, weight: .semibold)
+                Spacer(minLength: 4)
+                Text("\(value)")
+                    .font(TallyFont.display(18))
+                    .monospacedDigit()
+                    .contentTransition(.numericText())
+                Text(value == 1 ? "point" : "points")
+                    .sans(11, weight: .bold).foregroundStyle(Color.ink3)
+            }
+        }
+        .accessibilityLabel("\(label), \(Format.plural(value, "point"))")
     }
 }

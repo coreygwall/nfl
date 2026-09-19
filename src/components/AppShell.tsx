@@ -4,8 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useBootstrap, useClaimPlayer } from "../api/queries.ts";
 import { usePlayer } from "../lib/player.tsx";
 import { useChrome } from "./Chrome.tsx";
-import { PoolPlays } from "./PoolPlays.tsx";
-import { ChevronDown, ChevronLeft, ChevronRight, Football, House, Megaphone, Swap, Trophy, User, X } from "./Icons.tsx";
+import { ChevronDown, ChevronLeft, ChevronRight, Football, House, Megaphone, Trophy, User, X } from "./Icons.tsx";
 import { useToast } from "./Toast.tsx";
 import { useOnline } from "../lib/online.ts";
 import { ThemeToggle } from "./ThemeControl.tsx";
@@ -23,7 +22,6 @@ export function AppShell() {
   const nav = useNavigate();
   const toast = useToast();
   const { navHidden, headerWeek, changeWeek } = useChrome();
-  const [poolSheet, setPoolSheet] = useState(false);
   const poolName = boot.data?.poolName ?? "High Five";
   const online = useOnline();
   const updateReady = !!boot.data && boot.data.build !== __BUILD_ID__ && __BUILD_ID__ !== "test";
@@ -134,21 +132,19 @@ export function AppShell() {
     <div className="relative mx-auto flex min-h-dvh w-full max-w-[1180px] flex-col">
       <header data-scrolled={scrolled} className="app-header sticky top-0 z-30 bg-paper/90 backdrop-blur">
         <div className="flex items-center gap-3 px-4 py-3 sm:px-6 sm:py-3.5 lg:px-8">
-          <button
-            type="button"
-            aria-label={`${poolName}. Switch pool`}
-            className="flex min-w-0 shrink-0 items-center gap-2.5 text-left"
-            onClick={() => setPoolSheet(true)}
-          >
+          {/* A label, and only a label. It used to open a sheet that named the one pool this
+              origin serves and then offered to join another — a switcher with nothing to switch
+              to, on the surface where switching is not something a tab can do at all. Joining and
+              starting live where they belong: the fold at the bottom of Home, and Account. */}
+          <div className="flex min-w-0 shrink-0 items-center gap-2.5">
             <img src="/icon.svg" alt="" className="h-10 w-10 shrink-0 sm:h-11 sm:w-11" />
             <span className="flex min-w-0 flex-col leading-none">
               <span className="font-display truncate text-[1.55rem] font-extrabold tracking-tight sm:text-[1.8rem]">Tally</span>
-              <span className="mt-1 flex items-center gap-1 truncate text-[0.68rem] font-bold uppercase tracking-[0.16em] text-ink-2 sm:text-[0.72rem]">
+              <span className="mt-1 truncate text-[0.68rem] font-bold uppercase tracking-[0.16em] text-ink-2 sm:text-[0.72rem]">
                 {poolName}
-                <Swap className="shrink-0 text-ink-3" size={11} />
               </span>
             </span>
-          </button>
+          </div>
           {player && !onWelcome && (
             <>
               <nav className="ml-4 hidden items-center gap-1 md:flex" aria-label="Primary navigation">
@@ -238,10 +234,6 @@ export function AppShell() {
           </div>
         </nav>
       )}
-
-      <AnimatePresence>
-        {poolSheet && <PoolSheet poolName={poolName} poolType={boot.data?.pool?.type} onClose={() => setPoolSheet(false)} />}
-      </AnimatePresence>
 
     </div>
   );
@@ -474,30 +466,3 @@ export function Sheet({
 }
 
 
-/**
- * What the lockup opens.
- *
- * It is not a switcher and stopped pretending to be one: on the web a pool *is* an address, so
- * the only pool this page can show you is the one you are standing in, and another pool is
- * another link. What is useful here is the rest of it — how to get into one, and what else Tally
- * plays — which is the same panel Home and the account page show, written once in `PoolPlays`.
- *
- * The iOS app does have a switcher, because it keeps a catalogue of pools on the device and can
- * talk to each host in turn. A browser tab cannot: storage is per origin, so a second pool's app
- * is a stranger to this one.
- */
-function PoolSheet({ poolName, poolType, onClose }: { poolName: string; poolType?: string; onClose: () => void }) {
-  return (
-    <Sheet title="Pools" onClose={onClose}>
-      <h3 className="font-display mb-2 text-sm font-extrabold uppercase tracking-wider text-ink-3">You're in</h3>
-      <div className="card-flat bg-surface p-3">
-        <div className="font-display truncate font-extrabold">{poolName}</div>
-        <div className="truncate text-xs text-ink-2">{poolType ?? "High Five"}</div>
-      </div>
-      <h3 className="font-display mb-2 mt-5 text-sm font-extrabold uppercase tracking-wider text-ink-3">
-        Join or start a pool
-      </h3>
-      <PoolPlays />
-    </Sheet>
-  );
-}
