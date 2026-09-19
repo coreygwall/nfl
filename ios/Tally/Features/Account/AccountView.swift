@@ -355,7 +355,7 @@ struct AccountView: View {
                 // support contact anyway. The subject arrives filled in so one inbox rule catches
                 // everything the app sends.
                 SettingsRow(title: "Get help", detail: "Something wrong, or an idea — write to Tally", symbol: "envelope.fill") {
-                    if let url = Contact.supportMailto("Tally support · \(version)") { openURL(url) }
+                    if let url = Contact.supportMailto(subject: "Tally support · \(version)") { openURL(url) }
                 }
                 SettingsDivider()
                 HStack(spacing: 12) {
