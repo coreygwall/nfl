@@ -35,7 +35,9 @@ final class GolfModel {
     let activity = RoundActivityService()
 
     /// The Worker, for cards that have been shared. Needs no session: the link is the credential.
-    private let sharing = GolfService()
+    /// Named `remote` rather than anything with *share* in it, because `sharing` above is already
+    /// the card the share sheet is looking at — two different meanings of one word in one object.
+    private let remote = GolfService()
     /// One pending push per card, so a burst of taps is one request rather than four.
     private var pushes: [String: Task<Void, Never>] = [:]
     /// Cards whose last push or pull failed. The screen says so rather than pretending.
@@ -71,7 +73,7 @@ final class GolfModel {
     func publish(cardId: String) async -> String? {
         guard let card = catalog.card(cardId) else { return nil }
         do {
-            let response = try await sharing.publish(card)
+            let response = try await remote.publish(card)
             absorb(response, into: cardId)
             unsynced.remove(cardId)
             return response.token
@@ -93,7 +95,7 @@ final class GolfModel {
         // pulling underneath it would only race with a better answer.
         guard pushes[cardId] == nil else { return }
         do {
-            absorb(try await sharing.fetch(token: token), into: cardId)
+            absorb(try await remote.fetch(token: token), into: cardId)
             unsynced.remove(cardId)
         } catch let error as APIError where error.status == 404 {
             // The card is gone from the server. The local copy is still a perfectly good round;
@@ -120,7 +122,7 @@ final class GolfModel {
         defer { pushes[cardId] = nil }
         guard let card = catalog.card(cardId), let token = card.shareToken else { return }
         do {
-            absorb(try await sharing.push(card, token: token), into: cardId)
+            absorb(try await remote.push(card, token: token), into: cardId)
             unsynced.remove(cardId)
         } catch {
             // The change is still on disk, so the next tap carries it. Saying nothing here is the

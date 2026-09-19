@@ -350,6 +350,10 @@ final class ScrambleTests: XCTestCase {
     /// Correcting a par is a settings change, so a shared card has to say so or keep losing it.
     func testCorrectingAParMovesTheSettingsClock() {
         var c = card()
+        // Backdated rather than read straight off `init`: two `Date()` calls a microsecond apart
+        // are not equal, but they are close enough that the assertion would be measuring the
+        // machine rather than the rule.
+        c.touchSettings(Date(timeIntervalSinceNow: -60))
         let before = c.settingsUpdatedAt
         c.setPar(3, on: 1)
         XCTAssertGreaterThan(c.settingsUpdatedAt, before)
