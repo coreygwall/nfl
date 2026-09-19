@@ -25,10 +25,12 @@ import Foundation
  corrected again. Same posture as shortening a round to nine: the record survives, the counting
  stops.
 
- **Points are off until somebody turns them on.** A second leaderboard nobody asked for is a second
- answer to "who won", and two answers is none. When they are on, the values are the group's:
- `PointValues.standard` is a point a shot and ten an award, which is the split that makes a
- contest worth about two holes of keeping.
+ **Points are off until somebody turns them on, and they are a pot.** A second leaderboard nobody
+ asked for is a second answer to "who won", and two answers is none. When they are on, a `Stake`
+ is what **every player puts in** each time a thing is won rather than what the winner scores —
+ `PointValues.standard` is ten a head on each contest and shots kept left out, because a group
+ switches points on *because* of the side games and putting a stake on every shot the team keeps
+ is the unusual choice rather than the assumed one.
  */
 public enum SideContest: String, Codable, Hashable, Sendable, CaseIterable {
     /// The par fives. Everybody hits, and one of them went furthest.
