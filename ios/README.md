@@ -173,10 +173,14 @@ A card with both off behaves exactly as it did before they existed.
   already on it takes it back, so claim, change and undo are the same gesture. Yellow while it is
   unclaimed, green once it is. It is there on a finished hole too, because an award changes no
   score and the argument outlives the putt.
-- **Points are a second leaderboard**, off until somebody switches it on, priced in the same
-  sheet: so much a shot kept, so much a longest drive, so much a closest to the pin. Zero is a
-  real value — set the shot to nothing and the board is purely the bets. When points are on the
-  Tally tab shows them first, with *Shots kept* one tap away on the same segmented control.
+- **Points are a pot.** Off until somebody switches it on, then a stake per thing in the same
+  sheet — and a stake is what **every player puts in**, not what the winner scores. Ten each on
+  the closest to the pin, four playing: the winner is +30 and the other three are −10. The board
+  is therefore signed and adds to zero, and only holes somebody has actually claimed settle.
+  Each of the three has its own switch, so a group that does not want to play for the shots the
+  team keeps just leaves that one off. Every stepper says *each*, and the line under it works out
+  what a win is worth for the number of names currently on the card. When points are on the Tally
+  tab shows them first, with *Shots kept* one tap away on the same segmented control.
 - **Side games is its own card** under the leaderboard: a tile per contest hole, dashed while it
   is open, solid with a name once it is taken, and every tile is a way back to that tee. The
   scorecard marks the same holes `LD` / `CTP`, and the poster carries whoever took the most of

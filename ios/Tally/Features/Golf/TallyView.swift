@@ -158,25 +158,35 @@ private struct TallyRowCard: View {
 // MARK: Points
 
 /**
- The board a group priced for itself.
+ The board a group priced for itself, settled as a pot.
 
- The row carries the *counts* and the total, and the arithmetic between them is said once
- underneath rather than on every line — it is the same on every line, and a row that shows its own
- working is a row with no room for a name. A leading zero is still a row: somebody who has not
- scored yet is in the round, and a board that hides them is a board somebody has to count on their
- fingers.
+ Every line is a **net**, so the column adds to nothing and half of it is usually negative. That is
+ the point: a prize board makes everybody a winner by some amount, and this one says who is buying.
+ A zero is a real answer too — somebody who took nothing and paid nothing because nothing they are
+ in has been claimed yet.
+
+ The row carries the counts and the total; the arithmetic between them is said once underneath,
+ because it is the same on every line and a row that shows its own working has no room for a name.
+ A negative row gets one extra thing the positive rows do not need: what it won and what it put in,
+ because "−40" on its own reads like a mistake until you can see it is 0 won and 40 in.
  */
 private struct PointsBoard: View {
     let card: ScrambleCard
 
     var body: some View {
         let rows = ScrambleTally.points(card)
+        let live = card.points.playing(card.contests)
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Points")
-            if rows.allSatisfy({ $0.points == 0 }) {
+            if live.isEmpty {
                 EmptyState(
-                    title: "Nothing on the board yet",
-                    body: "Keep a shot on the Round tab, or hand somebody a hole's side game, and this fills in."
+                    title: "Nothing is being played for",
+                    body: "Open the card's settings and put a stake on a shot kept, a longest drive or a closest to the pin."
+                )
+            } else if rows.allSatisfy({ $0.points == 0 }) {
+                EmptyState(
+                    title: "Nobody is up or down yet",
+                    body: "Keep a shot on the Round tab, or hand somebody a hole's side game, and the pot starts moving."
                 )
             } else {
                 ForEach(Array(rows.enumerated()), id: \.element.id) { index, row in
@@ -184,9 +194,14 @@ private struct PointsBoard: View {
                         .dealt(index)
                 }
             }
-            Text(ScrambleTally.pointsLine(card))
-                .sans(12).foregroundStyle(Color.ink3)
-                .fixedSize(horizontal: false, vertical: true)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(ScrambleTally.pointsLine(card))
+                if !live.isEmpty {
+                    Text("Everybody puts that in each time. It adds up to nothing overall — what one person is up, the rest are down.")
+                }
+            }
+            .sans(12).foregroundStyle(Color.ink3)
+            .fixedSize(horizontal: false, vertical: true)
         }
     }
 }
@@ -196,31 +211,48 @@ private struct PointsRowCard: View {
     let card: ScrambleCard
     let leader: Bool
 
-    /// Where the points came from, in the order they are worth arguing about.
+    /// What they took, in the order worth arguing about.
     private var breakdown: String {
         var parts: [String] = []
-        if card.points.perShotKept > 0 || row.kept > 0 { parts.append("\(row.kept) kept") }
-        for contest in card.contests.playing where row.wins(contest) > 0 {
-            parts.append("\(row.wins(contest))× \(contest.initials)")
+        for item in card.points.playing(card.contests) where row.wins(item) > 0 {
+            parts.append(item == .shotKept ? "\(row.kept) kept" : "\(row.wins(item))× \(item.contest?.initials ?? "")")
         }
-        return parts.isEmpty ? "nothing yet" : parts.joined(separator: " · ")
+        if parts.isEmpty { return row.paid > 0 ? "nothing taken yet" : "nothing yet" }
+        return parts.joined(separator: " · ")
+    }
+
+    /// Only drawn when somebody is down, because that is the number that looks like a bug until
+    /// its two halves are visible.
+    private var ledger: String? {
+        guard row.points < 0 else { return nil }
+        return "\(row.won) won · \(row.paid) in"
+    }
+
+    private var tone: Color {
+        if row.points > 0 { return .turf }
+        if row.points < 0 { return .danger }
+        return .ink3
     }
 
     var body: some View {
         HStack(spacing: 12) {
-            PlaceBadge(place: row.place, muted: row.points == 0)
+            PlaceBadge(place: row.place, muted: row.points <= 0)
             VStack(alignment: .leading, spacing: 2) {
                 HStack(spacing: 6) {
                     Text(row.player.name).font(TallyFont.display(17)).lineLimit(1)
-                    if leader { Chip(text: "leading", fill: .flag, size: 10, label: .onAccent) }
+                    if leader { Chip(text: "up most", fill: .flag, size: 10, label: .onAccent) }
                 }
                 Text(breakdown).sans(12).foregroundStyle(Color.ink2).lineLimit(1)
+                if let ledger {
+                    Text(ledger).sans(11).foregroundStyle(Color.ink3).lineLimit(1)
+                }
             }
             Spacer()
             VStack(alignment: .trailing, spacing: 0) {
-                Text("\(row.points)")
+                Text(ScrambleTally.netText(row.points))
                     .font(TallyFont.display(30))
                     .monospacedDigit()
+                    .foregroundStyle(tone)
                     .contentTransition(.numericText())
                     .animation(Motion.settle, value: row.points)
                 Text("POINTS").font(TallyFont.sans(10, weight: .bold)).tracking(1).foregroundStyle(Color.ink3)
@@ -230,7 +262,12 @@ private struct PointsRowCard: View {
         .frame(maxWidth: .infinity)
         .modifier(TallyCard(hard: leader, fill: leader ? .flagSoft : .surface, border: .cardBorder, radius: TallyRadius.card, dashed: false))
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("\(row.player.name), \(Format.plural(row.points, "point")), \(breakdown)")
+        .accessibilityLabel(label)
+    }
+
+    private var label: String {
+        let net = row.points == 0 ? "level" : row.points > 0 ? "up \(row.points)" : "down \(-row.points)"
+        return "\(row.player.name), \(net), \(breakdown)"
     }
 }
 
