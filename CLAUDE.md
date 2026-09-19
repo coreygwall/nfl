@@ -331,6 +331,21 @@ light weights the dark cut nearly closed. The icon script, `TallyGlyph` and `Tal
 carry both sets; change one and change all three. The tee is what makes the golf ball legible at
 22pt: a bare ball is a circle with specks on it.
 
+**A hole closes into three things at once, and one of them is not in the repo.** The swipe stamps
+the word, buzzes a pattern shaped by the score (`Haptics.holed(toPar:)` — four steps, because four
+is what somebody can tell apart through a cart holder) and calls the score out loud. The voice is
+recordings, not synthesis, and `ios/Tally/Resources/Calls/` is empty: the **file name is the whole
+wiring**, so `birdie.m4a` makes the app say birdie with no code change, and a word with no file is
+silent. Silence is the working state — a placeholder beep would have shipped and then become the
+sound the app makes — which is also why the mute row only appears in the card menu once a recording
+exists. `ScrambleTally.callNames` folds everything past a double bogey into one `worse`, because
+there is no recording of "+5". Two things about the audio session are decisions rather than
+defaults: the category is `.ambient` because the default `.soloAmbient` **pauses whatever is
+playing in the cart**, and `.ambient` also means the ring/silent switch wins — ducking is legal
+only on `.playback`, which overrides that switch, so the duck and the override are one choice and
+not two. `RoundView` holds the stamp for the length of the clip (capped) so the next tee does not
+slide up over the end of a word.
+
 The round's Live Activity is the one lock screen in the app that **needs no APNs key**: a scramble
 has no feed, so every change is a tap in this app and `RoundActivityService` updates the activity
 itself with `pushType` left nil. Do not give it a token it would never use. It starts on the first

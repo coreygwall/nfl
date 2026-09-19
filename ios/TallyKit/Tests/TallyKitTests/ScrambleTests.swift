@@ -1219,4 +1219,58 @@ final class RoundDeepLinkTests: XCTestCase {
         let bare = URL(string: "https://playtally.app/golf")!
         XCTAssertNil(RoundActivityAttributes.cardId(in: bare))
     }
+
+    // MARK: Calling the score
+
+    /**
+     The name of the recording is the whole wiring, so these are the filenames on disk.
+
+     A rename here is somebody's voice going silent in an app that still looks like it is working,
+     which is the kind of break nobody reports and nobody finds — so the mapping is pinned score by
+     score rather than left to read correctly.
+     */
+    func testEveryScoreIsCalledByAName() {
+        XCTAssertEqual(ScrambleTally.callName(score: 1, par: 4), "ace")
+        XCTAssertEqual(ScrambleTally.callName(score: 1, par: 3), "ace")
+        XCTAssertEqual(ScrambleTally.callName(score: 2, par: 5), "albatross")
+        XCTAssertEqual(ScrambleTally.callName(score: 3, par: 5), "eagle")
+        XCTAssertEqual(ScrambleTally.callName(score: 3, par: 4), "birdie")
+        XCTAssertEqual(ScrambleTally.callName(score: 4, par: 4), "par")
+        XCTAssertEqual(ScrambleTally.callName(score: 5, par: 4), "bogey")
+        XCTAssertEqual(ScrambleTally.callName(score: 6, par: 4), "double")
+    }
+
+    /// `label` runs off into "+3", "+4", "+9"; there is no recording of any of those. The tail is
+    /// one word so a hole always has exactly one sound to reach for.
+    func testTheWholeBadTailIsOneWord() {
+        for over in 3...12 {
+            XCTAssertEqual(ScrambleTally.callName(score: 4 + over, par: 4), "worse", "\(over) over")
+        }
+    }
+
+    /// Nothing may be called a name the folder does not document. Every score on every par a
+    /// course can hold, against the one list.
+    func testACallIsAlwaysOneOfTheNamesOnTheList() {
+        for par in 3...6 {
+            for score in 1...15 {
+                let name = ScrambleTally.callName(score: score, par: par)
+                XCTAssertTrue(
+                    ScrambleTally.callNames.contains(name),
+                    "\(score) on a par \(par) is called \(name), which is not a file anybody has been asked for"
+                )
+            }
+        }
+    }
+
+    /// The two vocabularies agree wherever both have a word: what is stamped on the screen is what
+    /// the voice says, or the app is saying one thing and showing another.
+    func testTheCallMatchesTheWordOnScreen() {
+        for par in 3...5 {
+            for score in 1...15 {
+                let word = ScrambleTally.label(score: score, par: par)
+                guard ScrambleTally.callNames.contains(word) else { continue }
+                XCTAssertEqual(ScrambleTally.callName(score: score, par: par), word)
+            }
+        }
+    }
 }

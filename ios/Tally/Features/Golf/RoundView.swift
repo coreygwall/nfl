@@ -57,20 +57,30 @@ struct RoundView: View {
     }
 
     /**
-     The hole is in: stamp it, then move on.
+     The hole is in: say it, stamp it, then move on.
 
-     The swipe finishes the hole without advancing, the word comes down over the page (birdie in
-     turf, anything else in ink), and a beat later the card steps to the next tee on its own —
+     The swipe finishes the hole without advancing and three things land together — the word over
+     the page (birdie in turf, anything else in ink), a buzz shaped by the score, and the score
+     called out loud if there is a recording of it. Then the card steps to the next tee on its own,
      nothing to tap, which was the ask. `advance(card:from:)` is guarded by the hole, so if
      somebody has already flicked to another tee in that beat they are not moved twice.
+
+     The stamp waits for the voice rather than the other way round. A recording is whatever length
+     somebody said it, so a fixed beat would cut off a long "biiiirdie" with the next tee sliding
+     up underneath it; `Calls.hole` hands back the length and the stamp outlasts it by a breath.
+     The floor is the beat it has always been — silence must not make the round feel hurried — and
+     the ceiling is there because a recording is a mistake away from being thirty seconds long, and
+     a party trick should not be able to stop the group keeping score.
      */
     private func stamped(_ done: HoleEntry, on card: ScrambleCard) {
         let par = card.par(done.hole)
         let word = ScrambleTally.label(score: done.score, par: par)
         stamp = HoleStamp(text: word, under: done.score < par)
-        if done.score < par { Haptics.won() } else { Haptics.lockedIn() }
+        Haptics.holed(toPar: done.score - par)
+        let spoken = Calls.hole(score: done.score, par: par) ?? 0
+        let hold = min(max(1.15, spoken + 0.35), 4)
         Task { @MainActor in
-            try? await Task.sleep(for: .seconds(1.15))
+            try? await Task.sleep(for: .seconds(hold))
             stamp = nil
             golf.advance(card: card.id, from: done.hole)
         }

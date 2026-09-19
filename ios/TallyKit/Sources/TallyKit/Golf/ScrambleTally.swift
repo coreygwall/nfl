@@ -398,6 +398,25 @@ public enum ScrambleTally {
         return n < 0 ? "−\(-n)" : "+\(n)"
     }
 
+    /**
+     Every word a finished hole can be *called*, which is a shorter list than the words it can be
+     labelled with.
+
+     `label` runs off the end into a bare number — a quintuple bogey is "+5" — and there is no
+     recording of "+5", nor should there be. `callName` folds that whole tail into one word so a
+     hole always has exactly one sound to reach for, and this is the list of the sounds. It is the
+     naming rule for the files themselves: a recording is one of these words plus a format, so
+     `birdie.m4a` is the birdie. Nothing matches by score, which means a file can be added or
+     replaced without touching a line of code.
+     */
+    public static let callNames = ["ace", "albatross", "eagle", "birdie", "par", "bogey", "double", "worse"]
+
+    /// Which of `callNames` this hole is. Always one of them, for any score on any par.
+    public static func callName(score: Int, par: Int) -> String {
+        let word = label(score: score, par: par)
+        return callNames.contains(word) ? word : "worse"
+    }
+
     /// The word for a finished hole's score. Anything past a double bogey is just the number.
     public static func label(score: Int, par: Int) -> String {
         switch score - par {
