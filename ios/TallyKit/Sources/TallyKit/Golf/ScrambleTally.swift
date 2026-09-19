@@ -34,13 +34,23 @@ public struct ContestResult: Hashable, Identifiable, Sendable {
     public var claimed: Bool { winner != nil }
 }
 
-/// One line of the points board: the three things that earn, and what they came to.
+/**
+ One line of the points board: what somebody won, what they put in, and the difference.
+
+ `points` is a **net**, so it is signed and the column adds to nothing. That is the whole reason
+ the board is worth keeping: a prize board makes everybody a winner by some amount, and a pot says
+ who is buying.
+ */
 public struct PointsRow: Hashable, Identifiable, Sendable {
     public let player: GolfPlayer
     public let kept: Int
     public let longestDrives: Int
     public let closestToPins: Int
-    /// Those three at this card's values. The number the board is sorted by.
+    /// Collected from the others, across everything they won.
+    public let won: Int
+    /// Put in on everything somebody else won.
+    public let paid: Int
+    /// `won - paid`. Negative is a real answer. The number the board is sorted by.
     public let points: Int
     /// 1-based, and shared on a tie, the same rule the shots-kept board follows.
     public let place: Int
@@ -49,6 +59,14 @@ public struct PointsRow: Hashable, Identifiable, Sendable {
 
     public func wins(_ contest: SideContest) -> Int {
         switch contest {
+        case .longestDrive: return longestDrives
+        case .closestToPin: return closestToPins
+        }
+    }
+
+    public func wins(_ item: WagerItem) -> Int {
+        switch item {
+        case .shotKept: return kept
         case .longestDrive: return longestDrives
         case .closestToPin: return closestToPins
         }
@@ -201,48 +219,81 @@ public enum ScrambleTally {
     }
 
     /**
-     The points board.
+     The points board, settled as a pot.
+
+     Every item being played is a bet everybody is in: a stake of ten on the closest to the pin
+     means all four players put ten in on every par three, and whoever is nearest the flag takes
+     the other three tens. So a win is worth `each × (players − 1)` to the winner and `each` to
+     everybody else, and **the column adds to zero** — which `ScrambleTests` pins, because a board
+     that does not is a board somebody will have to settle with a calculator.
+
+     Only what has actually been *claimed* is settled. An unclaimed par three has no pot: nobody
+     has put anything in on a bet nobody has won yet, and showing it as money already lost would be
+     asking people to pay for a hole that is still in front of them.
 
      Built even when `points.enabled` is off, because the board is a reading of the card rather
-     than a setting — the screen decides whether to draw it. Sorted by points, then by the awards
-     that are hardest to get (closest, then longest), then by shots kept, then by name; the
-     *place* is shared on equal points alone, so a tie on the number stays a tie the way it does
-     on the other board.
+     than a setting — the screen decides whether to draw it.
      */
     public static func points(_ card: ScrambleCard) -> [PointsRow] {
         let values = card.points
+        let playing = values.playing(card.contests)
+        let players = card.players.count
         let kept = Dictionary(uniqueKeysWithValues: rows(card).map { ($0.id, $0.kept) })
-        var wins: [SideContest: [String: Int]] = [:]
+
+        // How many of each item every player has taken, and how many have been taken at all. The
+        // second is what everybody else pays into, so it is counted once rather than per player.
+        var wins: [WagerItem: [String: Int]] = [.shotKept: kept]
+        var claimed: [WagerItem: Int] = [.shotKept: kept.values.reduce(0, +)]
         for result in contestResults(card) {
+            let item = WagerItem(result.contest)
             guard let winner = result.winner else { continue }
-            wins[result.contest, default: [:]][winner.id, default: 0] += 1
+            wins[item, default: [:]][winner.id, default: 0] += 1
+            claimed[item, default: 0] += 1
         }
-        func won(_ contest: SideContest, _ id: String) -> Int { wins[contest]?[id] ?? 0 }
-        func total(_ id: String) -> Int {
-            kept[id, default: 0] * values.perShotKept
-                + won(.longestDrive, id) * values.perLongestDrive
-                + won(.closestToPin, id) * values.perClosestToPin
+        func mine(_ item: WagerItem, _ id: String) -> Int { wins[item]?[id] ?? 0 }
+
+        func settle(_ id: String) -> (won: Int, paid: Int) {
+            var won = 0
+            var paid = 0
+            for item in playing {
+                let stake = values[item]
+                let taken = mine(item, id)
+                won += taken * stake.winnings(players: players)
+                // Everything somebody else won is a stake this player put in and did not take back.
+                paid += (claimed[item, default: 0] - taken) * stake.each
+            }
+            return (won, paid)
         }
+
+        let net = Dictionary(uniqueKeysWithValues: card.players.map { player -> (String, Int) in
+            let s = settle(player.id)
+            return (player.id, s.won - s.paid)
+        })
+
         let sorted = card.players.sorted { a, b in
-            let pa = total(a.id), pb = total(b.id)
+            let pa = net[a.id, default: 0], pb = net[b.id, default: 0]
             if pa != pb { return pa > pb }
-            let ca = won(.closestToPin, a.id), cb = won(.closestToPin, b.id)
+            let ca = mine(.closestToPin, a.id), cb = mine(.closestToPin, b.id)
             if ca != cb { return ca > cb }
-            let la = won(.longestDrive, a.id), lb = won(.longestDrive, b.id)
+            let la = mine(.longestDrive, a.id), lb = mine(.longestDrive, b.id)
             if la != lb { return la > lb }
             let ka = kept[a.id, default: 0], kb = kept[b.id, default: 0]
             if ka != kb { return ka > kb }
             return a.name.localizedCaseInsensitiveCompare(b.name) == .orderedAscending
         }
+
         var out: [PointsRow] = []
         for (index, player) in sorted.enumerated() {
-            let p = total(player.id)
+            let s = settle(player.id)
+            let p = s.won - s.paid
             let place = index > 0 && out[index - 1].points == p ? out[index - 1].place : index + 1
             out.append(PointsRow(
                 player: player,
                 kept: kept[player.id, default: 0],
-                longestDrives: won(.longestDrive, player.id),
-                closestToPins: won(.closestToPin, player.id),
+                longestDrives: mine(.longestDrive, player.id),
+                closestToPins: mine(.closestToPin, player.id),
+                won: s.won,
+                paid: s.paid,
                 points: p,
                 place: place
             ))
@@ -250,22 +301,33 @@ public enum ScrambleTally {
         return out
     }
 
-    /**
-     What everything is worth, in one line, mentioning only what this card is actually playing.
+    /// "+30", "−10", "0" — a net, with a real minus sign and an explicit plus, because the sign is
+    /// the entire point of this column.
+    public static func netText(_ n: Int) -> String {
+        if n == 0 { return "0" }
+        return n < 0 ? "−\(-n)" : "+\(n)"
+    }
 
-     "1 a shot kept · 10 a long drive · 10 a closest". Said once under the board rather than
-     spelled out on every row: the row's job is the count and the total, and the arithmetic
-     between them is the same on every row.
+    /**
+     What everybody is in for, in one line, mentioning only what this card is actually playing.
+
+     "10 each on a closest to the pin · 10 each on a longest drive". The stake is said rather than
+     the prize because the stake is what a person is agreeing to; what a win is worth falls out of
+     how many are playing, and `winningsLine` says that separately for the one number people ask
+     about on the first tee.
      */
     public static func pointsLine(_ card: ScrambleCard) -> String {
-        let values = card.points
-        var parts: [String] = []
-        if values.perShotKept > 0 { parts.append("\(values.perShotKept) a shot kept") }
-        for contest in card.contests.playing where values.value(of: contest) > 0 {
-            parts.append("\(values.value(of: contest)) a \(contest == .longestDrive ? "long drive" : "closest")")
-        }
-        guard !parts.isEmpty else { return "Nothing is worth anything yet." }
-        return parts.joined(separator: " · ")
+        let playing = card.points.playing(card.contests)
+        guard !playing.isEmpty else { return "Nothing is being played for yet." }
+        return playing.map { "\(card.points[$0].each) each on \($0.unit)" }.joined(separator: " · ")
+    }
+
+    /// "Worth 30 to whoever takes it, 10 from each of the other 3." Written for the tee, where the
+    /// question is always what a win is actually worth — and the row above already names the bet.
+    public static func winningsLine(stake: Stake, players: Int) -> String {
+        let others = max(players - 1, 0)
+        guard others > 0, stake.each > 0 else { return "Nobody else to play it with yet." }
+        return "Worth \(stake.winnings(players: players)) to whoever takes it, \(stake.each) from each of the other \(others)."
     }
 
     /**
@@ -316,11 +378,11 @@ public enum ScrambleTally {
 
         if card.points.enabled {
             let board = points(card)
-            if board.contains(where: { $0.points > 0 }) {
+            if board.contains(where: { $0.points != 0 }) {
                 lines.append("")
-                lines.append("Points (\(pointsLine(card)))")
+                lines.append("Points · \(pointsLine(card))")
                 for row in board {
-                    lines.append("\(row.place). \(row.player.name) — \(row.points)")
+                    lines.append("\(row.place). \(row.player.name) — \(netText(row.points))")
                 }
             }
         }

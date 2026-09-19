@@ -193,11 +193,43 @@ obvious once the first is true:
   an award that only said "Dan" would be silently reinterpreted as the other contest when it did.
   Stored, it stops counting (hole 7 hosts nothing now) without being destroyed, and comes back
   whole if the par comes back — the same posture as shortening a round to nine.
-- **Points are a second leaderboard, and stay off until asked for.** `PointValues` prices a shot
-  kept, a longest drive and a closest to the pin; `ScrambleTally.points` reads them. When they are
-  on they are the board the Tally tab shows *first*, because a group that sat down and priced a
-  closest to the pin did it to decide something, and the board that decides should not be the one
-  you have to tap to reach. Shots kept is the other half of one segmented control.
+- **Points are a pot, not a prize.** A `Stake` of ten on the closest to the pin means every player
+  puts ten in on every par three and whoever is nearest takes the lot: four playing, the winner is
+  **+30** and the other three are −10 apiece. `ScrambleTally.points` settles it, so a row is a
+  signed net and **the column adds to zero** — which `ScrambleTests` pins, because a board that
+  does not is one somebody has to settle with a calculator. Only *claimed* holes settle: an
+  unclaimed par three has no pot, and charging for it would be asking people to pay for a hole
+  still in front of them.
+  The first shape of this was one Int an item meaning "the winner scores this much", which is a
+  different game — nobody could lose, and a player who took nothing finished level with a player
+  who was not there. `PointValues.init(from:)` migrates those numbers into stakes (the number
+  typed becomes the stake, a zero comes back switched off).
+  Each of the three things has **its own switch** (`WagerItem`: a shot kept, a longest drive, a
+  closest to the pin), because "I don't want to play for shots kept" is a normal thing to want and
+  a stake of zero is not the same sentence as not being in the game. The setup sheet says **each**
+  on every stepper and works the arithmetic out loud underneath for the number of names currently
+  on the card — the difference between "10 to the winner" and "10 from everybody" is the whole
+  feature, and a bare "10" reads as the first one.
+  When points are on they are the board the Tally tab shows *first*, because a group that sat down
+  and priced a closest to the pin did it to decide something, and the board that decides should not
+  be the one you have to tap to reach. Shots kept is the other half of one segmented control.
+
+**A stroke on the Round tab is a menu, and the correction it makes is the one people actually
+make**: "that was Dan's, not Pete's", noticed once the hole is in and the tally has moved.
+`ScrambleCard.reassign` swaps the name (or makes it a penalty / nobody's) on the same stroke id,
+and is allowed on a finished hole because the count — the score — does not change; `remove` takes a
+stroke out of the middle and is refused on a finished hole for the same reason `record` is, so the
+posture is one rule: anything that moves the score needs Reopen first, anything that only moves a
+mark does not. Before this the fix was Reopen, Undo back past the stroke and re-enter everything
+after it. The finishing button also names who it is about to credit ("Dan holed it") — a bare
+*Holed it* was a guess about the one fact the card exists to get right — and it does not finish
+the hole: it opens a **review** (`HoleReviewCard`: the score and its word, each name's shots on
+the hole, how the ball went in, the side game or the yellow note that nobody has been named for
+it) and the hole closes on a **swipe**, the pool's `SlideToLock` with golf's words on it, because
+a swipe is a decision and a tap is a reflex. `finishHole(advance: false)` then `advance(card:from:)`
+are deliberately two calls so the word can be stamped over the page for a beat before the next tee
+slides up on its own; the second is guarded by the hole so a stamp landing late never moves
+somebody twice.
 
 Claiming one is a row of names under the hole header on the Round tab — tapping the name already on
 it takes it back, so claim, change and undo are one gesture with no mode to be in. It is drawn on a
