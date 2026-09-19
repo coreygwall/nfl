@@ -61,7 +61,10 @@ test.describe.serial("pool flow", () => {
     await welcome.getByRole("button", { name: "Not now — start picking →" }).click();
     await expect(page).toHaveURL(/\/week\/1$/);
     await expect(page.locator('header img[src="/icon.svg"]')).toBeVisible();
-    await expect(page.getByRole("button", { name: "High Five. Switch pool" })).toBeVisible();
+    await expect(page.locator("header").getByText("High Five", { exact: true })).toBeVisible();
+    // The lockup is a label, not a control: on the web a pool *is* an address, so the sheet it
+    // used to open could only ever name the one pool this origin serves.
+    await expect(page.getByRole("button", { name: /switch pool/i })).toHaveCount(0);
     await expect(page.getByText("No weekly deadline")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Pick 5 winners" })).toBeVisible();
 
@@ -72,14 +75,12 @@ test.describe.serial("pool flow", () => {
     await expect(page.getByRole("heading", { name: "Explore the pool" })).toBeVisible();
     await expect(page.getByRole("link", { name: /Season standings/ })).toBeVisible();
     await expect(page.getByRole("link", { name: "Week 1", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "High Five. Switch pool" }).click();
-    const pools = page.getByRole("dialog", { name: "Pools" });
-    // The lockup is not a switcher here and has stopped pretending to be one: on the web a pool is
-    // an address, so this names the one you are standing in and says how to get into another.
-    await expect(pools.getByText("High Five").first()).toBeVisible();
-    await expect(pools.getByRole("heading", { name: "Join a pool" })).toBeVisible();
-    await pools.getByRole("button", { name: "Close" }).click();
-    await expect(pools).toBeHidden();
+    // The lockup opens nothing at all now. Joining lives in the fold at the bottom of Home, which
+    // is the only place on this surface where "another pool" means anything: a pool is an address
+    // here, so the sheet the lockup used to open could only ever name the one you are already in.
+    await expect(page.getByRole("button", { name: /switch pool/i })).toHaveCount(0);
+    await page.getByRole("button", { name: "Join or start a pool" }).click();
+    await expect(page.getByRole("heading", { name: "Join a pool" })).toBeVisible();
 
     // Account is a tab now, not a chip in the header. The offices behind it — a commissioner's and
     // the league's — were routes with nothing in the app linking to them.

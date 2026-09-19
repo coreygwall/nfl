@@ -238,12 +238,14 @@ took last week. (A golf card has its own three; see above.)
   catalogue's last-opened order, or the pool you just switched to would jump to the front and
   left/right would shuffle under your thumb. The page reloads rather than slides: a pool is a
   session and a bootstrap, not a page.
-- **The web has no switcher, and stopped pretending to.** A pool *is* an address there: the Worker
-  serving a page serves exactly one, so a second pool is a second host, and browser storage is per
-  origin — a catalogue of them is not something a tab can hold. `PoolSheet` off the lockup names
-  the pool you are standing in and hands over to `PoolPlays` (join / start / what Tally plays),
-  which is one component behind three doors: that sheet, the account page and the fold at the
-  bottom of Home. The iOS app keeps a catalogue because it can talk to each host in turn.
+- **The web has no switcher at all, and the lockup opens nothing.** A pool *is* an address there:
+  the Worker serving a page serves exactly one, so a second pool is a second host, and browser
+  storage is per origin — a catalogue of them is not something a tab can hold. The lockup used to
+  open a sheet that named the one pool this origin serves and then offered to join another, which
+  is a switcher with nothing to switch to; it is a label now, the mark over the pool's name.
+  `PoolPlays` (join / start / what Tally plays) is one component behind the two doors that mean
+  something here: the account page, and the fold at the bottom of Home. The iOS app keeps a
+  catalogue because it can talk to each host in turn.
 - **The entry switcher is not in the navigation bar, on either surface.** It is `EntryPicker`, a
   row of names above the picks and above the board — the two places the answer changes anything —
   drawn only when there is more than one name. Home shows every entry already and Account manages
@@ -371,6 +373,16 @@ implementations phrase by phrase in both directions — reword one and it fails 
 It strips comments first, because the comments quote the sentences they explain. The same test
 holds the pairing on the number: before anything settles the *stake* leads ("15 to play"), because
 a big honest 0 is discouraging; after that the points lead with what is still out there behind them.
+
+The home page's weekly card follows the same instinct one level up. `previewWeek`
+(`src/lib/poolHome.ts`, mirrored by `PoolHome.previewWeek` in TallyKit) picks **the newest week
+that has kicked off**, not the newest week that has finished: `latestCompletedWeek` led with Week 1
+for the four days between Thursday night and Sunday afternoon of Week 2, so the game everybody had
+just watched went unmentioned on the page that exists to mention it. `final` is a separate fact —
+every game has a result — and only it may wear the `Final` chip and the words "results" and
+"Latest weekly winner"; a week in flight says "This week so far" behind an `In progress` chip. The
+chip was always the problem, not the week: a live board under a `Final` chip is a lie, a live board
+under an honest one is the most interesting thing on the page.
 
 ## Two offices, one PIN that is no longer a login
 
