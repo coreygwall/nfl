@@ -67,17 +67,25 @@ final class GolfModel {
         mutate(id) { $0.record(stroke, on: $0.currentHole) }
     }
 
-    /// The hole is done. Returns the finished entry so the screen can say what it was.
+    /// The hole is done. Returns the finished entry so the screen can say what it was. With
+    /// `advance` off the card stays on the hole, for a screen that wants to stamp it before
+    /// moving on (`advance(card:from:)` is the second half).
     @discardableResult
-    func finishHole(card id: String, tapIn: Bool) -> HoleEntry? {
+    func finishHole(card id: String, tapIn: Bool, advance: Bool = true) -> HoleEntry? {
         var finished: HoleEntry?
         mutate(id) {
             let hole = $0.currentHole
             $0.finish(hole: hole, tapIn: tapIn)
             finished = $0.entry(hole)
-            if finished?.finished == true { $0.advance() }
+            if finished?.finished == true, advance { $0.advance() }
         }
         return finished?.finished == true ? finished : nil
+    }
+
+    /// On to the next hole still to play — but only if the card is still standing on `hole`, so
+    /// a stamp that lands after somebody has already moved on does not move them twice.
+    func advance(card id: String, from hole: Int) {
+        mutate(id) { if $0.currentHole == hole { $0.advance() } }
     }
 
     func undo(card id: String) {

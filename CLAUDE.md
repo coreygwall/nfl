@@ -222,7 +222,14 @@ stroke out of the middle and is refused on a finished hole for the same reason `
 posture is one rule: anything that moves the score needs Reopen first, anything that only moves a
 mark does not. Before this the fix was Reopen, Undo back past the stroke and re-enter everything
 after it. The finishing button also names who it is about to credit ("Dan holed it") — a bare
-*Holed it* was a guess about the one fact the card exists to get right.
+*Holed it* was a guess about the one fact the card exists to get right — and it does not finish
+the hole: it opens a **review** (`HoleReviewCard`: the score and its word, each name's shots on
+the hole, how the ball went in, the side game or the yellow note that nobody has been named for
+it) and the hole closes on a **swipe**, the pool's `SlideToLock` with golf's words on it, because
+a swipe is a decision and a tap is a reflex. `finishHole(advance: false)` then `advance(card:from:)`
+are deliberately two calls so the word can be stamped over the page for a beat before the next tee
+slides up on its own; the second is guarded by the hole so a stamp landing late never moves
+somebody twice.
 
 Claiming one is a row of names under the hole header on the Round tab — tapping the name already on
 it takes it back, so claim, change and undo are one gesture with no mode to be in. It is drawn on a
