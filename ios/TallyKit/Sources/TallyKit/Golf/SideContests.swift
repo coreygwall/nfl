@@ -224,9 +224,26 @@ public struct Stake: Codable, Hashable, Sendable {
     /// Nothing is worth less than nothing or more than fifty a head.
     public static let range = 0...50
 
+    /// Spelled out rather than left to synthesis, the same reason `PointValues` spells its out:
+    /// `init(from:)` below is hand-written and the encoder's half is not, so the two have to be
+    /// looking at the same keys.
+    private enum CodingKeys: String, CodingKey {
+        case on, each
+    }
+
     public init(on: Bool, each: Int) {
         self.on = on
         self.each = min(max(each, Stake.range.lowerBound), Stake.range.upperBound)
+    }
+
+    /// Routed through the clamping initialiser rather than synthesised, so a blob written by a
+    /// future build — or edited by hand — costs one bad number rather than a board of nonsense.
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        self.init(
+            on: try c.decodeIfPresent(Bool.self, forKey: .on) ?? false,
+            each: try c.decodeIfPresent(Int.self, forKey: .each) ?? 0
+        )
     }
 
     /// Whether this actually moves anything: switched on, and worth something.
@@ -299,6 +316,22 @@ public struct PointValues: Codable, Hashable, Sendable {
             longestDrive: try stake(.longestDrive, was: .perLongestDrive, otherwise: defaults.longestDrive),
             closestToPin: try stake(.closestToPin, was: .perClosestToPin, otherwise: defaults.closestToPin)
         )
+    }
+
+    /**
+     Hand-written, because the legacy keys above have no stored property and that is exactly the
+     condition under which Swift refuses to synthesise an encoder — which is how this first
+     reached CI.
+
+     Only the current shape is ever written, so a card re-saved by this build stops carrying the
+     old prize numbers: the migration finishes itself the first time anybody touches the card.
+     */
+    public func encode(to encoder: Encoder) throws {
+        var c = encoder.container(keyedBy: CodingKeys.self)
+        try c.encode(enabled, forKey: .enabled)
+        try c.encode(shotKept, forKey: .shotKept)
+        try c.encode(longestDrive, forKey: .longestDrive)
+        try c.encode(closestToPin, forKey: .closestToPin)
     }
 
     public subscript(item: WagerItem) -> Stake {

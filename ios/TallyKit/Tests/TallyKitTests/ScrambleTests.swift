@@ -934,6 +934,28 @@ final class SideContestTests: XCTestCase {
         XCTAssertEqual(card.points.longestDrive, Stake(on: true, each: 10))
         XCTAssertFalse(card.points.shotKept.on, "a zero meant they did not want it, and still does")
         XCTAssertEqual(card.points.playing(card.contests), [.longestDrive, .closestToPin])
+
+        // And writing it back drops the dead keys, so the migration finishes itself the first
+        // time anybody touches the card.
+        var catalog = CardCatalog.empty
+        catalog.upsert(card)
+        let written = String(decoding: try catalog.encoded(), as: UTF8.self)
+        XCTAssertFalse(written.contains("perClosestToPin"), "the prize shape is not written back")
+        XCTAssertTrue(written.contains("closestToPin"))
+    }
+
+    /// A stake outside the range is clamped on the way *in* as well as on the way out, so a blob
+    /// written by a future build cannot hand the board a number it would refuse from a stepper.
+    func testAStakeIsClampedWhenItIsRead() throws {
+        let json = """
+        {"cards":[{\
+        "createdAt":"2026-09-19T01:00:00Z","currentHole":1,"course":"","holes":[],\
+        "id":"card-wild","name":"Saturday","pars":[3],\
+        "players":[{"id":"c","name":"Corey"},{"id":"d","name":"Dan"}],\
+        "points":{"enabled":true,"closestToPin":{"on":true,"each":900}}}]}
+        """
+        let card = try XCTUnwrap(CardCatalog.decode(Data(json.utf8)).card("card-wild"))
+        XCTAssertEqual(card.points.closestToPin.each, 50)
     }
 
     /// The round trip, so a card written by this build reads back the same on the next launch.
