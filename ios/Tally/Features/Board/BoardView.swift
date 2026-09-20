@@ -7,16 +7,18 @@ import TallyKit
  */
 struct BoardView: View {
     @Environment(AppModel.self) private var model
+    /// List or grid. A preference rather than screen state, so the person who reads the board as
+    /// a table on Sunday finds it that way again on Monday. It lives up here with the other two
+    /// controls: all three are ways of looking at the same standings.
+    @AppStorage("tally.boardGrid") private var grid = false
 
     var body: some View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 10) {
-                TallySegmented(value: $model.boardScope, options: [(.week, "Week"), (.season, "Season")])
-                TallySegmented(value: $model.boardSort, options: [(.points, "Points"), (.possible, "Potential")])
-            }
+            BoardControls(scope: $model.boardScope, sort: $model.boardSort, grid: $grid,
+                          showLayout: model.boardScope == .week)
             if model.boardScope == .week {
-                WeekBoardView(week: model.activeBoardWeek, sort: model.boardSort)
+                WeekBoardView(week: model.activeBoardWeek, sort: model.boardSort, grid: grid)
                     .id("\(model.player?.id ?? "-"):\(model.activeBoardWeek)")
             } else {
                 SeasonBoardView(sort: model.boardSort)
@@ -29,6 +31,51 @@ struct BoardView: View {
     }
 }
 
+/**
+ The three ways of reading the board: which board, how it is sorted, and — on the week — list or
+ grid. One line when one line holds them, two when it does not.
+
+ `ViewThatFits` rather than a width someone measured once. Three controls across a phone leaves
+ about forty points a label, which is where "Season" and "Potential" start shrinking, and a person
+ who has turned their type size up has less room again. So the one-line arrangement is offered
+ first and the stacked one takes over whenever it would not fit — the toggle drops to its own
+ right-aligned row and the two segmented controls keep their full width. The web draws the same
+ two shapes off a width floor, because CSS has no `ViewThatFits`.
+
+ The layout toggle is drawn for the whole of the week tab rather than only once rows land, so the
+ row does not reflow under your thumb as the board loads. The season board has no grid, so it has
+ no toggle and never needs the second row.
+ */
+private struct BoardControls: View {
+    @Binding var scope: BoardScope
+    @Binding var sort: BoardSort
+    @Binding var grid: Bool
+    let showLayout: Bool
+
+    var body: some View {
+        if showLayout {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    pair
+                    BoardLayoutToggle(grid: $grid)
+                }
+                VStack(alignment: .trailing, spacing: 8) {
+                    HStack(spacing: 8) { pair }
+                    BoardLayoutToggle(grid: $grid)
+                }
+            }
+        } else {
+            HStack(spacing: 8) { pair }
+        }
+    }
+
+    /// Which board, and how it is sorted. Always together, always this order.
+    @ViewBuilder private var pair: some View {
+        TallySegmented(value: $scope, options: [(.week, "Week"), (.season, "Season")])
+        TallySegmented(value: $sort, options: [(.points, "Points"), (.possible, "Potential")])
+    }
+}
+
 /// Sorting by potential reorders the list but keeps each player's real standing on their badge.
 private func rowsSorted<T: BoardRow>(_ rows: [T], by sort: BoardSort) -> [T] {
     sort == .points ? rows : rows.sorted { a, b in a.possible != b.possible ? a.possible > b.possible : a.place < b.place }
@@ -38,13 +85,12 @@ struct WeekBoardView: View {
     @Environment(AppModel.self) private var model
     let week: Int
     let sort: BoardSort
+    /// List or grid, decided by the toggle on the row above (`BoardView`).
+    let grid: Bool
     @State private var board: Loadable<WeekBoardResponse> = .idle
     @State private var open: String?
     @State private var celebrating = false
     @State private var confetti = 0
-    /// List or grid. A preference rather than screen state, so the person who reads the board as
-    /// a table on Sunday finds it that way again on Monday.
-    @AppStorage("tally.boardGrid") private var grid = false
 
     var body: some View {
         Group {
@@ -161,21 +207,6 @@ struct WeekBoardView: View {
             if !top.isEmpty {
                 WeekWinnerBanner(week: week, winners: top.map(\.name), points: top[0].points, isMe: iWon)
             }
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(data.lockedCount == 0
-                         ? "Nothing has kicked off yet · \(data.rows.filter { $0.picksMade > 0 }.count) of \(data.rows.count) have picked"
-                         : "\(data.finalCount) of \(data.gameCount) games final")
-                        .sans(14).foregroundStyle(Color.ink2)
-                    Spacer(minLength: 8)
-                    if !data.rows.isEmpty { BoardLayoutToggle(grid: $grid) }
-                }
-                if week < model.seasonStartsAt {
-                    Text("Week \(week) has its own winner. The season race starts in Week \(model.seasonStartsAt).")
-                        .sans(12).foregroundStyle(Color.ink3)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
             if data.rows.isEmpty {
                 EmptyState(title: "Nobody's on the board yet.", body: "Be the first to lock in five picks.") {
                     Button("Make your picks") { model.pickWeek = week; model.tab = .picks }.buttonStyle(.tally(.primary, size: .small))
@@ -216,6 +247,21 @@ struct WeekBoardView: View {
                 }
                 .animation(Motion.settle, value: sort)
             }
+            // How far through the week this is, and which prize it settles — underneath, because
+            // it is a footnote about the standings rather than a heading over them, and the top
+            // of this screen is for the standings and the three ways of reading them.
+            VStack(alignment: .leading, spacing: 2) {
+                Text(data.lockedCount == 0
+                     ? "Nothing has kicked off yet · \(data.rows.filter { $0.picksMade > 0 }.count) of \(data.rows.count) have picked"
+                     : "\(data.finalCount) of \(data.gameCount) games final")
+                    .sans(13).foregroundStyle(Color.ink2)
+                if week < model.seasonStartsAt {
+                    Text("Week \(week) has its own winner. The season race starts in Week \(model.seasonStartsAt).")
+                        .sans(12).foregroundStyle(Color.ink3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(.top, 2)
         }
     }
 }

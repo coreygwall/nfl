@@ -110,34 +110,35 @@ struct PoolScreen<Content: View>: View {
                             if hub {
                                 ScreenHeader(mark: "TallyMark", title: "Tally")
                             } else {
-                                ScreenHeader(mark: "FootballMark", title: model.poolName)
+                                ScreenHeader(mark: "FootballMark", title: model.poolName) {
+                                    // The megaphone, then the rules, then the week — on every one
+                                    // of the pool's tabs, for the reason they always were: "what
+                                    // is the 5 for" arrives in the middle of picking, and an
+                                    // answer that costs you your place in the flow is one people
+                                    // do without. Never on the app's own home, because the rules
+                                    // and the feed are one pool's and that page is about all of
+                                    // them.
+                                    HStack(spacing: 2) {
+                                        if model.announcementsAvailable { MegaphoneButton() }
+                                        RulesButton()
+                                        if let week {
+                                            WeekMenu(week: week, max: model.maxWeek, onChange: onWeek)
+                                                .padding(.leading, 4)
+                                        }
+                                    }
+                                }
                             }
                             content
                         }
                         .padding(.horizontal, 16)
-                        .padding(.top, 6)
+                        .padding(.top, 8)
                         .padding(.bottom, 120)
                     }
                 }
             }
-            .toolbar {
-                if !hub && model.announcementsAvailable {
-                    ToolbarItem(placement: .topBarTrailing) { MegaphoneButton() }
-                }
-                // Right of the megaphone, and on every one of the pool's tabs for the same reason
-                // it is: "what is the 5 for" arrives in the middle of picking, and an answer that
-                // costs you your place in the flow is one people do without. Never on the app's
-                // own home — the rules are one pool's, and that page is about all of them.
-                if !hub {
-                    ToolbarItem(placement: .topBarTrailing) { RulesButton() }
-                }
-                if let week {
-                    ToolbarItem(placement: .topBarTrailing) {
-                        WeekMenu(week: week, max: model.maxWeek, onChange: onWeek)
-                    }
-                }
-            }
-            .toolbarTitleDisplayMode(.inline)
+            // Nothing is left up there. The pool's controls sit on the name's line now, and an
+            // empty inline bar is forty-odd points of glass saying nothing on every tab.
+            .toolbar(.hidden, for: .navigationBar)
         }
     }
 }

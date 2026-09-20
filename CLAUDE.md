@@ -395,6 +395,13 @@ took last week. (A golf card has its own three; see above.)
   the pool's own tabs (`ScreenHeader`) is the mark and the pool name, and it is a label rather
   than a menu — and it is page content, not a toolbar item, because iOS 26 wraps a leading
   toolbar item in glass sized to its own idea of the width, which for a name was one letter.
+  **The pool's controls came down to the name rather than the name going up to them**: the
+  megaphone, the rules and the week now sit on the header's own line, in `ScreenHeader`'s
+  `trailing` slot, and the navigation bar is hidden outright. Two lines that each held one thing
+  became one line holding both, on every tab, and an empty inline bar is forty-odd points of
+  glass saying nothing. Only the name carries `.isHeader`; combining the whole row would swallow
+  the controls that are the reason it exists. A family with no controls (the app's own home, a
+  golf card) uses the `EmptyView` initialiser and draws exactly as it did.
   `PoolsView` is only join / start / the catalogue, the way in at the bottom of Home. The pool's
   page does not list the other pools; Home says everything that strip used to. Behind Labs
   (`poolPager`) the Pool tab wears a `PoolPager` row — chevrons, dots, a contained flick — as a
@@ -437,7 +444,21 @@ took last week. (A golf card has its own three; see above.)
   six columns on a phone a logo is twenty points and the Giants and the Jets are the same blue
   smudge. Web keeps it in the query (`view=grid`, beside `sort`, only when not the default); iOS
   keeps it as a preference (`tally.boardGrid`), because the person who reads the board as a table
-  on Sunday wants it that way on Monday.
+  on Sunday wants it that way on Monday. **The toggle rides with the scope and the sort**, since
+  all three are ways of reading the same standings, and it is drawn for the whole of the week tab
+  rather than appearing once rows land — a control that arrives with the data reflows the row
+  under your thumb. **Three on one line when three fit, and the toggle takes its own row when
+  they do not**, which is a measurement rather than a breakpoint: `ViewThatFits` offers the
+  one-line arrangement first on iOS, and the web gives its two segmented controls a width floor
+  so the toggle wraps. The two surfaces resolve it differently at the same width because their
+  labels are set differently — iOS puts no horizontal padding inside a segment and fits all three
+  on a phone; the web's `px-2` does not, and "Season" and "Potential" truncate rather than shrink.
+  Both follow the same rule, and a bigger type size pushes either one to two rows.
+- **"6 of 16 games final" sits under the board, not over it.** It is a footnote about the
+  standings rather than a heading for them, and it was the last thing between the controls and
+  the leaderboard on a screen whose top is the part people came for. The prize line ("most points
+  wins Week 2") travels with it, because they answer the same question about the week rather than
+  about anybody's row.
 - **The season drawer is a chart of the whole season, not of the weeks played.** It used to draw
   only `fromWeek` through `throughWeek`, so in Week 2 it was one column filling the width — and
   since a nothing week was a two-pixel sliver, that column read as a horizontal rule with a stray
