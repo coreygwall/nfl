@@ -1,10 +1,10 @@
 import { env, SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
 import { MAX_CLAIM_ATTEMPTS } from "../../worker/auth.ts";
+import { uniqueName } from "./names.ts";
 
 const BEFORE = "2026-09-09T12:00:00.000Z";
-let seq = 0;
-const name = () => `Family ${Date.now().toString(36)}${seq++}`;
+const name = () => uniqueName("Family");
 async function api(path: string, options: { token?: string; entry?: string; body?: unknown; method?: string; cookie?: string; pin?: string; ip?: string } = {}) {
   const headers: Record<string, string> = { "content-type": "application/json" };
   if (options.token) headers["x-player-token"] = options.token;
