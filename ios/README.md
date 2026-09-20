@@ -210,6 +210,18 @@ A card with both off behaves exactly as it did before they existed.
   team keeps just leaves that one off. Every stepper says *each*, and the line under it works out
   what a win is worth for the number of names currently on the card. When points are on the Tally
   tab shows them first, with *Shots kept* one tap away on the same segmented control.
+- **A bet nobody wins can roll into the next one.** Per contest, switched in the same row as its
+  stake, and **on by default for a new card** — it is the bet most groups think they are already
+  playing. Off, an unclaimed par three costs nobody anything; on, its stakes wait and whoever
+  takes the next one takes both. Only a hole that is *over* carries, so the back nine's par threes
+  never inflate the pot on the fourth tee, and a run still open when the round ends settles
+  nothing: money nobody won is money nobody pays. What is riding is on the Tally tab from the
+  moment a hole goes begging — "Closest to the pin: 3 holes riding · hole 16 is worth 160" —
+  because knowing before the tee shot is the whole appeal.
+  A card made before this existed keeps the old rule until somebody switches it on.
+- **Settling up is under the points board**, not instead of it: the fewest payments that clear
+  the column, *Dillon → Lehman 80*. The board is how you check the app is right; this is what you
+  do about it.
 - **Side games is its own card** under the leaderboard: a tile per contest hole, dashed while it
   is open, solid with a name once it is taken, and every tile is a way back to that tee. The
   scorecard marks the same holes `LD` / `CTP`, and the poster carries whoever took the most of

@@ -446,14 +446,17 @@ private struct StakeRow: View {
                 Spacer(minLength: 6)
                 Toggle(item.title, isOn: Binding(get: { stake.on }, set: { value in
                     Haptics.tap()
-                    stake = Stake(on: value, each: stake.each)
+                    stake = Stake(on: value, each: stake.each, carry: stake.carry)
                 }))
                 .labelsHidden()
                 .tint(Color.turf)
             }
             if stake.on {
                 Stepper(
-                    value: Binding(get: { stake.each }, set: { stake = Stake(on: stake.on, each: $0) }),
+                    value: Binding(
+                        get: { stake.each },
+                        set: { stake = Stake(on: stake.on, each: $0, carry: stake.carry) }
+                    ),
                     in: Stake.range
                 ) {
                     HStack(spacing: 6) {
@@ -470,6 +473,23 @@ private struct StakeRow: View {
                 Text(ScrambleTally.winningsLine(stake: stake, players: players))
                     .sans(12).foregroundStyle(Color.ink2)
                     .fixedSize(horizontal: false, vertical: true)
+                // Only the two contests: a shot the team keeps has no hole to roll into, so a
+                // switch here would be a control with nothing behind it.
+                if item.contest != nil {
+                    Divider().overlay(Color.line)
+                    Toggle(isOn: Binding(get: { stake.carry }, set: { value in
+                        Haptics.tap()
+                        stake = Stake(on: stake.on, each: stake.each, carry: value)
+                    })) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Carry it over").sans(13, weight: .bold)
+                            Text(ScrambleTally.carryLine(stake: stake, players: players))
+                                .sans(12).foregroundStyle(Color.ink2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .tint(Color.turf)
+                }
             }
         }
         .padding(.vertical, 2)

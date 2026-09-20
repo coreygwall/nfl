@@ -222,6 +222,21 @@ public struct Stake: Codable, Hashable, Sendable {
     public var on: Bool
     /// What **every player** puts in, once, each time this is won.
     public var each: Int
+    /**
+     Whether a hole nobody won rolls into the next one.
+
+     Off, an unclaimed par three costs nobody anything and is simply gone. On, its stakes wait, and
+     whoever takes the next one takes both — which is how a group that has watched three tee shots
+     in a row miss the green ends up playing the fourth for four holes' money. That is the whole
+     appeal, and it is also why the Tally tab says what is riding all the way round rather than
+     revealing it in the settlement: a pot that quadrupled without anybody being told is an
+     argument in the car park.
+
+     **Only a hole that is over can carry.** One still in front of you has not been missed yet, so
+     it is not money — the same reason an unclaimed hole has never been charged for. `shotKept`
+     ignores this entirely: a shot the team keeps has no hole to roll into.
+     */
+    public var carry: Bool
 
     /// Nothing is worth less than nothing or more than fifty a head.
     public static let range = 0...50
@@ -230,21 +245,31 @@ public struct Stake: Codable, Hashable, Sendable {
     /// `init(from:)` below is hand-written and the encoder's half is not, so the two have to be
     /// looking at the same keys.
     private enum CodingKeys: String, CodingKey {
-        case on, each
+        case on, each, carry
     }
 
-    public init(on: Bool, each: Int) {
+    public init(on: Bool, each: Int, carry: Bool = false) {
         self.on = on
         self.each = min(max(each, Stake.range.lowerBound), Stake.range.upperBound)
+        self.carry = carry
     }
 
-    /// Routed through the clamping initialiser rather than synthesised, so a blob written by a
-    /// future build — or edited by hand — costs one bad number rather than a board of nonsense.
+    /**
+     Routed through the clamping initialiser rather than synthesised, so a blob written by a
+     future build — or edited by hand — costs one bad number rather than a board of nonsense.
+
+     **`carry` is absent-means-off, and that is the opposite of the default for a new card.** It
+     has to be: a card played before this existed was settled under the old rule, and every phone
+     and browser holding it must keep reading the same money out of it. A new card is offered the
+     carry because that is the bet people think they are making; an old one is not retrofitted
+     into a different one.
+     */
     public init(from decoder: Decoder) throws {
         let c = try decoder.container(keyedBy: CodingKeys.self)
         self.init(
             on: try c.decodeIfPresent(Bool.self, forKey: .on) ?? false,
-            each: try c.decodeIfPresent(Int.self, forKey: .each) ?? 0
+            each: try c.decodeIfPresent(Int.self, forKey: .each) ?? 0,
+            carry: try c.decodeIfPresent(Bool.self, forKey: .carry) ?? false
         )
     }
 
@@ -286,8 +311,8 @@ public struct PointValues: Codable, Hashable, Sendable {
     public init(
         enabled: Bool = false,
         shotKept: Stake = Stake(on: false, each: 1),
-        longestDrive: Stake = Stake(on: true, each: 10),
-        closestToPin: Stake = Stake(on: true, each: 10)
+        longestDrive: Stake = Stake(on: true, each: 10, carry: true),
+        closestToPin: Stake = Stake(on: true, each: 10, carry: true)
     ) {
         self.enabled = enabled
         self.shotKept = shotKept

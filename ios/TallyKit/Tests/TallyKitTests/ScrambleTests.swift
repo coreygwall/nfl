@@ -1195,6 +1195,188 @@ final class SideContestTests: XCTestCase {
         XCTAssertEqual(back.contests, c.contests)
         XCTAssertEqual(back.points, c.points)
     }
+
+    // MARK: A pot that carries
+
+    /// Ten a head on the closest to the pin, rolling. Par threes are holes 2 and 5 on this card.
+    private var carried: PointValues {
+        PointValues(
+            enabled: true,
+            shotKept: Stake(on: false, each: 0),
+            longestDrive: Stake(on: false, each: 0),
+            closestToPin: Stake(on: true, each: 10, carry: true)
+        )
+    }
+
+    private func played(_ c: inout ScrambleCard, _ hole: Int) {
+        c.record(.shot(by: corey.id), on: hole)
+        c.finish(hole: hole, tapIn: true)
+    }
+
+    func testAHoleNobodyTookIsOnTheNextOneInstead() {
+        var c = four(points: carried)
+        played(&c, 2)
+        c.award(.closestToPin, on: 5, to: dan.id)
+
+        let results = ScrambleTally.contestResults(c).filter { $0.contest == .closestToPin }
+        XCTAssertEqual(results.map(\.holes), [1, 2])
+        XCTAssertEqual(results.last?.carried, 1)
+
+        let rows = ScrambleTally.points(c)
+        XCTAssertEqual(rows.first { $0.id == dan.id }?.points, 60, "two holes at ten a head, four playing")
+        XCTAssertEqual(rows.first { $0.id == corey.id }?.points, -20)
+        XCTAssertEqual(rows.map(\.points).reduce(0, +), 0, "a carried pot cannot create points either")
+    }
+
+    /// The column still shows one win. What carried is money, not a trophy.
+    func testACarriedWinIsStillOneWin() {
+        var c = four(points: carried)
+        played(&c, 2)
+        c.award(.closestToPin, on: 5, to: dan.id)
+        XCTAssertEqual(ScrambleTally.points(c).first { $0.id == dan.id }?.closestToPins, 1)
+    }
+
+    func testSwitchedOffTheSameRoundSettlesTheOldWay() {
+        var values = carried
+        values.closestToPin = Stake(on: true, each: 10, carry: false)
+        var c = four(points: values)
+        played(&c, 2)
+        c.award(.closestToPin, on: 5, to: dan.id)
+        XCTAssertEqual(ScrambleTally.points(c).first { $0.id == dan.id }?.points, 30)
+    }
+
+    /// Every par three is a contest hole from the moment the card is dealt, so counting the ones
+    /// nobody has reached would have the second hole worth the whole round.
+    func testAHoleStillInFrontOfYouIsNotCarryingAnything() {
+        var c = four(points: carried)
+        c.award(.closestToPin, on: 2, to: dan.id)
+        XCTAssertEqual(ScrambleTally.contestResults(c).first { $0.hole == 2 }?.holes, 1)
+        XCTAssertEqual(ScrambleTally.points(c).first { $0.id == dan.id }?.points, 30)
+    }
+
+    func testAHolePlayedButNotFinishedDoesNotCarryEither() {
+        var c = four(points: carried)
+        c.record(.shot(by: corey.id), on: 2)
+        c.award(.closestToPin, on: 5, to: dan.id)
+        XCTAssertEqual(ScrambleTally.points(c).first { $0.id == dan.id }?.points, 30)
+    }
+
+    /// The honest end to it: money nobody won is money nobody pays.
+    func testACarryNobodyEverTakesCostsNobodyAnything() {
+        var c = four(points: carried)
+        played(&c, 2)
+        played(&c, 5)
+        XCTAssertTrue(ScrambleTally.points(c).allSatisfy { $0.points == 0 })
+        XCTAssertTrue(ScrambleTally.settleUp(c).isEmpty)
+    }
+
+    func testItSaysWhatIsRidingAndOnWhichHole() {
+        var c = four(points: carried)
+        played(&c, 2)
+        let pot = ScrambleTally.riding(c).first
+        XCTAssertEqual(pot?.contest, .closestToPin)
+        XCTAssertEqual(pot?.carried, 1)
+        XCTAssertEqual(pot?.nextHole, 5)
+        XCTAssertEqual(pot?.worth, 60, "two holes at ten a head from three other players")
+    }
+
+    func testNothingIsRidingOnceSomebodyTakesIt() {
+        var c = four(points: carried)
+        played(&c, 2)
+        c.award(.closestToPin, on: 5, to: dan.id)
+        XCTAssertTrue(ScrambleTally.riding(c).isEmpty)
+    }
+
+    func testABetWithNoHoleLeftToSettleItIsWorthNothing() {
+        var c = four(points: carried)
+        played(&c, 2)
+        played(&c, 5)
+        let pot = ScrambleTally.riding(c).first
+        XCTAssertEqual(pot?.carried, 2)
+        XCTAssertNil(pot?.nextHole)
+        XCTAssertEqual(pot?.worth, 0)
+    }
+
+    /// A card written before the carry existed decodes without one, whatever a new card defaults
+    /// to — otherwise an update silently restates what a group already settled up on.
+    func testACardThatAlreadyHadStakesIsNeverRetrofittedWithACarry() throws {
+        let json = #"{"on":true,"each":10}"#
+        let stake = try JSONDecoder().decode(Stake.self, from: Data(json.utf8))
+        XCTAssertEqual(stake, Stake(on: true, each: 10, carry: false))
+        XCTAssertTrue(PointValues().closestToPin.carry, "a new card is offered the carry")
+    }
+
+    // MARK: Settling up
+
+    func testTheBoardBecomesTheSmallestSetOfPayments() {
+        var c = four(points: carried)
+        c.award(.closestToPin, on: 2, to: dan.id)
+        let payments = ScrambleTally.settleUp(c)
+        XCTAssertEqual(payments.count, 3)
+        XCTAssertTrue(payments.allSatisfy { $0.to.id == dan.id && $0.amount == 10 })
+    }
+
+    /// Every payment clears somebody, and what leaves one person's column arrives in another's.
+    func testThePaymentsExactlyClearTheBoard() {
+        var c = four(points: carried)
+        played(&c, 2)
+        c.award(.closestToPin, on: 5, to: dan.id)
+
+        var balance: [String: Int] = [:]
+        for row in ScrambleTally.points(c) { balance[row.id] = row.points }
+        for payment in ScrambleTally.settleUp(c) {
+            XCTAssertGreaterThan(payment.amount, 0, "a payment of nothing is not an instruction")
+            balance[payment.from.id, default: 0] += payment.amount
+            balance[payment.to.id, default: 0] -= payment.amount
+        }
+        XCTAssertTrue(balance.values.allSatisfy { $0 == 0 }, "everybody should be square afterwards")
+    }
+
+    /**
+     The round this feature came from, kept whole because it is the only test here that was
+     settled by four people at a bar.
+
+     Four players, ten a head, both bets carrying. The first three par threes went unclaimed and
+     Lehman took the fourth — four holes' money. The first par five went unclaimed and Ryan took
+     the second — two holes'. Lehman took the last two outright.
+     */
+    func testItSettlesTheRoundItWasBuiltFor() {
+        let lehman = GolfPlayer(id: "l", name: "Lehman")
+        let ryan = GolfPlayer(id: "r", name: "Ryan")
+        let dillon = GolfPlayer(id: "d2", name: "Dillon")
+        let wall = GolfPlayer(id: "w", name: "Wall")
+        var c = ScrambleCard(
+            name: "Saturday",
+            players: [lehman, ryan, dillon, wall],
+            pars: [3, 5, 3, 5, 3, 5, 3, 5],
+            contests: ContestRules(longestDrive: true, closestToPin: true),
+            points: PointValues(
+                enabled: true,
+                shotKept: Stake(on: false, each: 0),
+                longestDrive: Stake(on: true, each: 10, carry: true),
+                closestToPin: Stake(on: true, each: 10, carry: true)
+            )
+        )
+        for hole in 1...8 {
+            c.record(.shot(by: lehman.id), on: hole)
+            c.finish(hole: hole, tapIn: true)
+        }
+        c.award(.closestToPin, on: 7, to: lehman.id)  // par 3s: 1, 3 and 5 went begging
+        c.award(.longestDrive, on: 4, to: ryan.id)    // par 5s: 2 went begging
+        c.award(.longestDrive, on: 6, to: lehman.id)
+        c.award(.longestDrive, on: 8, to: lehman.id)
+
+        let net = Dictionary(uniqueKeysWithValues: ScrambleTally.points(c).map { ($0.id, $0.points) })
+        XCTAssertEqual(net[lehman.id], 160)
+        XCTAssertEqual(net[ryan.id], 0, "he won a double pot and paid it all back out")
+        XCTAssertEqual(net[dillon.id], -80)
+        XCTAssertEqual(net[wall.id], -80)
+        XCTAssertEqual(net.values.reduce(0, +), 0)
+
+        // And the instruction the group actually wanted: two payments, nobody chasing Ryan.
+        let payments = ScrambleTally.settleUp(c).map { [$0.from.name, $0.to.name, "\($0.amount)"] }
+        XCTAssertEqual(payments, [["Dillon", "Lehman", "80"], ["Wall", "Lehman", "80"]])
+    }
 }
 
 /// The lock screen's tap target, and that tapping it lands back on the round it came from.

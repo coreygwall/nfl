@@ -14,6 +14,8 @@ import {
   plural,
   pointsBoard,
   pointsLine,
+  ridingPots,
+  settleUp,
   strokesTaken,
   tallyRows,
   wagerContest,
@@ -56,10 +58,97 @@ export function TallyTab({ card, base }: { card: ScrambleCard; base: string }) {
           onChange={setBoard}
         />
       )}
-      {shown === "points" ? <PointsBoard card={card} /> : <KeptBoard card={card} />}
+      {/* Above the boards, always: the one thing here about a hole still in front of them. */}
+      <Riding card={card} base={base} />
+      {shown === "points" ? (
+        <>
+          <PointsBoard card={card} />
+          <SettleUp card={card} />
+        </>
+      ) : (
+        <KeptBoard card={card} />
+      )}
       {anyContest(card.contests) && <SideGames card={card} base={base} />}
       <DriveNote rows={tallyRows(card)} />
     </div>
+  );
+}
+
+/**
+ * What is on the table that nobody has taken yet.
+ *
+ * Drawn from the moment a hole goes begging rather than revealed in the settlement, because the
+ * carry's whole appeal is knowing about it *before* the tee shot. A group told on the fourth tee
+ * that it is playing for a hundred and sixty is having the best part of the bet; a group that
+ * finds out afterwards is having an argument.
+ *
+ * The hole number is a link, the way every tile in Side games is: the answer to "what's riding"
+ * is always followed by "which hole", and on a phone in a cart that should not be a scroll.
+ */
+function Riding({ card, base }: { card: ScrambleCard; base: string }) {
+  const pots = ridingPots(card);
+  if (!pots.length) return null;
+  return (
+    <div className="space-y-2">
+      {pots.map((pot) => (
+        <div key={pot.contest} className="card-flat bg-flag-soft p-3" aria-label={`${contestTitle(pot.contest)} riding`}>
+          <p className="font-display text-[15px] font-extrabold">
+            {contestTitle(pot.contest)}: {plural(pot.carried, "hole")} riding
+          </p>
+          <p className="text-xs text-ink-2">
+            {pot.nextHole === null ? (
+              "Nobody took it and there's no hole left to. Nothing changes hands."
+            ) : pot.worth > 0 ? (
+              <>
+                <Link className="underline underline-offset-2" to={`${base}?hole=${pot.nextHole}`}>
+                  Hole {pot.nextHole}
+                </Link>{" "}
+                is worth {pot.worth} to whoever takes it.
+              </>
+            ) : (
+              <>
+                It all rides on{" "}
+                <Link className="underline underline-offset-2" to={`${base}?hole=${pot.nextHole}`}>
+                  hole {pot.nextHole}
+                </Link>
+                .
+              </>
+            )}
+          </p>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * The board, turned into the two or three payments that clear it.
+ *
+ * A signed column adding to zero is the honest record and it is still a puzzle somebody has to
+ * solve at the bar while four people hold up four screens. This is the same fact as an
+ * instruction, and it sits underneath the board rather than instead of it: the column is how you
+ * check the app is right, this is what you do about it.
+ */
+function SettleUp({ card }: { card: ScrambleCard }) {
+  const payments = settleUp(card);
+  if (!payments.length) return null;
+  return (
+    <section className="card p-4" aria-label="Settling up">
+      <h2 className="font-display mb-2 text-xs font-extrabold uppercase tracking-[0.12em] text-ink-3">Settling up</h2>
+      <ul className="divide-y-2 divide-line">
+        {payments.map((payment) => (
+          <li key={`${payment.from.id}-${payment.to.id}`} className="flex items-center gap-2 py-2">
+            <span className="font-display min-w-0 truncate text-base font-extrabold">{payment.from.name}</span>
+            <span aria-hidden className="text-ink-3">→</span>
+            <span className="font-display min-w-0 truncate text-base font-extrabold">{payment.to.name}</span>
+            <span className="font-display tabular ml-auto text-xl font-extrabold">{payment.amount}</span>
+          </li>
+        ))}
+      </ul>
+      <p className="mt-2 text-xs text-ink-3">
+        {plural(payments.length, "payment")} and everybody&rsquo;s square.
+      </p>
+    </section>
   );
 }
 
