@@ -441,14 +441,16 @@ took last week. (A golf card has its own three; see above.)
 - **The season drawer is a chart of the whole season, not of the weeks played.** It used to draw
   only `fromWeek` through `throughWeek`, so in Week 2 it was one column filling the width — and
   since a nothing week was a two-pixel sliver, that column read as a horizontal rule with a stray
-  "2" under it. It runs to `WEEKS` now, and a column says which of three things it is: a scored
-  week is a turf fill with its number above, a played week that scored nothing is an empty track,
-  and a week still to come is a dashed outline, the same as the grid's "nobody took this". Only
-  played columns navigate — a placeholder that opens a page is a surprise at this pitch. The scale
-  is `MAX_WEEK_POINTS` rather than the row's own best, so a five-point column is the same height
-  on everybody's chart, which is the only reason stacking them one above another says anything.
-  Every fourth week carries a number, plus both ends; seventeen labels is a wall of digits.
-  `SeasonWeekChart` and `WeekBars` are the pair.
+  "2" under it. It runs to `WEEKS` now, and **every track is identical** — the
+  green bar is the only thing that varies, because saying which weeks have happened is the one
+  job it already does. Dashing the weeks still to come said it a second time, and seventeen
+  dashed boxes at this size is a texture rather than information. The scale is `MAX_WEEK_POINTS`
+  rather than the row's own best, so a five-point column is the same height on everybody's chart,
+  which is the only reason stacking them one above another says anything. **Only the score is
+  loud**: full ink above its bar, while every week is numbered underneath in a smaller, faded
+  hand — an axis is for orienting yourself once and must never compete with the numbers it sits
+  under. Every column opens its week, including one still to come, since they all look alike and
+  a board of fixtures is a fair answer to the tap. `SeasonWeekChart` and `WeekBars` are the pair.
 - **Account is a tab on the web too**, which is how the offices became reachable: `/commissioner`
   and `/league` were routes with nothing in the app linking to them, so a commissioner had to
   remember the address. Both are rows on `src/screens/Account.tsx`, drawn from `roles` in the

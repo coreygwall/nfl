@@ -526,34 +526,30 @@ struct WeekBars: View {
                 .sans(10, weight: .bold).tracking(1)
                 .foregroundStyle(Color.ink3)
             HStack(alignment: .bottom, spacing: 2) {
-                ForEach(fromWeek...last, id: \.self) { w in column(w, last: last) }
+                ForEach(fromWeek...last, id: \.self) { w in column(w) }
             }
-            Text("Dashed weeks haven't been played yet.")
-                .sans(10).foregroundStyle(Color.ink3)
         }
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Points by week")
     }
 
-    /// Every fourth week carries a number, plus both ends. Seventeen labels at this pitch is a wall
-    /// of digits; five says "this axis is the season" and leaves the columns to do the talking.
-    private func tick(_ w: Int, last: Int) -> Bool {
-        w == fromWeek || w == last || (w - fromWeek) % 4 == 0
-    }
-
-    private func column(_ w: Int, last: Int) -> some View {
+    private func column(_ w: Int) -> some View {
         let pts = row.points(inWeek: w)
         let played = w <= throughWeek
         return VStack(spacing: 3) {
+            // The score is the thing to read, so it is the only full-ink text here.
             Text(played && pts > 0 ? "\(pts)" : " ")
-                .sans(9, weight: .bold).monospacedDigit()
-                .foregroundStyle(Color.ink2)
+                .sans(10, weight: .bold).monospacedDigit()
+                .foregroundStyle(Color.ink)
             ZStack(alignment: .bottom) {
+                // Every track is the same. A dashed outline on the weeks still to come was doing
+                // the job a green bar already does — saying which weeks have happened — and
+                // seventeen dashed boxes at this size is a texture, not information.
                 RoundedRectangle(cornerRadius: 4, style: .continuous)
-                    .fill(played ? Color.paper2 : Color.clear)
+                    .fill(Color.paper2)
                     .overlay(
                         RoundedRectangle(cornerRadius: 4, style: .continuous)
-                            .strokeBorder(played ? Color.clear : Color.line, style: StrokeStyle(lineWidth: 2, dash: [3, 3]))
+                            .strokeBorder(Color.line, lineWidth: 1)
                     )
                 if pts > 0 {
                     UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 4)
@@ -566,17 +562,19 @@ struct WeekBars: View {
                 }
             }
             .frame(height: track)
-            Text(tick(w, last: last) ? "\(w)" : " ")
-                .sans(9, weight: .bold).monospacedDigit()
-                .foregroundStyle(Color.ink3)
+            // Every week is numbered, but quietly: the axis is for orienting yourself once, and it
+            // should never compete with the scores above it.
+            Text("\(w)")
+                .sans(8, weight: .bold).monospacedDigit()
+                .foregroundStyle(Color.ink3.opacity(0.7))
         }
         .frame(maxWidth: .infinity)
         .contentShape(Rectangle())
-        // A week that has not been played is a placeholder, and a placeholder that navigates is a
-        // surprise — especially at this width, where the columns are barely a thumb apart.
-        .onTapGesture { if played { Haptics.tap(); onWeek(w) } }
+        // Every column opens its week now that they all look alike; a week still to come opens a
+        // board of fixtures, which is a fair answer to tapping it.
+        .onTapGesture { Haptics.tap(); onWeek(w) }
         .accessibilityElement(children: .ignore)
         .accessibilityLabel(played ? "Week \(w): \(pts) point\(pts == 1 ? "" : "s")" : "Week \(w): not played yet")
-        .accessibilityAddTraits(played ? .isButton : [])
+        .accessibilityAddTraits(.isButton)
     }
 }

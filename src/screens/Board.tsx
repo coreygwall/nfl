@@ -495,9 +495,6 @@ const TRACK = 52;
  */
 function SeasonWeekChart({ row, fromWeek, throughWeek }: { row: SeasonRow; fromWeek: number; throughWeek: number }) {
   const weeks = Array.from({ length: Math.max(WEEKS - fromWeek + 1, 1) }, (_, i) => i + fromWeek);
-  // Every fourth week carries a number, plus both ends. Seventeen labels at this pitch is a wall
-  // of digits; five says "this axis is the season" and leaves the columns to do the talking.
-  const tick = (w: number) => w === fromWeek || w === WEEKS || (w - fromWeek) % 4 === 0;
   return (
     <div>
       <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-ink-3">Points by week</p>
@@ -506,38 +503,29 @@ function SeasonWeekChart({ row, fromWeek, throughWeek }: { row: SeasonRow; fromW
           const pts = row.byWeek[w] ?? 0;
           const played = w <= throughWeek;
           const said = played ? `Week ${w}: ${pts} point${pts === 1 ? "" : "s"}` : `Week ${w}: not played yet`;
-          const column = (
-            <>
-              <span className="h-3 text-[9px] font-bold leading-3 tabular text-ink-2">{played && pts > 0 ? pts : ""}</span>
-              <span
-                className={`relative w-full overflow-hidden rounded-[4px] ${played ? "bg-paper-2" : "border-2 border-dashed border-line"}`}
-                style={{ height: TRACK }}
-              >
+          return (
+            <Link key={w} to={`/board/week/${w}`} className="flex flex-1 flex-col items-center gap-1" title={said} aria-label={said}>
+              {/* The score is the thing to read, so it is the only ink-black text here. */}
+              <span className="h-3.5 text-[10px] font-extrabold leading-[14px] tabular text-ink">{played && pts > 0 ? pts : ""}</span>
+              {/* Every track is the same. A dashed outline on the weeks still to come was doing the
+                  job a green bar already does — saying which weeks have happened — and seventeen
+                  dashed boxes at this size is a texture, not information. */}
+              <span className="relative w-full overflow-hidden rounded-[3px] border border-line bg-paper-2" style={{ height: TRACK }}>
                 {pts > 0 && (
                   <motion.span
                     initial={{ height: 0 }}
                     animate={{ height: Math.max((pts / MAX_WEEK_POINTS) * TRACK, 6) }}
-                    className="absolute inset-x-0 bottom-0 block rounded-t-[4px] border-2 border-b-0 border-ink bg-turf"
+                    className="absolute inset-x-0 bottom-0 block rounded-t-[3px] border-2 border-b-0 border-ink bg-turf"
                   />
                 )}
               </span>
-              <span className="h-3 text-[9px] font-bold leading-3 tabular text-ink-3">{tick(w) ? w : ""}</span>
-            </>
-          );
-          // A week that has not been played is a placeholder, and a placeholder that navigates is
-          // a surprise — especially at this width, where the columns are barely a thumb apart.
-          return played ? (
-            <Link key={w} to={`/board/week/${w}`} className="flex flex-1 flex-col items-center gap-1" title={said} aria-label={said}>
-              {column}
+              {/* Every week is numbered, but quietly: the axis is for orienting yourself once, and
+                  it should never compete with the scores above it. */}
+              <span className="h-3 text-[8px] font-bold leading-3 tabular text-ink-3/70">{w}</span>
             </Link>
-          ) : (
-            <span key={w} className="flex flex-1 flex-col items-center gap-1" title={said} aria-label={said} role="img">
-              {column}
-            </span>
           );
         })}
       </div>
-      <p className="mt-1.5 text-[10px] text-ink-3">Dashed weeks haven&rsquo;t been played yet.</p>
     </div>
   );
 }
