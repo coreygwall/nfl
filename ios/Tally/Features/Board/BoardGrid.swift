@@ -32,6 +32,12 @@ struct BoardGrid: View {
                 line(row)
             }
         }
+        // `TallyCard` paints its stroke *under* the content, so a row's fill — the flag behind
+        // your own entry — covered the border and squared the corners off. Clip the rows to a
+        // shape two points inside the card's, concentric with the stroke, and let the card draw
+        // its border in the ring that leaves.
+        .clipShape(RoundedRectangle(cornerRadius: TallyRadius.card - 2, style: .continuous))
+        .padding(2)
         .cardFlat()
         .accessibilityElement(children: .contain)
         .accessibilityLabel("Who picked whom, by place")
@@ -51,7 +57,7 @@ struct BoardGrid: View {
                 .foregroundStyle(Color.ink3)
                 .frame(width: 44, alignment: .trailing)
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 8)
         .padding(.vertical, 8)
         .overlay(alignment: .bottom) { Rectangle().fill(Color.line).frame(height: 2) }
     }
@@ -78,7 +84,7 @@ struct BoardGrid: View {
                 .monospacedDigit()
                 .frame(width: 44, alignment: .trailing)
         }
-        .padding(.horizontal, 10)
+        .padding(.horizontal, 8)
         .padding(.vertical, 6)
         .background(isMe ? Color.flagSoft : Color.clear)
         .accessibilityElement(children: .combine)
