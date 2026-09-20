@@ -313,7 +313,8 @@ test.describe.serial("pool flow", () => {
     // any of it has happened it is an axis running to the end and nothing but placeholders.
     await page.getByRole("button", { name: /Corey/ }).click();
     await expect(page.getByText("Points by week")).toBeVisible();
-    await expect(page.getByText(/Dashed weeks haven.t been played yet/)).toBeVisible();
+    // Every week is numbered, all the way to the end of the season.
+    await expect(page.getByLabel("Week 10: not played yet")).toContainText("10");
     await expect(page.getByLabel("Week 2: not played yet")).toBeVisible();
     await expect(page.getByLabel("Week 18: not played yet")).toBeVisible();
   });
