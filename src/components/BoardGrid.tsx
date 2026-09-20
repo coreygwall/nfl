@@ -21,50 +21,62 @@ import { Lock } from "./Icons.tsx";
  */
 export function BoardGrid({ rows, started, activeId }: { rows: WeekRow[]; started: boolean; activeId: string | null }) {
   return (
-    <div className="card-flat overflow-x-auto bg-surface" role="region" aria-label="Who picked whom, by place">
-      <table className="w-full min-w-[340px] border-collapse text-left">
-        <thead>
-          <tr className="border-b-2 border-line text-[10px] font-bold uppercase tracking-wider text-ink-3">
-            <th scope="col" className="py-2 pl-3 pr-1 font-bold">
-              <span className="sr-only">Place and name</span>
-            </th>
-            {[1, 2, 3, 4, 5].map((rank) => (
-              <th key={rank} scope="col" className="w-11 px-0.5 py-2 text-center font-display text-[13px] font-extrabold text-ink" title={`Rank ${rank}, worth ${6 - rank}`}>
-                {6 - rank}
+    // Two boxes rather than one. The outer draws the border and clips to it; the inner is what
+    // scrolls if a screen is narrower than the columns, rounded to sit just inside the stroke. On
+    // one box the highlighted row painted over the border at the corners, because a scroll
+    // container's clip and a border's radius are not the same shape in every browser.
+    <div className="card-flat overflow-hidden bg-surface" role="region" aria-label="Who picked whom, by place">
+      <div className="overflow-x-auto rounded-[calc(var(--radius-card)-2px)]">
+        {/* Fixed layout: the five places and the points are set widths, and the name gets every
+            pixel that is left — under auto layout it was the column that gave way, to one letter
+            on a phone. A long name wraps to a second line rather than being cut; the chip drops
+            under it so it never competes for the same line. */}
+        <table className="w-full min-w-[300px] table-fixed border-collapse text-left">
+          <thead>
+            <tr className="border-b-2 border-line text-[10px] font-bold uppercase tracking-wider text-ink-3">
+              <th scope="col" className="py-2 pl-3 pr-1 font-bold">
+                <span className="sr-only">Place and name</span>
               </th>
-            ))}
-            <th scope="col" className="py-2 pl-1 pr-3 text-right">
-              Pts
-            </th>
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => {
-            const isMe = row.playerId === activeId;
-            const yours = row.mine && !isMe;
-            const byRank = new Map(row.picks.map((p) => [p.rank, p]));
-            const hidden = new Set(row.hiddenRanks);
-            return (
-              <tr key={row.playerId} className={`border-b border-line last:border-b-0 ${isMe ? "bg-flag-soft" : ""}`}>
-                <th scope="row" className="max-w-0 py-1.5 pl-3 pr-1 font-normal">
-                  <div className="flex items-center gap-2">
-                    <Place place={row.place} muted={!started} />
-                    <span className="font-display min-w-0 truncate text-[14px] font-extrabold">{row.name}</span>
-                    {isMe && <span className="chip shrink-0 bg-surface py-0 text-[10px]">you</span>}
-                    {yours && <span className="chip shrink-0 bg-surface py-0 text-[10px]">yours</span>}
-                  </div>
+              {[1, 2, 3, 4, 5].map((rank) => (
+                <th key={rank} scope="col" className="w-10 px-0.5 py-2 text-center font-display text-[13px] font-extrabold text-ink" title={`Rank ${rank}, worth ${6 - rank}`}>
+                  {6 - rank}
                 </th>
-                {[1, 2, 3, 4, 5].map((rank) => (
-                  <td key={rank} className="px-0.5 py-1.5 text-center">
-                    <GridCell pick={byRank.get(rank)} locked={hidden.has(rank)} rank={rank} />
-                  </td>
-                ))}
-                <td className="py-1.5 pl-1 pr-3 text-right font-display text-lg font-extrabold tabular">{row.points}</td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+              ))}
+              <th scope="col" className="w-11 py-2 pl-1 pr-3 text-right">
+                Pts
+              </th>
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((row) => {
+              const isMe = row.playerId === activeId;
+              const yours = row.mine && !isMe;
+              const byRank = new Map(row.picks.map((p) => [p.rank, p]));
+              const hidden = new Set(row.hiddenRanks);
+              return (
+                <tr key={row.playerId} className={`border-b border-line last:border-b-0 ${isMe ? "bg-flag-soft" : ""}`}>
+                  <th scope="row" className="py-1.5 pl-3 pr-1 font-normal">
+                    <div className="flex items-center gap-2">
+                      <Place place={row.place} muted={!started} />
+                      <div className="flex min-w-0 flex-col items-start gap-0.5">
+                        <span className="font-display line-clamp-2 break-words text-[13px] font-extrabold leading-tight">{row.name}</span>
+                        {isMe && <span className="chip bg-surface py-0 text-[10px]">you</span>}
+                        {yours && <span className="chip bg-surface py-0 text-[10px]">yours</span>}
+                      </div>
+                    </div>
+                  </th>
+                  {[1, 2, 3, 4, 5].map((rank) => (
+                    <td key={rank} className="px-0.5 py-1.5 text-center">
+                      <GridCell pick={byRank.get(rank)} locked={hidden.has(rank)} rank={rank} />
+                    </td>
+                  ))}
+                  <td className="py-1.5 pl-1 pr-3 text-right font-display text-lg font-extrabold tabular">{row.points}</td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
     </div>
   );
 }
@@ -79,12 +91,12 @@ function GridCell({ pick, locked, rank }: { pick: ScoredPick | undefined; locked
   const worth = 6 - rank;
   if (!pick) {
     return locked ? (
-      <span className="inline-flex h-7 w-10 items-center justify-center rounded-md border-2 border-ink/25 bg-surface" title={`A hidden pick worth ${worth}, revealed at kickoff`}>
+      <span className="inline-flex h-7 w-9 items-center justify-center rounded-md border-2 border-ink/25 bg-surface" title={`A hidden pick worth ${worth}, revealed at kickoff`}>
         <span className="sr-only">{`Hidden pick worth ${worth}`}</span>
         <Lock size={12} className="text-ink-2" />
       </span>
     ) : (
-      <span className="inline-flex h-7 w-10 items-center justify-center rounded-md border-2 border-dashed border-line text-[12px] font-bold text-ink-3" title={`No pick worth ${worth}`}>
+      <span className="inline-flex h-7 w-9 items-center justify-center rounded-md border-2 border-dashed border-line text-[12px] font-bold text-ink-3" title={`No pick worth ${worth}`}>
         <span className="sr-only">{`No pick worth ${worth}`}</span>
         <span aria-hidden="true">–</span>
       </span>
@@ -100,7 +112,7 @@ function GridCell({ pick, locked, rank }: { pick: ScoredPick | undefined; locked
           ? ["border-line bg-paper-2 text-ink-3", "tied"]
           : ["border-ink/25 bg-surface text-ink", `still playing, worth ${worth}`];
   return (
-    <span className={`font-display inline-flex h-7 w-10 items-center justify-center rounded-md border-2 text-[12px] font-extrabold ${tone}`} title={`${t.city} ${t.nickname} — ${said}`}>
+    <span className={`font-display inline-flex h-7 w-9 items-center justify-center rounded-md border-2 text-[12px] font-extrabold ${tone}`} title={`${t.city} ${t.nickname} — ${said}`}>
       <span className="sr-only">{`${t.nickname}, ${said}`}</span>
       <span aria-hidden="true">{t.display}</span>
     </span>
