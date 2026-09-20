@@ -449,7 +449,10 @@ test("one phone can pick for the whole family, and the code stays out of the way
   await expect(kid).toContainText("yours");
   await expect(boardRows.getByRole("button", { name: new RegExp(`Parent ${stamp}`) })).toContainText("you");
   await kid.click();
-  await expect(page.getByTitle(/Seattle Seahawks — still playing, worth 5 points/)).toBeVisible();
+  // The team being named at all is the reveal; a stranger would get a lock here. The outcome is
+  // deliberately not asserted: an earlier test settles Week 1 as home wins, so by this point in
+  // the suite the pick has already "won", and on its own it is "still playing".
+  await expect(page.getByTitle(/^Seattle Seahawks — /)).toBeVisible();
   await expect(page.getByText(/still hidden/)).toBeHidden();
 
   // The same week as a grid: entries down the side, the five places across, points at the end.
@@ -459,7 +462,7 @@ test("one phone can pick for the whole family, and the code stays out of the way
   await expect(grid).toBeVisible();
   const kidRow = grid.getByRole("row", { name: new RegExp(`Kid ${stamp}`) });
   await expect(kidRow).toContainText("yours");
-  await expect(kidRow.getByTitle(/Seattle Seahawks — still playing, worth 5/)).toBeVisible();
+  await expect(kidRow.getByTitle(/^Seattle Seahawks — /)).toBeVisible();
   // And it is a preference of the page, not of the week: it survives the sort.
   await page.getByRole("tab", { name: "Potential" }).click();
   await expect(page).toHaveURL(/sort=possible/);
