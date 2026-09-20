@@ -15,14 +15,8 @@ struct BoardView: View {
     var body: some View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 8) {
-                TallySegmented(value: $model.boardScope, options: [(.week, "Week"), (.season, "Season")])
-                TallySegmented(value: $model.boardSort, options: [(.points, "Points"), (.possible, "Potential")])
-                // Drawn for the whole of the week tab rather than only once rows land, so the row
-                // does not reflow under your thumb as the board loads. The season board has no
-                // grid, so it has no toggle.
-                if model.boardScope == .week { BoardLayoutToggle(grid: $grid) }
-            }
+            BoardControls(scope: $model.boardScope, sort: $model.boardSort, grid: $grid,
+                          showLayout: model.boardScope == .week)
             if model.boardScope == .week {
                 WeekBoardView(week: model.activeBoardWeek, sort: model.boardSort, grid: grid)
                     .id("\(model.player?.id ?? "-"):\(model.activeBoardWeek)")
@@ -34,6 +28,51 @@ struct BoardView: View {
             .frame(maxWidth: .infinity)
             .padding(.top, 24)
         }
+    }
+}
+
+/**
+ The three ways of reading the board: which board, how it is sorted, and — on the week — list or
+ grid. One line when one line holds them, two when it does not.
+
+ `ViewThatFits` rather than a width someone measured once. Three controls across a phone leaves
+ about forty points a label, which is where "Season" and "Potential" start shrinking, and a person
+ who has turned their type size up has less room again. So the one-line arrangement is offered
+ first and the stacked one takes over whenever it would not fit — the toggle drops to its own
+ right-aligned row and the two segmented controls keep their full width. The web draws the same
+ two shapes off a width floor, because CSS has no `ViewThatFits`.
+
+ The layout toggle is drawn for the whole of the week tab rather than only once rows land, so the
+ row does not reflow under your thumb as the board loads. The season board has no grid, so it has
+ no toggle and never needs the second row.
+ */
+private struct BoardControls: View {
+    @Binding var scope: BoardScope
+    @Binding var sort: BoardSort
+    @Binding var grid: Bool
+    let showLayout: Bool
+
+    var body: some View {
+        if showLayout {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    pair
+                    BoardLayoutToggle(grid: $grid)
+                }
+                VStack(alignment: .trailing, spacing: 8) {
+                    HStack(spacing: 8) { pair }
+                    BoardLayoutToggle(grid: $grid)
+                }
+            }
+        } else {
+            HStack(spacing: 8) { pair }
+        }
+    }
+
+    /// Which board, and how it is sorted. Always together, always this order.
+    @ViewBuilder private var pair: some View {
+        TallySegmented(value: $scope, options: [(.week, "Week"), (.season, "Season")])
+        TallySegmented(value: $sort, options: [(.points, "Points"), (.possible, "Potential")])
     }
 }
 

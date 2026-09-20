@@ -447,9 +447,13 @@ took last week. (A golf card has its own three; see above.)
   on Sunday wants it that way on Monday. **The toggle rides with the scope and the sort**, since
   all three are ways of reading the same standings, and it is drawn for the whole of the week tab
   rather than appearing once rows land — a control that arrives with the data reflows the row
-  under your thumb. On the web the two segmented controls carry a width floor so the toggle wraps
-  to its own line on a phone instead: three across 390 pixels leaves about forty a label, and
-  "Season" and "Potential" both truncate at that width.
+  under your thumb. **Three on one line when three fit, and the toggle takes its own row when
+  they do not**, which is a measurement rather than a breakpoint: `ViewThatFits` offers the
+  one-line arrangement first on iOS, and the web gives its two segmented controls a width floor
+  so the toggle wraps. The two surfaces resolve it differently at the same width because their
+  labels are set differently — iOS puts no horizontal padding inside a segment and fits all three
+  on a phone; the web's `px-2` does not, and "Season" and "Potential" truncate rather than shrink.
+  Both follow the same rule, and a bigger type size pushes either one to two rows.
 - **"6 of 16 games final" sits under the board, not over it.** It is a footnote about the
   standings rather than a heading for them, and it was the last thing between the controls and
   the leaderboard on a screen whose top is the part people came for. The prize line ("most points
