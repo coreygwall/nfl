@@ -293,7 +293,7 @@ struct SeasonBoardView: View {
                     BoardRowCard(place: row.place, name: row.name, isMe: row.playerId == model.player?.id, mine: row.isMine, points: row.points, muted: data.throughWeek == 0,
                                  subtitle: subtitle, open: open == row.playerId,
                                  onToggle: { withAnimation(Motion.fade) { open = open == row.playerId ? nil : row.playerId } }) {
-                        WeekBars(row: row, throughWeek: data.throughWeek) { w in
+                        WeekBars(row: row, fromWeek: data.seasonStartsAt, throughWeek: data.throughWeek) { w in
                             model.boardScope = .week
                             model.boardWeek = w
                         }
@@ -489,32 +489,94 @@ struct PickChip: View {
     }
 }
 
-/// Points per week as a row of bars; tap one to open that week's board.
+/**
+ One player's season as a chart: a column per week from the first week that counts to the last of
+ the season, so the weeks still to come are *on screen* as placeholders rather than implied.
+
+ It used to draw only the weeks that had been played, which in Week 2 meant a single column filling
+ the whole width — and because a nothing week was drawn as a two-point sliver, that column read as
+ a horizontal rule with a stray "2" under it. Nobody could tell it was a chart.
+
+ Three states, and the dashes mean here what they mean on the grid: nothing here.
+
+ | Column | Week | Drawn as |
+ | --- | --- | --- |
+ | scored | played, points on the board | turf fill, its number above |
+ | blank | played, nothing scored | an empty track |
+ | ahead | not played yet | a dashed outline |
+
+ The scale is a *perfect week* rather than this row's own best, so a five-point column is the same
+ height on everybody's chart — which is the whole point of putting them one above another. The web
+ draws the same three states from the same rule (`SeasonWeekChart`).
+ */
 struct WeekBars: View {
     let row: SeasonRow
+    /// The first week that counts towards the season — the server's, not a client constant.
+    let fromWeek: Int
     let throughWeek: Int
     let onWeek: (Int) -> Void
 
+    /// How tall a column's track is. A perfect week fills it exactly.
+    private let track: CGFloat = 52
+
     var body: some View {
-        let weeks = Array(1...max(throughWeek, 1))
-        let top = max(15, weeks.map { row.points(inWeek: $0) }.max() ?? 0)
-        HStack(alignment: .bottom, spacing: 4) {
-            ForEach(weeks, id: \.self) { w in
-                let pts = row.points(inWeek: w)
-                Button { onWeek(w) } label: {
-                    VStack(spacing: 4) {
-                        UnevenRoundedRectangle(topLeadingRadius: 5, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 5)
-                            .fill(pts > 0 ? Color.turf : Color.paper3)
-                            .overlay(UnevenRoundedRectangle(topLeadingRadius: 5, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 5).strokeBorder(Color.ink, lineWidth: 2))
-                            .frame(height: max(CGFloat(pts) / CGFloat(top) * 48, pts > 0 ? 6 : 2))
-                        Text("\(w)").sans(9, weight: .bold).foregroundStyle(Color.ink3)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Week \(w): \(pts) points")
+        let last = max(WeekLogic.weeks, fromWeek)
+        VStack(alignment: .leading, spacing: 6) {
+            Text("POINTS BY WEEK")
+                .sans(10, weight: .bold).tracking(1)
+                .foregroundStyle(Color.ink3)
+            HStack(alignment: .bottom, spacing: 2) {
+                ForEach(fromWeek...last, id: \.self) { w in column(w, last: last) }
             }
+            Text("Dashed weeks haven't been played yet.")
+                .sans(10).foregroundStyle(Color.ink3)
         }
-        .frame(height: 64, alignment: .bottom)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Points by week")
+    }
+
+    /// Every fourth week carries a number, plus both ends. Seventeen labels at this pitch is a wall
+    /// of digits; five says "this axis is the season" and leaves the columns to do the talking.
+    private func tick(_ w: Int, last: Int) -> Bool {
+        w == fromWeek || w == last || (w - fromWeek) % 4 == 0
+    }
+
+    private func column(_ w: Int, last: Int) -> some View {
+        let pts = row.points(inWeek: w)
+        let played = w <= throughWeek
+        return VStack(spacing: 3) {
+            Text(played && pts > 0 ? "\(pts)" : " ")
+                .sans(9, weight: .bold).monospacedDigit()
+                .foregroundStyle(Color.ink2)
+            ZStack(alignment: .bottom) {
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(played ? Color.paper2 : Color.clear)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .strokeBorder(played ? Color.clear : Color.line, style: StrokeStyle(lineWidth: 2, dash: [3, 3]))
+                    )
+                if pts > 0 {
+                    UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 4)
+                        .fill(Color.turf)
+                        .overlay(
+                            UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 4)
+                                .strokeBorder(Color.ink, lineWidth: 2)
+                        )
+                        .frame(height: max(CGFloat(pts) / CGFloat(Scoring.maxWeekPoints) * track, 6))
+                }
+            }
+            .frame(height: track)
+            Text(tick(w, last: last) ? "\(w)" : " ")
+                .sans(9, weight: .bold).monospacedDigit()
+                .foregroundStyle(Color.ink3)
+        }
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
+        // A week that has not been played is a placeholder, and a placeholder that navigates is a
+        // surprise — especially at this width, where the columns are barely a thumb apart.
+        .onTapGesture { if played { Haptics.tap(); onWeek(w) } }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(played ? "Week \(w): \(pts) point\(pts == 1 ? "" : "s")" : "Week \(w): not played yet")
+        .accessibilityAddTraits(played ? .isButton : [])
     }
 }

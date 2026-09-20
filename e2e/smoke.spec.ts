@@ -308,6 +308,14 @@ test.describe.serial("pool flow", () => {
     await expect(page.getByText("Season standings start in Week 2")).toBeVisible();
     await expect(page.getByText(/Most points from Week 2 on wins the season/)).toBeVisible();
     await expect(page.getByRole("button", { name: /Corey/ })).toContainText("No picks yet");
+
+    // The drawer is a chart of the whole season rather than of the weeks played so far, so before
+    // any of it has happened it is an axis running to the end and nothing but placeholders.
+    await page.getByRole("button", { name: /Corey/ }).click();
+    await expect(page.getByText("Points by week")).toBeVisible();
+    await expect(page.getByText(/Dashed weeks haven.t been played yet/)).toBeVisible();
+    await expect(page.getByLabel("Week 2: not played yet")).toBeVisible();
+    await expect(page.getByLabel("Week 18: not played yet")).toBeVisible();
   });
 });
 
@@ -758,4 +766,38 @@ test("the privacy page is reachable from the account page and says what is kept"
   // asks for a support contact besides.
   await expect(page.getByRole("heading", { name: "Getting in touch" })).toBeVisible();
   await expect(page.getByRole("link", { name: /@/ })).toHaveAttribute("href", /^mailto:.+@.+\..+\?subject=/);
+});
+
+test("a settled season week is a labelled column, and the rest of the season is still drawn", async ({ page, request }) => {
+  const stamp = Date.now().toString(36);
+  const me = await (await request.post("/api/players", { data: { name: `Charter ${stamp}` } })).json();
+
+  // Five picks in Week 2, then results for exactly those five: three right, two wrong.
+  const week = await (await request.get(`/api/league/weeks/2?now=${BEFORE}`, { headers: { "x-admin-pin": "1234" } })).json();
+  const games = (week.games as { id: string; home: string; away: string }[]).slice(0, 5);
+  await request.put(`/api/weeks/2/picks?now=${BEFORE}`, {
+    headers: { "x-player-token": me.token },
+    data: { picks: games.map((g, i) => ({ gameId: g.id, team: g.home, rank: i + 1 })) },
+  });
+  for (const [i, g] of games.entries()) {
+    await request.put(`/api/league/games/${g.id}/result?now=${BEFORE}`, {
+      headers: { "x-admin-pin": "1234" },
+      data: { winner: i < 3 ? g.home : g.away },
+    });
+  }
+
+  // Ranks 1, 2 and 3 came in: 5 + 4 + 3.
+  const after = "2026-09-22T12:00:00Z";
+  await page.goto(`/welcome?claim=${me.player.id}&code=${me.code}&now=${after}`);
+  await page.waitForURL(/\/week\/\d+$/);
+  await page.goto(`/board/season?now=${after}`);
+  const row = page.getByRole("button", { name: new RegExp(`Charter ${stamp}`) });
+  await expect(row).toContainText("12");
+  await row.click();
+
+  // The week that happened is a column carrying its own number; the rest of the season is there
+  // too, which is the whole point — a chart of one column reads as a rule, not a chart.
+  await expect(page.getByLabel("Week 2: 12 points")).toBeVisible();
+  await expect(page.getByLabel("Week 3: not played yet")).toBeVisible();
+  await expect(page.getByLabel("Week 18: not played yet")).toBeVisible();
 });

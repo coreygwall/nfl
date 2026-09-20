@@ -375,6 +375,7 @@ function BrowsePool() {
                   open={openSeasonPlayer === row.playerId}
                   onToggle={() => setOpenSeasonPlayer(openSeasonPlayer === row.playerId ? null : row.playerId)}
                   throughWeek={seasonBoard.data.throughWeek}
+                  fromWeek={seasonBoard.data.fromWeek}
                 />
               ))}
             </ul>

@@ -561,7 +561,7 @@ private struct SeasonPreviewCard: View {
                         open: open == row.playerId,
                         onToggle: { withAnimation(Motion.fade) { open = open == row.playerId ? nil : row.playerId } }
                     ) {
-                        WeekBars(row: row, throughWeek: season.throughWeek) { week in
+                        WeekBars(row: row, fromWeek: season.seasonStartsAt, throughWeek: season.throughWeek) { week in
                             model.boardScope = .week
                             model.boardWeek = week
                             model.tab = .board

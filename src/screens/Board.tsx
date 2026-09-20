@@ -6,7 +6,7 @@ import { usePlayer } from "../lib/player.tsx";
 import { useHeaderWeek } from "../components/Chrome.tsx";
 import { EntryPicker } from "../components/EntryPicker.tsx";
 import { TEAMS } from "../../shared/teams.ts";
-import { ordinal, type ScoredPick, type SeasonRow, type WeekRow } from "../../shared/scoring.ts";
+import { MAX_WEEK_POINTS, ordinal, type ScoredPick, type SeasonRow, type WeekRow } from "../../shared/scoring.ts";
 import { SEASON_START_WEEK, WEEKS } from "../../shared/week.ts";
 import { CountUp, EmptyState, ErrorState, RankBadge, Segmented } from "../components/Common.tsx";
 import { BoardSkeleton } from "../components/TallyLoader.tsx";
@@ -463,7 +463,7 @@ function SeasonBoardView({ sort }: { sort: BoardSort }) {
       ) : (
         <motion.ul layout className="space-y-2">
           {rows.map((row, i) => (
-            <SeasonRowItem key={row.playerId} row={row} index={i} isMe={row.playerId === player?.id} open={open === row.playerId} onToggle={() => setOpen(open === row.playerId ? null : row.playerId)} throughWeek={board.data.throughWeek} />
+            <SeasonRowItem key={row.playerId} row={row} index={i} isMe={row.playerId === player?.id} open={open === row.playerId} onToggle={() => setOpen(open === row.playerId ? null : row.playerId)} throughWeek={board.data.throughWeek} fromWeek={board.data.fromWeek} />
           ))}
         </motion.ul>
       )}
@@ -471,10 +471,78 @@ function SeasonBoardView({ sort }: { sort: BoardSort }) {
   );
 }
 
-export function SeasonRowItem({ row, index, isMe, open, onToggle, throughWeek }: { row: SeasonRow; index: number; isMe: boolean; open: boolean; onToggle: () => void; throughWeek: number }) {
-  const first = SEASON_START_WEEK;
-  const weeks = Array.from({ length: Math.max(throughWeek - first + 1, 1) }, (_, i) => i + first);
-  const max = Math.max(15, ...Object.values(row.byWeek));
+/** How tall a column's track is. A perfect week fills it exactly. */
+const TRACK = 52;
+
+/**
+ * One player's season as a chart: a column per week from the first week that counts to the last
+ * of the season, so the weeks still to come are *on screen* as placeholders rather than implied.
+ *
+ * It used to draw only the weeks that had been played, which in Week 2 meant a single column
+ * filling the whole width — and because a nothing week was drawn as a two-pixel sliver, that
+ * column read as a horizontal rule with a stray "2" under it. Nobody could tell it was a chart.
+ *
+ * Three states, and the dashes mean here what they mean on the grid: nothing here.
+ *
+ * | Column | Week | Drawn as |
+ * | --- | --- | --- |
+ * | scored | played, points on the board | turf fill, its number above |
+ * | blank | played, nothing scored | an empty track |
+ * | ahead | not played yet | a dashed outline |
+ *
+ * The scale is a *perfect week* rather than this row's own best, so a five-point column is the
+ * same height on everybody's chart — which is the whole point of putting them one above another.
+ */
+function SeasonWeekChart({ row, fromWeek, throughWeek }: { row: SeasonRow; fromWeek: number; throughWeek: number }) {
+  const weeks = Array.from({ length: Math.max(WEEKS - fromWeek + 1, 1) }, (_, i) => i + fromWeek);
+  // Every fourth week carries a number, plus both ends. Seventeen labels at this pitch is a wall
+  // of digits; five says "this axis is the season" and leaves the columns to do the talking.
+  const tick = (w: number) => w === fromWeek || w === WEEKS || (w - fromWeek) % 4 === 0;
+  return (
+    <div>
+      <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-ink-3">Points by week</p>
+      <div className="flex items-end gap-[2px]">
+        {weeks.map((w) => {
+          const pts = row.byWeek[w] ?? 0;
+          const played = w <= throughWeek;
+          const said = played ? `Week ${w}: ${pts} point${pts === 1 ? "" : "s"}` : `Week ${w}: not played yet`;
+          const column = (
+            <>
+              <span className="h-3 text-[9px] font-bold leading-3 tabular text-ink-2">{played && pts > 0 ? pts : ""}</span>
+              <span
+                className={`relative w-full overflow-hidden rounded-[4px] ${played ? "bg-paper-2" : "border-2 border-dashed border-line"}`}
+                style={{ height: TRACK }}
+              >
+                {pts > 0 && (
+                  <motion.span
+                    initial={{ height: 0 }}
+                    animate={{ height: Math.max((pts / MAX_WEEK_POINTS) * TRACK, 6) }}
+                    className="absolute inset-x-0 bottom-0 block rounded-t-[4px] border-2 border-b-0 border-ink bg-turf"
+                  />
+                )}
+              </span>
+              <span className="h-3 text-[9px] font-bold leading-3 tabular text-ink-3">{tick(w) ? w : ""}</span>
+            </>
+          );
+          // A week that has not been played is a placeholder, and a placeholder that navigates is
+          // a surprise — especially at this width, where the columns are barely a thumb apart.
+          return played ? (
+            <Link key={w} to={`/board/week/${w}`} className="flex flex-1 flex-col items-center gap-1" title={said} aria-label={said}>
+              {column}
+            </Link>
+          ) : (
+            <span key={w} className="flex flex-1 flex-col items-center gap-1" title={said} aria-label={said} role="img">
+              {column}
+            </span>
+          );
+        })}
+      </div>
+      <p className="mt-1.5 text-[10px] text-ink-3">Dashed weeks haven&rsquo;t been played yet.</p>
+    </div>
+  );
+}
+
+export function SeasonRowItem({ row, index, isMe, open, onToggle, throughWeek, fromWeek = SEASON_START_WEEK }: { row: SeasonRow; index: number; isMe: boolean; open: boolean; onToggle: () => void; throughWeek: number; fromWeek?: number }) {
   return (
     <motion.li
       layout
@@ -508,21 +576,7 @@ export function SeasonRowItem({ row, index, isMe, open, onToggle, throughWeek }:
         {open && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
             <div className="border-t-2 border-dashed border-line px-3 pb-3 pt-3">
-              <div className="flex h-16 items-end gap-1">
-                {weeks.map((w) => {
-                  const pts = row.byWeek[w] ?? 0;
-                  return (
-                    <Link key={w} to={`/board/week/${w}`} className="group flex flex-1 flex-col items-center gap-1" title={`Week ${w}: ${pts}`}>
-                      <motion.div
-                        initial={{ height: 0 }}
-                        animate={{ height: `${Math.max((pts / max) * 48, pts ? 6 : 2)}px` }}
-                        className={`w-full rounded-t-md border-2 border-b-0 border-ink ${pts ? "bg-turf" : "bg-paper-3"}`}
-                      />
-                      <span className="text-[9px] font-bold text-ink-3">{w}</span>
-                    </Link>
-                  );
-                })}
-              </div>
+              <SeasonWeekChart row={row} fromWeek={fromWeek} throughWeek={throughWeek} />
             </div>
           </motion.div>
         )}
