@@ -223,7 +223,11 @@ public protocol BoardRow: Identifiable {
 public struct WeekRow: Codable, Hashable, Sendable, BoardRow {
     public let playerId: String
     public let name: String
+    /// The entry the request was made as. One row at most.
     public let isMe: Bool
+    /// An entry the asking *account* owns — the active one and every other name it picks for.
+    /// Optional so a board served by an older Worker still decodes; read `isMine`.
+    public let mine: Bool?
     public let place: Int
     public let points: Int
     public let correct: Int
@@ -237,6 +241,10 @@ public struct WeekRow: Codable, Hashable, Sendable, BoardRow {
     /// Worker still decodes; `pickSlots` is what screens should read.
     public let hiddenRanks: [Int]?
     public var id: String { playerId }
+
+    /// Yours to see whole: the account's own entries. A Worker that has not heard of `mine`
+    /// only ever revealed the requester, so that is the honest fallback.
+    public var isMine: Bool { mine ?? isMe }
 
     /// One entry per rank, in rank order, so a row draws five places that fill in rather than a
     /// list that grows sideways as games kick off.
@@ -293,6 +301,8 @@ public struct SeasonRow: Codable, Hashable, Sendable, BoardRow {
     public let playerId: String
     public let name: String
     public let isMe: Bool
+    /// Owned by the asking account — see `WeekRow.mine`.
+    public let mine: Bool?
     public let place: Int
     public let points: Int
     public let correct: Int
@@ -304,6 +314,7 @@ public struct SeasonRow: Codable, Hashable, Sendable, BoardRow {
     /// Keyed by week as a string, because that is what JSON objects have for keys.
     public let byWeek: [String: Int]
     public var id: String { playerId }
+    public var isMine: Bool { mine ?? isMe }
 
     public func points(inWeek week: Int) -> Int { byWeek[String(week)] ?? 0 }
 }

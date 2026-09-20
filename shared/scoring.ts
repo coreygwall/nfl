@@ -42,7 +42,14 @@ export interface ScoredPick {
 export interface WeekRow {
   playerId: string;
   name: string;
+  /** The entry the request was made as. One row at most. */
   isMe: boolean;
+  /**
+   * An entry the asking *account* owns — the active one and every other name it picks for. A
+   * phone that picks for the family is one reader, so the board tells it apart from the field
+   * on every row that is its own, and shows it those rows' picks whole (see `picks`).
+   */
+  mine: boolean;
   place: number;
   points: number;
   correct: number;
@@ -50,7 +57,7 @@ export interface WeekRow {
   picksMade: number;
   /** Points still reachable this week (current points + pending picks). */
   possible: number;
-  /** Only picks whose game has kicked off, plus all of the requester's own. */
+  /** Only picks whose game has kicked off, plus all of the asking account's own entries'. */
   picks: ScoredPick[];
   /**
    * Ranks held by picks that are still hidden. The team stays secret until kickoff, but the rank
@@ -72,6 +79,8 @@ export interface SeasonRow {
   playerId: string;
   name: string;
   isMe: boolean;
+  /** Owned by the asking account — see `WeekRow.mine`. */
+  mine: boolean;
   place: number;
   points: number;
   correct: number;
@@ -121,6 +130,21 @@ export function assignPlaces<T extends Rankable & { place: number }>(rows: T[]):
   return sorted;
 }
 
+/**
+ * Whose picks a board shows before kickoff.
+ *
+ * The rule used to be "the requester's, and nobody else's", which quietly made a family phone
+ * worse than a browser: picking as Parker, you could not see what you had put in for Declan
+ * without switching to Declan, and switching is a bootstrap. The account owns every entry it
+ * picks for, so every one of those is *yours to see* — `revealIds` is that set, and the
+ * requester alone is only the default for a caller that has not said otherwise.
+ */
+function revealed(requesterId: string | null | undefined, revealIds: Iterable<string> | null | undefined): Set<string> {
+  const set = new Set(revealIds ?? []);
+  if (requesterId) set.add(requesterId);
+  return set;
+}
+
 export function buildWeekBoard(input: {
   week: number;
   players: Player[];
@@ -128,8 +152,11 @@ export function buildWeekBoard(input: {
   games: Game[];
   now: string;
   requesterId?: string | null;
+  /** Every entry the asking account owns. Shown in full, marked `mine`. Defaults to the requester. */
+  revealIds?: Iterable<string> | null;
 }): WeekBoard {
   const { week, players, picks, games, now, requesterId } = input;
+  const reveal = revealed(requesterId, input.revealIds);
   const weekGames = games.filter((g) => g.week === week);
   const gamesById = new Map(weekGames.map((g) => [g.id, g]));
   const byPlayer = new Map<string, PlayerPick[]>();
@@ -153,7 +180,7 @@ export function buildWeekBoard(input: {
         if (p.rank === 1) fives++;
       }
       possible += outcome === "pending" ? pointsForRank(p.rank) : pts;
-      if (player.id === requesterId || isLocked(game, now)) {
+      if (reveal.has(player.id) || isLocked(game, now)) {
         scored.push({ gameId: p.gameId, team: p.team, rank: p.rank, points: pts, outcome });
       } else {
         hiddenRanks.push(p.rank);
@@ -163,6 +190,7 @@ export function buildWeekBoard(input: {
       playerId: player.id,
       name: player.name,
       isMe: player.id === requesterId,
+      mine: reveal.has(player.id),
       place: 0,
       points,
       correct,
@@ -189,13 +217,17 @@ export function buildSeasonBoard(input: {
   games: Game[];
   now: string;
   requesterId?: string | null;
+  /** Every entry the asking account owns, marked `mine`. Defaults to the requester. */
+  revealIds?: Iterable<string> | null;
 }): SeasonBoard {
   const { season, players, picks, games, now, requesterId } = input;
+  const reveal = revealed(requesterId, input.revealIds);
   const gamesById = new Map(games.map((g) => [g.id, g]));
   const rows: SeasonRow[] = players.map((player) => ({
     playerId: player.id,
     name: player.name,
     isMe: player.id === requesterId,
+    mine: reveal.has(player.id),
     place: 0,
     points: 0,
     correct: 0,

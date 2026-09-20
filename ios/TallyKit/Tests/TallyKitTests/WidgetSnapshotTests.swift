@@ -143,6 +143,7 @@ final class WidgetSnapshotTests: XCTestCase {
             playerId: "other",
             name: "Sam",
             isMe: false,
+            mine: nil,
             place: 1,
             points: 8,
             correct: 2,

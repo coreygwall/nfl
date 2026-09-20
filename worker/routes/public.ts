@@ -45,6 +45,7 @@ import {
   listPlayers,
   listWeekGames,
   listWeekPicks,
+  ownedEntryIds,
   noteRateLimit,
   publicPlayer,
   rateLimit,
@@ -459,23 +460,35 @@ publicRoutes.put("/weeks/:week/picks", async (c) => {
   return c.json(res);
 });
 
+/** The names this request may see whole: the account's, and everything it picks for. */
+async function revealFor(c: { env: { DB: D1Database }; get: (k: "account") => Player | null }): Promise<Set<string>> {
+  const account = c.get("account");
+  return account ? ownedEntryIds(c.env.DB, account.id) : new Set();
+}
+
 publicRoutes.get("/board/week/:week", async (c) => {
   const week = parseWeek(c.req.param("week"));
   const now = c.get("now");
-  const [games, players, picks] = await Promise.all([
+  const [games, players, picks, revealIds] = await Promise.all([
     listWeekGames(c.env.DB, SEASON, week),
     listPlayers(c.env.DB),
     listWeekPicks(c.env.DB, week),
+    revealFor(c),
   ]);
-  const board = buildWeekBoard({ week, players: players.map(publicPlayer), picks, games, now, requesterId: c.get("player")?.id });
+  const board = buildWeekBoard({ week, players: players.map(publicPlayer), picks, games, now, requesterId: c.get("player")?.id, revealIds });
   const res: WeekBoardResponse = { now, ...board };
   return c.json(res);
 });
 
 publicRoutes.get("/board/season", async (c) => {
   const now = c.get("now");
-  const [games, players, picks] = await Promise.all([listGames(c.env.DB, SEASON), listPlayers(c.env.DB), listAllPicks(c.env.DB)]);
-  const board = buildSeasonBoard({ season: SEASON, players: players.map(publicPlayer), picks, games, now, requesterId: c.get("player")?.id });
+  const [games, players, picks, revealIds] = await Promise.all([
+    listGames(c.env.DB, SEASON),
+    listPlayers(c.env.DB),
+    listAllPicks(c.env.DB),
+    revealFor(c),
+  ]);
+  const board = buildSeasonBoard({ season: SEASON, players: players.map(publicPlayer), picks, games, now, requesterId: c.get("player")?.id, revealIds });
   const res: SeasonBoardResponse = { now, ...board };
   return c.json(res);
 });

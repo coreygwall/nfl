@@ -297,6 +297,23 @@ nowhere else: the tab bar and toolbar (free), the floating pick tray, the toast,
 Content stays on paper. The two families are registered at launch from `Resources/Fonts`; if a
 file is missing the rounded system face stands in rather than a blank.
 
+## The board, and the family that reads it
+
+Three things on the Board tab exist because one phone picks for several names:
+
+- **The entry picker is chips up to three names and a menu past that** (`EntryPicker.chipLimit`,
+  matched by the web's `CHIP_LIMIT`). It is drawn only when the bootstrap reports more than one
+  entry — so a phone that shows no picker while the web shows three names is a phone whose
+  session has fallen behind the account, not a missing control. The account tab says so
+  (`deviceUnrecognised`), and signing in again from a device link fixes it.
+- **Every entry the account owns is revealed and marked.** The Worker reveals the whole family's
+  picks before kickoff to the account that owns them (`mine` on the row; `isMe` is still the
+  active one). Those rows wear a *yours* chip and open whole on a tap, so browsing the board as
+  Parker shows what Declan picked without switching. Everyone else still sees a lock.
+- **List or grid**, toggled on the caption line and remembered (`tally.boardGrid`). The grid is
+  `BoardGrid.swift`: entries down the side, 5·4·3·2·1 across, points at the end, three-letter
+  cells in the pick chips' colours. It draws what the server sent and nothing more.
+
 ## Widgets, and the two doors into the extension
 
 `TallyWidgetsExtension` carries the Live Activity, three home-screen widgets (this week's picks,

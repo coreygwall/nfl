@@ -440,6 +440,37 @@ test("one phone can pick for the whole family, and the code stays out of the way
   await page.getByRole("button", { name: `Pick as Parent ${stamp}` }).click();
   await expectPickingAs(page, `Parent ${stamp}`);
 
+  // One phone, one reader. Picking as the parent, the kid's row on the board is marked as yours
+  // and opens whole — nothing has kicked off, and to anybody else that Seahawks pick is a lock.
+  await page.goto(`/board/week/1?now=${BEFORE}`);
+  // Rows live in list items; the picker's chips above them carry the same names and do not.
+  const boardRows = page.locator("li");
+  const kid = boardRows.getByRole("button", { name: new RegExp(`Kid ${stamp}`) });
+  await expect(kid).toContainText("yours");
+  await expect(boardRows.getByRole("button", { name: new RegExp(`Parent ${stamp}`) })).toContainText("you");
+  await kid.click();
+  // The team being named at all is the reveal; a stranger would get a lock here. The outcome is
+  // deliberately not asserted: an earlier test settles Week 1 as home wins, so by this point in
+  // the suite the pick has already "won", and on its own it is "still playing".
+  await expect(page.getByTitle(/^Seattle Seahawks — /)).toBeVisible();
+  await expect(page.getByText(/still hidden/)).toBeHidden();
+
+  // The same week as a grid: entries down the side, the five places across, points at the end.
+  await page.getByRole("button", { name: "Grid" }).click();
+  await expect(page).toHaveURL(/view=grid/);
+  const grid = page.getByRole("region", { name: "Who picked whom, by place" });
+  await expect(grid).toBeVisible();
+  const kidRow = grid.getByRole("row", { name: new RegExp(`Kid ${stamp}`) });
+  await expect(kidRow).toContainText("yours");
+  await expect(kidRow.getByTitle(/^Seattle Seahawks — /)).toBeVisible();
+  // And it is a preference of the page, not of the week: it survives the sort.
+  await page.getByRole("tab", { name: "Potential" }).click();
+  await expect(page).toHaveURL(/sort=possible/);
+  await expect(page).toHaveURL(/view=grid/);
+  await page.getByRole("button", { name: "List" }).click();
+  await expect(page).not.toHaveURL(/view=/);
+
+  await page.goto(`/week/1?now=${BEFORE}`);
   await expect(page.getByRole("heading", { name: "Pick 5 winners" })).toBeVisible();
 
   await expect(page.getByRole("button", { name: "Pick Buffalo Bills" })).toHaveAttribute("aria-pressed", "true");

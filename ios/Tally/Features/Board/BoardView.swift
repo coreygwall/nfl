@@ -42,6 +42,9 @@ struct WeekBoardView: View {
     @State private var open: String?
     @State private var celebrating = false
     @State private var confetti = 0
+    /// List or grid. A preference rather than screen state, so the person who reads the board as
+    /// a table on Sunday finds it that way again on Monday.
+    @AppStorage("tally.boardGrid") private var grid = false
 
     var body: some View {
         Group {
@@ -159,10 +162,14 @@ struct WeekBoardView: View {
                 WeekWinnerBanner(week: week, winners: top.map(\.name), points: top[0].points, isMe: iWon)
             }
             VStack(alignment: .leading, spacing: 2) {
-                Text(data.lockedCount == 0
-                     ? "Nothing has kicked off yet · \(data.rows.filter { $0.picksMade > 0 }.count) of \(data.rows.count) have picked"
-                     : "\(data.finalCount) of \(data.gameCount) games final")
-                    .sans(14).foregroundStyle(Color.ink2)
+                HStack(alignment: .firstTextBaseline, spacing: 8) {
+                    Text(data.lockedCount == 0
+                         ? "Nothing has kicked off yet · \(data.rows.filter { $0.picksMade > 0 }.count) of \(data.rows.count) have picked"
+                         : "\(data.finalCount) of \(data.gameCount) games final")
+                        .sans(14).foregroundStyle(Color.ink2)
+                    Spacer(minLength: 8)
+                    if !data.rows.isEmpty { BoardLayoutToggle(grid: $grid) }
+                }
                 if week < model.seasonStartsAt {
                     Text("Week \(week) has its own winner. The season race starts in Week \(model.seasonStartsAt).")
                         .sans(12).foregroundStyle(Color.ink3)
@@ -173,10 +180,13 @@ struct WeekBoardView: View {
                 EmptyState(title: "Nobody's on the board yet.", body: "Be the first to lock in five picks.") {
                     Button("Make your picks") { model.pickWeek = week; model.tab = .picks }.buttonStyle(.tally(.primary, size: .small))
                 }
+            } else if grid {
+                BoardGrid(rows: rowsSorted(data.rows, by: sort), started: started)
+                    .animation(Motion.settle, value: sort)
             } else {
                 ForEach(Array(rowsSorted(data.rows, by: sort).enumerated()), id: \.element.id) { index, row in
                     let won = !top.isEmpty && row.place == 1 && row.picksMade > 0
-                    BoardRowCard(place: row.place, name: row.name, isMe: row.playerId == model.player?.id, points: row.points, muted: !started,
+                    BoardRowCard(place: row.place, name: row.name, isMe: row.playerId == model.player?.id, mine: row.isMine, points: row.points, muted: !started,
                                  crowned: won,
                                  subtitle: row.picksMade == 0 ? "No picks"
                                     : !started ? "\(Format.plural(row.picksMade, "pick")) in · up to \(row.possible)"
@@ -280,7 +290,7 @@ struct SeasonBoardView: View {
                         if let best = row.bestWeek, best.points > 0 { s += " · best \(best.points) (W\(best.week))" }
                         return s
                     }()
-                    BoardRowCard(place: row.place, name: row.name, isMe: row.playerId == model.player?.id, points: row.points, muted: data.throughWeek == 0,
+                    BoardRowCard(place: row.place, name: row.name, isMe: row.playerId == model.player?.id, mine: row.isMine, points: row.points, muted: data.throughWeek == 0,
                                  subtitle: subtitle, open: open == row.playerId,
                                  onToggle: { withAnimation(Motion.fade) { open = open == row.playerId ? nil : row.playerId } }) {
                         WeekBars(row: row, throughWeek: data.throughWeek) { w in
@@ -302,6 +312,10 @@ struct BoardRowCard<Detail: View>: View {
     let place: Int
     let name: String
     let isMe: Bool
+    /// One of the account's other entries: not who you are picking as, but yours all the same.
+    /// Told apart from the field with a chip rather than the flag fill, because two highlighted
+    /// rows would leave nobody sure which one the picks tab is actually on.
+    var mine = false
     let points: Int
     let muted: Bool
     /// Took the week. Only ever true once the week is over, so it reads as a result rather than a
@@ -321,6 +335,7 @@ struct BoardRowCard<Detail: View>: View {
                         HStack(spacing: 6) {
                             Text(name).font(TallyFont.display(17)).lineLimit(1)
                             if isMe { Chip(text: "you", size: 10) }
+                            if mine && !isMe { Chip(text: "yours", size: 10) }
                             if crowned { Chip(text: "winner", fill: .flag, size: 10, label: .onAccent) }
                         }
                         Text(subtitle).sans(12).foregroundStyle(Color.ink2).lineLimit(1)
