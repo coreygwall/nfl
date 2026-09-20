@@ -415,7 +415,29 @@ took last week. (A golf card has its own three; see above.)
   drawn only when there is more than one name. Home shows every entry already and Account manages
   them. On iOS it used to sit next to the megaphone, which made the megaphone look like part of
   it; on the web the same chip was *also* the account door, so one control held both the
-  mid-week question and the once-a-season one.
+  mid-week question and the once-a-season one. **Past three names it is one control** — the
+  current name and a menu (`chipLimit` / `CHIP_LIMIT`, the same number on both) — because twelve
+  chips wrap to three lines on the web and scroll off the edge on the phone, and at that count
+  nobody is scanning for a name, they are looking for theirs. If the picker is *missing* on a
+  phone the account has three names on, the phone's bootstrap is reporting one entry: see *The
+  roster is the server's*, not this component.
+- **The board reveals every entry the account owns, not just the one it is picking as.**
+  `buildWeekBoard` used to hide a pick before kickoff from everyone but `requesterId`, which made
+  a family phone worse than a browser: picking as Parker, you could not see what you had put in
+  for Declan without switching, and switching is a bootstrap. `revealIds` is the account's whole
+  entry set (`ownedEntryIds`), those rows are marked `mine` — `isMe` stays the active one — and
+  wear a `yours` chip rather than the flag fill, because two highlighted rows would leave nobody
+  sure which the picks tab is on. Tapping one opens its picks whole. A stranger still sees a lock,
+  and `entries.test.ts` proves it from both sides. `mine` is optional in Swift (`isMine`) so a
+  board from an older Worker still decodes, falling back to the requester.
+- **The week board has a grid, and it replaces nothing.** Entries down the side, 5·4·3·2·1
+  across, points at the end — the answer to *who took whom* for the whole pool at once, which is
+  a different question from the list's *how is everybody doing*. It draws only what the server
+  sent, so it hides exactly what the list hides. Cells are three letters rather than logos: at
+  six columns on a phone a logo is twenty points and the Giants and the Jets are the same blue
+  smudge. Web keeps it in the query (`view=grid`, beside `sort`, only when not the default); iOS
+  keeps it as a preference (`tally.boardGrid`), because the person who reads the board as a table
+  on Sunday wants it that way on Monday.
 - **Account is a tab on the web too**, which is how the offices became reachable: `/commissioner`
   and `/league` were routes with nothing in the app linking to them, so a commissioner had to
   remember the address. Both are rows on `src/screens/Account.tsx`, drawn from `roles` in the

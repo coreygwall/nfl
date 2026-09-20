@@ -216,5 +216,61 @@ describe("hidden picks keep their slot", () => {
     const me = board.rows.find((r) => r.playerId === "me")!;
     expect(me.picks).toHaveLength(2);
     expect(me.hiddenRanks).toEqual([]);
+    expect(me.mine).toBe(true);
+  });
+});
+
+/**
+ * A phone that picks for the family is one reader.
+ *
+ * "The requester's picks, and nobody else's" made a family phone worse than a browser: picking
+ * as the parent, you could not see what you had put in for the kid without switching, and
+ * switching is a bootstrap. The account owns every entry it picks for, and every one of them is
+ * yours to see whole.
+ */
+describe("the account's other entries", () => {
+  const three = [
+    { id: "parent", name: "Parent" },
+    { id: "kid", name: "Kid" },
+    { id: "them", name: "Them" },
+  ];
+  // Every pick here is on g4, which has NOT kicked off by NOW — the only case the rule touches.
+  const picks = [
+    { playerId: "parent", gameId: "g4", team: "PHI" as const, rank: 1 },
+    { playerId: "kid", gameId: "g4", team: "DAL" as const, rank: 2 },
+    { playerId: "them", gameId: "g4", team: "PHI" as const, rank: 3 },
+  ];
+
+  it("shows every entry the account owns before kickoff, and marks each of them", () => {
+    const board = buildWeekBoard({ week: 1, players: three, picks, games: WEEK1, now: NOW, requesterId: "parent", revealIds: ["parent", "kid"] });
+    const byId = new Map(board.rows.map((r) => [r.playerId, r]));
+    expect(byId.get("parent")).toMatchObject({ isMe: true, mine: true });
+    expect(byId.get("parent")!.picks.map((p) => p.team)).toEqual(["PHI"]);
+    // The kid is not who the request was made as, but the account picks for them.
+    expect(byId.get("kid")).toMatchObject({ isMe: false, mine: true });
+    expect(byId.get("kid")!.picks.map((p) => p.team)).toEqual(["DAL"]);
+    expect(byId.get("kid")!.hiddenRanks).toEqual([]);
+    // A stranger's stays a lock.
+    expect(byId.get("them")).toMatchObject({ isMe: false, mine: false });
+    expect(byId.get("them")!.picks).toEqual([]);
+    expect(byId.get("them")!.hiddenRanks).toEqual([3]);
+    expect(JSON.stringify(byId.get("them"))).not.toContain("PHI");
+  });
+
+  it("the requester is revealed even when the caller forgets to list them", () => {
+    const board = buildWeekBoard({ week: 1, players: three, picks, games: WEEK1, now: NOW, requesterId: "kid", revealIds: ["parent"] });
+    const kid = board.rows.find((r) => r.playerId === "kid")!;
+    expect(kid.mine).toBe(true);
+    expect(kid.picks).toHaveLength(1);
+  });
+
+  it("with no account, nothing is anybody's", () => {
+    const board = buildWeekBoard({ week: 1, players: three, picks, games: WEEK1, now: NOW });
+    expect(board.rows.every((r) => !r.mine && !r.isMe && r.picks.length === 0)).toBe(true);
+  });
+
+  it("the season board carries the same mark", () => {
+    const board = buildSeasonBoard({ season: 2026, players: three, picks: [], games: WEEK1, now: NOW, requesterId: "parent", revealIds: ["parent", "kid"] });
+    expect(board.rows.map((r) => [r.playerId, r.mine]).sort()).toEqual([["kid", true], ["parent", true], ["them", false]]);
   });
 });

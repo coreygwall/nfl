@@ -12,9 +12,11 @@ import { CountUp, EmptyState, ErrorState, RankBadge, Segmented } from "../compon
 import { BoardSkeleton } from "../components/TallyLoader.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
 import { Lock } from "../components/Icons.tsx";
+import { BoardGrid } from "../components/BoardGrid.tsx";
 import { fallbackPoolWeeks } from "../lib/poolFallback.ts";
 
 export type BoardSort = "points" | "possible";
+export type BoardView = "list" | "grid";
 
 export function Board({ tab }: { tab: "week" | "season" }) {
   const nav = useNavigate();
@@ -25,8 +27,19 @@ export function Board({ tab }: { tab: "week" | "season" }) {
   if (tab === "week" && (!Number.isInteger(week) || week! < 1 || week! > WEEKS)) return <Navigate to="/board" replace />;
   const boardWeek = boot.data?.boardWeek ?? fallbackPoolWeeks().boardWeek;
   const sort: BoardSort = params.get("sort") === "possible" ? "possible" : "points";
-  const setSort = (v: BoardSort) => setParams(v === "possible" ? { sort: v } : {}, { replace: true });
-  const keepSort = sort === "possible" ? "?sort=possible" : "";
+  // The grid is a way of looking at the week, not a different board, so it rides in the query
+  // beside the sort — and like the sort, only when it is not the default.
+  const view: BoardView = params.get("view") === "grid" ? "grid" : "list";
+  const query = (next: { sort: BoardSort; view: BoardView }) => {
+    const q: Record<string, string> = {};
+    if (next.sort === "possible") q.sort = "possible";
+    if (next.view === "grid") q.view = "grid";
+    return q;
+  };
+  const setSort = (v: BoardSort) => setParams(query({ sort: v, view }), { replace: true });
+  const setView = (v: BoardView) => setParams(query({ sort, view: v }), { replace: true });
+  const kept = new URLSearchParams(query({ sort, view })).toString();
+  const keepSort = kept ? `?${kept}` : "";
   return (
     <div className="mx-auto w-full max-w-[760px] lg:max-w-[1060px]">
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start lg:gap-8">
@@ -57,7 +70,7 @@ export function Board({ tab }: { tab: "week" | "season" }) {
           </div>
           <div className="mt-4">
             {tab === "week" ? (
-              <WeekBoardView week={week!} sort={sort} onWeek={(w) => nav(`/board/week/${w}${keepSort}`)} />
+              <WeekBoardView week={week!} sort={sort} view={view} onView={setView} onWeek={(w) => nav(`/board/week/${w}${keepSort}`)} />
             ) : (
               <SeasonBoardView sort={sort} />
             )}
@@ -158,6 +171,36 @@ function sortRows<T extends { place: number; possible: number }>(rows: T[], sort
  * Before anything has been scored everyone shares first place, which is true but reads as a wall
  * of gold — and gold that every row has stops meaning anything. Muted until there is a race.
  */
+/**
+ * List or grid, on the week board. Two glyphs rather than a third segmented control: the line
+ * already holds two, and this is a way of looking rather than a different board.
+ */
+function LayoutToggle({ view, onChange }: { view: BoardView; onChange: (v: BoardView) => void }) {
+  const glyph = (value: BoardView, label: string, path: string) => {
+    const active = view === value;
+    return (
+      <button
+        type="button"
+        aria-pressed={active}
+        aria-label={label}
+        title={label}
+        onClick={() => !active && onChange(value)}
+        className={`flex h-7 w-9 items-center justify-center rounded-lg transition-colors ${active ? "bg-ink text-paper" : "text-ink-2 hover:bg-paper-3"}`}
+      >
+        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+          <path d={path} />
+        </svg>
+      </button>
+    );
+  };
+  return (
+    <div className="flex shrink-0 gap-0.5 rounded-[10px] bg-paper-2 p-0.5" role="group" aria-label="Board layout">
+      {glyph("list", "List", "M2 4h12M2 8h12M2 12h12")}
+      {glyph("grid", "Grid", "M2 2h12v12H2zM2 6.7h12M2 11.3h12M6.7 2v12M11.3 2v12")}
+    </div>
+  );
+}
+
 function PlaceBadge({ place, size = "md", muted = false }: { place: number; size?: "md" | "sm"; muted?: boolean }) {
   const tone = muted
     ? "bg-paper-2 text-ink-3"
@@ -170,7 +213,7 @@ function PlaceBadge({ place, size = "md", muted = false }: { place: number; size
   );
 }
 
-function WeekBoardView({ week, sort, onWeek }: { week: number; sort: BoardSort; onWeek: (w: number) => void }) {
+function WeekBoardView({ week, sort, view, onView, onWeek }: { week: number; sort: BoardSort; view: BoardView; onView: (v: BoardView) => void; onWeek: (w: number) => void }) {
   const board = useWeekBoard(week);
   const { player } = usePlayer();
   const [open, setOpen] = useState<string | null>(null);
@@ -183,11 +226,14 @@ function WeekBoardView({ week, sort, onWeek }: { week: number; sort: BoardSort; 
         <ErrorState message={board.error.message} onRetry={() => board.refetch()} />
       ) : (
         <div className="mt-4">
-          <p className="text-sm text-ink-2">
-            {board.data.lockedCount === 0
-              ? `Nothing has kicked off yet · ${board.data.rows.filter((r) => r.picksMade > 0).length} of ${board.data.rows.length} have picked`
-              : `${board.data.finalCount} of ${board.data.gameCount} games final`}
-          </p>
+          <div className="flex items-baseline justify-between gap-3">
+            <p className="text-sm text-ink-2">
+              {board.data.lockedCount === 0
+                ? `Nothing has kicked off yet · ${board.data.rows.filter((r) => r.picksMade > 0).length} of ${board.data.rows.length} have picked`
+                : `${board.data.finalCount} of ${board.data.gameCount} games final`}
+            </p>
+            {board.data.rows.length > 0 && <LayoutToggle view={view} onChange={onView} />}
+          </div>
           {/* Which of the two prizes this particular week is playing for. */}
           <p className="mb-3 mt-0.5 text-xs text-ink-3">
             {week < SEASON_START_WEEK
@@ -204,6 +250,8 @@ function WeekBoardView({ week, sort, onWeek }: { week: number; sort: BoardSort; 
                 </Link>
               }
             />
+          ) : view === "grid" ? (
+            <BoardGrid rows={sortRows(board.data.rows, sort)} started={board.data.lockedCount > 0} activeId={player?.id ?? null} />
           ) : (
             <motion.ul layout className="space-y-2">
               {sortRows(board.data.rows, sort).map((row, i) => (
@@ -242,6 +290,9 @@ export function WeekRowItem({ row, index, open, onToggle, isMe, week, started }:
           <div className="font-display flex items-center gap-2 truncate text-[17px] font-extrabold">
             <span className="truncate">{row.name}</span>
             {isMe && <span className="chip bg-surface py-0 text-[10px]">you</span>}
+            {/* One of the account's other entries: not who you are picking as, but yours all the
+                same — and, since the server knows that too, its picks open whole below. */}
+            {row.mine && !isMe && <span className="chip bg-surface py-0 text-[10px]">yours</span>}
           </div>
           <div className="text-xs text-ink-2">
             {row.picksMade === 0 ? (
@@ -438,6 +489,7 @@ export function SeasonRowItem({ row, index, isMe, open, onToggle, throughWeek }:
           <div className="font-display flex items-center gap-2 truncate text-[17px] font-extrabold">
             <span className="truncate">{row.name}</span>
             {isMe && <span className="chip bg-surface py-0 text-[10px]">you</span>}
+            {row.mine && !isMe && <span className="chip bg-surface py-0 text-[10px]">yours</span>}
           </div>
           <div className="text-xs text-ink-2">
             {row.weeksPlayed === 0

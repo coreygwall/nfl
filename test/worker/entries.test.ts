@@ -94,6 +94,46 @@ describe("account-owned entries", () => {
   });
 });
 
+describe("what a family phone can see on the board", () => {
+  /**
+   * The rule the board used to have — the requester's picks and nobody else's — made one phone
+   * picking for three people blind to two of them until kickoff. Every entry the account owns is
+   * revealed to it now, and marked `mine`, whichever of them the request was made as.
+   */
+  it("reveals every entry the account owns before kickoff, and only to that account", async () => {
+    const { owner, child } = await family();
+    const stranger = (await api("/players", { body: { name: name() } })).body;
+    // Week 1's opener is NE @ SEA; nothing has started at BEFORE. Three different picks on it.
+    const put = (token: string, entry: string | undefined, team: string) =>
+      api("/weeks/1/picks", { token, entry, method: "PUT", body: { picks: [{ gameId: "2026_01_NE_SEA", team, rank: 1 }] } });
+    expect((await put(owner.token, undefined, "SEA")).status).toBe(200);
+    expect((await put(owner.token, child.id, "NE")).status).toBe(200);
+    expect((await put(stranger.token, undefined, "SEA")).status).toBe(200);
+
+    // Asked as the child: the child is `isMe`, the owner is still `mine`, and both picks show.
+    const asChild = await api("/board/week/1", { token: owner.token, entry: child.id });
+    expect(asChild.status).toBe(200);
+    const rows = new Map<string, any>(asChild.body.rows.map((r: any) => [r.playerId, r]));
+    expect(rows.get(child.id)).toMatchObject({ isMe: true, mine: true });
+    expect(rows.get(child.id).picks.map((p: any) => p.team)).toEqual(["NE"]);
+    expect(rows.get(owner.player.id)).toMatchObject({ isMe: false, mine: true });
+    expect(rows.get(owner.player.id).picks.map((p: any) => p.team)).toEqual(["SEA"]);
+    // The stranger's pick is a rank and a lock, and the team is nowhere in the answer.
+    expect(rows.get(stranger.player.id)).toMatchObject({ isMe: false, mine: false, picks: [], hiddenRanks: [1] });
+
+    // And the stranger, looking back, sees nothing of the family's.
+    const asStranger = await api("/board/week/1", { token: stranger.token });
+    const theirs = new Map<string, any>(asStranger.body.rows.map((r: any) => [r.playerId, r]));
+    expect(theirs.get(owner.player.id)).toMatchObject({ mine: false, picks: [], hiddenRanks: [1] });
+    expect(theirs.get(child.id)).toMatchObject({ mine: false, picks: [], hiddenRanks: [1] });
+    expect(theirs.get(stranger.player.id)).toMatchObject({ isMe: true, mine: true });
+
+    // Signed out, the board is all locks and nobody's.
+    const anonymous = await api("/board/week/1");
+    expect(anonymous.body.rows.every((r: any) => !r.mine && !r.isMe && r.picks.length === 0)).toBe(true);
+  });
+});
+
 describe("attaching a player who already joined on their own", () => {
   it("brings them into the calling commissioner's account, never a third party's, and only once", async () => {
     const independent = (await api("/players", { body: { name: name() }, ip: "10.0.9.1" })).body.player;
