@@ -159,6 +159,35 @@ got picked. So the card is a list of strokes with a name on each, and the score 
   is right in a cart and wrong for the three seconds afterwards when somebody says that last one was
   Dan's. Tapping it stands you back on that hole, where *Reopen* is waiting.
 
+#### How a hole closes, and what it sounds like
+
+*Holed it* or *Tap-in* does not finish the hole — it opens the **review**: the score and its word,
+each name's shots, how the ball went in, and the side game or a yellow note that nobody has claimed
+it. The hole closes on a **swipe**, the pool's `SlideToLock` with golf's words on it, because a
+swipe is a decision and a tap is a reflex. Then three things land together and the next tee slides
+up on its own, with nothing to tap:
+
+- **The word**, stamped at an angle over the page — turf under par, ink otherwise.
+- **A buzz shaped by the score** (`Haptics.holed(toPar:)`): the week winner's roll for an eagle or
+  better, two bright taps for a birdie, three rising ones for a par, one dull thud past that. Four
+  things somebody can tell apart with the phone in a cart holder is the point; a fifth would not be.
+- **The score, called out loud**, if there is a recording of it.
+
+The voice is the one piece that is not in the repo. `Tally/Resources/Calls/` is empty and its
+`README.md` is the whole contract: drop in `birdie.m4a` and the app says "birdie" — the file's
+**name** is the wiring, there is no registration step, and a word with no file is simply silent.
+Eight names cover every score (`ScrambleTally.callNames`, pinned by `ScrambleTests`), because
+everything past a double bogey folds into one `worse`.
+
+`Calls.swift` sets an `.ambient` session, which does two things worth knowing: the music in the
+cart keeps playing under the word rather than being stopped — the default category, `.soloAmbient`,
+*pauses* other audio, which is the bug this avoids — and a phone on silent says nothing. Ducking the
+music is only legal on `.playback`, which also overrides the silent switch, so those two travel
+together and the trade is a two-line change if a word ever gets lost under somebody's playlist. The
+stamp waits for the voice (capped at four seconds) so a long *biiiirdie* is not cut off by the next
+tee. The card menu grows a *Call the score out loud* row — but only once the build actually has a
+recording in it, because a switch that cannot make a sound is decoration.
+
 #### The two bets beside the round
 
 Switched on per card, in the setup sheet under *Side games* — **longest drive** on the par fives,
@@ -181,6 +210,18 @@ A card with both off behaves exactly as it did before they existed.
   team keeps just leaves that one off. Every stepper says *each*, and the line under it works out
   what a win is worth for the number of names currently on the card. When points are on the Tally
   tab shows them first, with *Shots kept* one tap away on the same segmented control.
+- **A bet nobody wins can roll into the next one.** Per contest, switched in the same row as its
+  stake, and **on by default for a new card** — it is the bet most groups think they are already
+  playing. Off, an unclaimed par three costs nobody anything; on, its stakes wait and whoever
+  takes the next one takes both. Only a hole that is *over* carries, so the back nine's par threes
+  never inflate the pot on the fourth tee, and a run still open when the round ends settles
+  nothing: money nobody won is money nobody pays. What is riding is on the Tally tab from the
+  moment a hole goes begging — "Closest to the pin: 3 holes riding · hole 16 is worth 160" —
+  because knowing before the tee shot is the whole appeal.
+  A card made before this existed keeps the old rule until somebody switches it on.
+- **Settling up is under the points board**, not instead of it: the fewest payments that clear
+  the column, *Dillon → Lehman 80*. The board is how you check the app is right; this is what you
+  do about it.
 - **Side games is its own card** under the leaderboard: a tile per contest hole, dashed while it
   is open, solid with a name once it is taken, and every tile is a way back to that tee. The
   scorecard marks the same holes `LD` / `CTP`, and the poster carries whoever took the most of
@@ -223,9 +264,10 @@ The footer says `playtally.app` and nothing more. That is the seam for the link 
 eventually: a recap for the people who played the round, or the App Store for everyone else once
 there is a listing. Neither exists yet, so neither is pretended at.
 
-**One phone keeps the card, for now.** The shape is already right for sharing — every card has an
-id, every hole carries `updatedAt`, and the catalogue is JSON a Worker could take unchanged — so
-two people logging different holes is an endpoint and a per-hole merge rule, not a rewrite.
+**The card no longer stays on one phone.** *Share the card ▸ Play together* publishes it and hands
+back a link and a QR code; every browser holding that link keeps the same round, and the server
+merges hole by hole on `updatedAt`. The app is still the only way to *make* a card. See the shared
+card section of the root `README.md`.
 
 ## Built to grow
 

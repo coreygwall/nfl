@@ -41,8 +41,12 @@ struct TallyView: View {
                         options: [(Board.points, "Points"), (Board.kept, "Shots kept")]
                     )
                 }
+                // Above the board, always, and the one thing on this tab that is about a hole
+                // still in front of them rather than one behind.
+                RidingStrip(card: card)
                 if shown == .points {
                     PointsBoard(card: card)
+                    SettleUpCard(card: card)
                 } else {
                     KeptBoard(card: card)
                 }
@@ -202,6 +206,118 @@ private struct PointsBoard: View {
             }
             .sans(12).foregroundStyle(Color.ink3)
             .fixedSize(horizontal: false, vertical: true)
+        }
+    }
+}
+
+/**
+ What is on the table that nobody has taken yet.
+
+ The carry's whole appeal is knowing about it *before* the tee shot, so this is drawn from the
+ moment a hole goes begging rather than revealed in the settlement. A group told on the fourth tee
+ that it is playing for a hundred and sixty is having the best part of the bet; a group that finds
+ out afterwards is having an argument in the car park — which is the failure this feature exists
+ to prevent, not a risk it runs.
+
+ It wears the flag rather than the turf because it is the one thing on this tab that is *owed* —
+ the same vocabulary the pool uses for picks that are due, and the reason Home can dress a card
+ without deciding anything for itself.
+ */
+private struct RidingStrip: View {
+    let card: ScrambleCard
+
+    var body: some View {
+        let pots = ScrambleTally.riding(card)
+        if !pots.isEmpty {
+            VStack(alignment: .leading, spacing: 8) {
+                ForEach(pots) { pot in
+                    HStack(alignment: .top, spacing: 10) {
+                        Image(systemName: pot.contest.symbol)
+                            .font(.system(size: 14, weight: .bold))
+                            .foregroundStyle(Color.ink)
+                            .frame(width: 22)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(headline(pot)).font(TallyFont.display(15))
+                            Text(detail(pot)).sans(12).foregroundStyle(Color.ink2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                    .padding(12)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .cardFlat(fill: .flagSoft, border: .flag)
+                    .accessibilityElement(children: .combine)
+                }
+            }
+        }
+    }
+
+    private func headline(_ pot: RidingPot) -> String {
+        let holes = pot.carried == 1 ? "1 hole" : "\(pot.carried) holes"
+        return "\(pot.contest.title): \(holes) riding"
+    }
+
+    /// Says the money only when there is money and somewhere left to win it. A round that has run
+    /// out of par threes is told plainly that the pot died rather than left showing a figure
+    /// nobody can collect.
+    private func detail(_ pot: RidingPot) -> String {
+        guard let hole = pot.nextHole else {
+            return "Nobody took it and there's no hole left to. Nothing changes hands."
+        }
+        guard pot.worth > 0 else { return "It all rides on hole \(hole)." }
+        return "Hole \(hole) is worth \(pot.worth) to whoever takes it."
+    }
+}
+
+/**
+ The board, turned into the two or three payments that clear it.
+
+ A signed column adding to zero is the honest record and it is still a puzzle somebody has to
+ solve at the bar, badly, while four people hold up four phones. This is the same fact as an
+ instruction — *Dillon → Lehman 80* — and it is deliberately underneath the board rather than
+ instead of it: the column is how you check the app is right, and this is what you do about it.
+
+ Drawn only once somebody is actually up or down. A card where everything came out level needs no
+ instructions, and a round nobody has scored yet needs them least of all.
+ */
+private struct SettleUpCard: View {
+    let card: ScrambleCard
+
+    var body: some View {
+        let payments = ScrambleTally.settleUp(card)
+        if !payments.isEmpty {
+            VStack(alignment: .leading, spacing: 10) {
+                SectionLabel(text: "Settling up")
+                VStack(spacing: 0) {
+                    ForEach(Array(payments.enumerated()), id: \.element.id) { index, payment in
+                        if index > 0 { Divider().overlay(Color.line) }
+                        HStack(spacing: 8) {
+                            Text(payment.from.name)
+                                .font(TallyFont.display(16))
+                                .lineLimit(1).minimumScaleFactor(0.7)
+                            Image(systemName: "arrow.right")
+                                .font(.system(size: 12, weight: .bold))
+                                .foregroundStyle(Color.ink3)
+                            Text(payment.to.name)
+                                .font(TallyFont.display(16))
+                                .lineLimit(1).minimumScaleFactor(0.7)
+                            Spacer(minLength: 6)
+                            Text("\(payment.amount)")
+                                .font(TallyFont.display(20))
+                                .monospacedDigit()
+                        }
+                        .padding(.vertical, 10)
+                        .padding(.horizontal, 12)
+                        .accessibilityElement(children: .ignore)
+                        .accessibilityLabel("\(payment.from.name) pays \(payment.to.name) \(payment.amount)")
+                    }
+                }
+                .card()
+                Text(payments.count == 1
+                     ? "One payment and everybody's square."
+                     : "\(payments.count) payments and everybody's square.")
+                    .sans(12).foregroundStyle(Color.ink3)
+            }
         }
     }
 }

@@ -27,11 +27,59 @@ public struct ContestResult: Hashable, Identifiable, Sendable {
     public let hole: Int
     public let contest: SideContest
     public let winner: GolfPlayer?
+    /**
+     How many holes' stakes this one ride is for — one, plus every finished hole behind it that
+     nobody claimed, when the bet carries.
+
+     This is the whole of the carry rule, and putting it here rather than in the settlement is what
+     keeps the money simple: a claim worth four holes settles exactly like four claims worth one,
+     so `points` multiplies and nothing else about it changes. On an *unclaimed* hole it reads as
+     what is on the table right now — what the next person to win it would take.
+     */
+    public let holes: Int
+
+    public init(hole: Int, contest: SideContest, winner: GolfPlayer?, holes: Int = 1) {
+        self.hole = hole
+        self.contest = contest
+        self.winner = winner
+        self.holes = holes
+    }
 
     /// The hole cannot host two contests today — par is one number — but the id says both anyway,
     /// so a third contest on a par four would not collide with anything.
     public var id: String { "\(hole)-\(contest.rawValue)" }
     public var claimed: Bool { winner != nil }
+    /// How many holes rolled into this one. Zero is the ordinary case and says nothing on screen.
+    public var carried: Int { max(holes - 1, 0) }
+}
+
+/**
+ A bet nobody has won yet, and what it is now worth.
+
+ Drawn on the Tally tab and beside the hole itself for the length of the round, because the carry
+ is the one rule in this app that makes money appear somewhere nobody put it. A group that is told
+ on the fourth tee that it is playing for a hundred and sixty is having the best part of the bet;
+ a group that finds out afterwards is having an argument.
+ */
+public struct RidingPot: Hashable, Identifiable, Sendable {
+    public let contest: SideContest
+    /// Finished holes nobody claimed, waiting on the next one.
+    public let carried: Int
+    /// The next hole still to settle it, if the card still has one.
+    public let nextHole: Int?
+    /// What the winner of that next hole would take home, net. Zero when nothing is being staked.
+    public let worth: Int
+
+    public var id: String { contest.rawValue }
+}
+
+/// One payment that settles part of the board: who hands what to whom.
+public struct Payment: Hashable, Identifiable, Sendable {
+    public let from: GolfPlayer
+    public let to: GolfPlayer
+    public let amount: Int
+
+    public var id: String { "\(from.id)-\(to.id)" }
 }
 
 /**
@@ -205,11 +253,75 @@ public enum ScrambleTally {
 
     // MARK: The contests beside the round
 
-    /// Every hole hosting a contest today, in playing order, with whoever has claimed it.
+    /**
+     Every hole hosting a contest today, in playing order, with whoever has claimed it and how many
+     holes' stakes were on it.
+
+     The walk is the carry rule, and it is a fold over the card's current state rather than a
+     running total anybody keeps: nothing is stored, so there is no counter to get out of step with
+     a par correction, a claim taken back, or a hole that four people edited from three devices.
+     Recomputed from scratch it is simply right.
+
+     Two conditions decide whether a hole rolls forward, and both matter:
+
+     - **The bet has to carry**, which is a per-contest setting. A group that wants the closest to
+       the pin to roll and the longest drive not to is playing two ordinary bets, not a special
+       case.
+     - **The hole has to be over.** A hole still in front of you has not been missed yet, so its
+       stake is not on the table — the same rule that has always kept an unclaimed hole from
+       costing anybody anything. This is what stops the back nine's par threes inflating the pot
+       on the fourth tee.
+
+     A claim settles everything waiting and resets the run. A finished hole nobody claimed adds
+     itself to it. And a run still open when the round ends never settles at all: nobody pays for
+     a bet nobody won, which is the honest end to it and is pinned by a test.
+     */
     public static func contestResults(_ card: ScrambleCard) -> [ContestResult] {
-        card.contestHoles.compactMap { hole -> ContestResult? in
-            guard let contest = card.contest(for: hole) else { return nil }
-            return ContestResult(hole: hole, contest: contest, winner: card.winner(of: contest, on: hole))
+        var waiting: [SideContest: Int] = [:]
+        var out: [ContestResult] = []
+        for hole in card.contestHoles {
+            guard let contest = card.contest(for: hole) else { continue }
+            let winner = card.winner(of: contest, on: hole)
+            let carries = card.points[WagerItem(contest)].carry
+            let behind = carries ? waiting[contest, default: 0] : 0
+            out.append(ContestResult(hole: hole, contest: contest, winner: winner, holes: behind + 1))
+            if winner != nil {
+                waiting[contest] = 0
+            } else if carries, card.entry(hole)?.finished == true {
+                waiting[contest] = behind + 1
+            }
+        }
+        return out
+    }
+
+    /**
+     What is on the table and nobody has taken, per contest.
+
+     Only ever non-empty when a bet carries and at least one finished hole has gone begging, so a
+     card playing the ordinary rule never draws any of this and a card that is not playing for
+     money says a number of holes with no figure against it.
+     */
+    public static func riding(_ card: ScrambleCard) -> [RidingPot] {
+        let results = contestResults(card)
+        let players = card.players.count
+        return SideContest.allCases.compactMap { contest -> RidingPot? in
+            let stake = card.points[WagerItem(contest)]
+            guard card.contests.runs(contest), stake.carry else { return nil }
+            let mine = results.filter { $0.contest == contest }
+            // The run still open: everything after the last hole somebody claimed.
+            let lastClaim = mine.lastIndex(where: \.claimed)
+            let open = Array(mine[(lastClaim.map { $0 + 1 } ?? 0)...])
+            let carried = open.filter { card.entry($0.hole)?.finished == true }.count
+            guard carried > 0 else { return nil }
+            let next = open.first { card.entry($0.hole)?.finished != true }?.hole
+            return RidingPot(
+                contest: contest,
+                carried: carried,
+                nextHole: next,
+                // Nil above means the card has run out of holes to settle this on, and the honest
+                // figure for a bet nobody can win any more is nothing — see the note on the type.
+                worth: next != nil && stake.live ? (carried + 1) * stake.winnings(players: players) : 0
+            )
         }
     }
 
@@ -240,24 +352,31 @@ public enum ScrambleTally {
         let players = card.players.count
         let kept = Dictionary(uniqueKeysWithValues: rows(card).map { ($0.id, $0.kept) })
 
-        // How many of each item every player has taken, and how many have been taken at all. The
-        // second is what everybody else pays into, so it is counted once rather than per player.
+        // Two different counts, and conflating them is how a carry goes wrong.
+        //
+        // `wins` is how many times somebody took a thing — what the board's columns show, and what
+        // a person means when they say they had two long drives. `stakes` is how many holes' money
+        // that represents, which is the same number until a bet carries and then is not: one claim
+        // on a pot that has rolled three times settles four holes. Only the second settles.
         var wins: [WagerItem: [String: Int]] = [.shotKept: kept]
+        var stakes: [WagerItem: [String: Int]] = [.shotKept: kept]
         var claimed: [WagerItem: Int] = [.shotKept: kept.values.reduce(0, +)]
         for result in contestResults(card) {
             let item = WagerItem(result.contest)
             guard let winner = result.winner else { continue }
             wins[item, default: [:]][winner.id, default: 0] += 1
-            claimed[item, default: 0] += 1
+            stakes[item, default: [:]][winner.id, default: 0] += result.holes
+            claimed[item, default: 0] += result.holes
         }
         func mine(_ item: WagerItem, _ id: String) -> Int { wins[item]?[id] ?? 0 }
+        func held(_ item: WagerItem, _ id: String) -> Int { stakes[item]?[id] ?? 0 }
 
         func settle(_ id: String) -> (won: Int, paid: Int) {
             var won = 0
             var paid = 0
             for item in playing {
                 let stake = values[item]
-                let taken = mine(item, id)
+                let taken = held(item, id)
                 won += taken * stake.winnings(players: players)
                 // Everything somebody else won is a stake this player put in and did not take back.
                 paid += (claimed[item, default: 0] - taken) * stake.each
@@ -301,6 +420,51 @@ public enum ScrambleTally {
         return out
     }
 
+    /**
+     The board turned into the smallest set of payments that clears it.
+
+     A signed column is the honest record and it is still not what anybody wants at the bar: four
+     numbers adding to zero is a puzzle, and the group solves it out loud, badly, while somebody
+     opens an app to send money. This is that puzzle already solved — the biggest debt against the
+     biggest credit, over and over, which for any board needs at most one payment fewer than there
+     are people and usually far fewer. A round where one person took everything is two taps.
+
+     The board's own order breaks every tie, so the same card produces the same list on a phone
+     and in three browsers — people comparing screens and finding different instructions is
+     precisely the argument this is here to end.
+
+     Empty when nothing is owed, which is the common case for a card with no money on it and the
+     happy case for one that came out level.
+     */
+    public static func settleUp(_ card: ScrambleCard) -> [Payment] {
+        let board = points(card)
+        let creditors = board.filter { $0.points > 0 }
+        // Deepest debt first, so the largest debt meets the largest credit and the list stays
+        // short. Sorted rather than reversed: reversing turns a tie upside down, and two people
+        // down the same amount would then be listed in the opposite order to the board they are
+        // reading it beside. `sorted` is not a stable sort in Swift, so the board's own position
+        // is the explicit tiebreak rather than something the standard library happens to do.
+        let debtors = board.filter { $0.points < 0 }
+            .enumerated()
+            .sorted { a, b in a.element.points != b.element.points ? a.element.points < b.element.points : a.offset < b.offset }
+            .map(\.element)
+        var credit = creditors.map(\.points)
+        var debit = debtors.map { -$0.points }
+
+        var out: [Payment] = []
+        var owed = 0
+        var owing = 0
+        while owed < creditors.count, owing < debtors.count {
+            if credit[owed] <= 0 { owed += 1; continue }
+            if debit[owing] <= 0 { owing += 1; continue }
+            let amount = min(credit[owed], debit[owing])
+            out.append(Payment(from: debtors[owing].player, to: creditors[owed].player, amount: amount))
+            credit[owed] -= amount
+            debit[owing] -= amount
+        }
+        return out
+    }
+
     /// "+30", "−10", "0" — a net, with a real minus sign and an explicit plus, because the sign is
     /// the entire point of this column.
     public static func netText(_ n: Int) -> String {
@@ -320,6 +484,26 @@ public enum ScrambleTally {
         let playing = card.points.playing(card.contests)
         guard !playing.isEmpty else { return "Nothing is being played for yet." }
         return playing.map { "\(card.points[$0].each) each on \($0.unit)" }.joined(separator: " · ")
+    }
+
+    /**
+     What happens to a hole nobody wins, said out loud on the tee rather than discovered at the bar.
+
+     Both halves are spelled out because neither is obvious and the difference between them is the
+     biggest number on the card: a closest to the pin that has rolled three times is four holes'
+     money on one tee shot. The sentence names that figure rather than saying "it rolls over",
+     because "it rolls over" is what everybody already thinks the rule is and nobody has priced.
+     */
+    public static func carryLine(stake: Stake, players: Int) -> String {
+        guard stake.live, players > 1 else {
+            return stake.carry
+                ? "A hole nobody wins rolls into the next one."
+                : "A hole nobody wins is simply gone."
+        }
+        if stake.carry {
+            return "Nobody wins it, it rolls: the next one is worth \(2 * stake.winnings(players: players)), and it keeps going."
+        }
+        return "Nobody wins it, nobody pays — that hole is simply gone."
     }
 
     /// "Worth 30 to whoever takes it, 10 from each of the other 3." Written for the tee, where the
@@ -396,6 +580,25 @@ public enum ScrambleTally {
     public static func toParText(_ n: Int) -> String {
         if n == 0 { return "E" }
         return n < 0 ? "−\(-n)" : "+\(n)"
+    }
+
+    /**
+     Every word a finished hole can be *called*, which is a shorter list than the words it can be
+     labelled with.
+
+     `label` runs off the end into a bare number — a quintuple bogey is "+5" — and there is no
+     recording of "+5", nor should there be. `callName` folds that whole tail into one word so a
+     hole always has exactly one sound to reach for, and this is the list of the sounds. It is the
+     naming rule for the files themselves: a recording is one of these words plus a format, so
+     `birdie.m4a` is the birdie. Nothing matches by score, which means a file can be added or
+     replaced without touching a line of code.
+     */
+    public static let callNames = ["ace", "albatross", "eagle", "birdie", "par", "bogey", "double", "worse"]
+
+    /// Which of `callNames` this hole is. Always one of them, for any score on any par.
+    public static func callName(score: Int, par: Int) -> String {
+        let word = label(score: score, par: par)
+        return callNames.contains(word) ? word : "worse"
     }
 
     /// The word for a finished hole's score. Anything past a double bogey is just the number.

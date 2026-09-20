@@ -131,8 +131,10 @@ from it, so there is one place to edit and no second copy to drift.
 
 **When a second pool arrives**, the shape is ready for it: `pools(id, slug, type, sport, season, name)`,
 players stay global to Tally (one identity, many pools) with a `pool_players` join, and picks key on
-`(pool_id, player_id)`. Groups slot in above pools as `/g/<slug>` without disturbing pool URLs, and chat
-hangs off either. None of that is built yet — the point is that nothing in the current shape blocks it.
+`(pool_id, player_id)`. Groups slot in above pools without disturbing pool URLs, and chat hangs off
+either. None of that is built yet — the point is that nothing in the current shape blocks it. Pick
+their prefix when they arrive rather than from this paragraph: `/g/` was going to be theirs and is a
+shared golf card's now, and the one thing a group cannot have is the address a link already points at.
 
 ## The custom domain
 

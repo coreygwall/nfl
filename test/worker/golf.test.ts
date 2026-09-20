@@ -45,9 +45,9 @@ function card(overrides: Partial<ScrambleCard> = {}): ScrambleCard {
     contests: { longestDrive: true, closestToPin: true },
     points: {
       enabled: true,
-      shotKept: { on: false, each: 0 },
-      longestDrive: { on: true, each: 10 },
-      closestToPin: { on: true, each: 10 },
+      shotKept: { on: false, each: 0, carry: false },
+      longestDrive: { on: true, each: 10, carry: false },
+      closestToPin: { on: true, each: 10, carry: false },
     },
     ...overrides,
   };

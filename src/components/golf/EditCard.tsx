@@ -6,6 +6,7 @@ import {
   STAKE_MIN,
   STANDARD_PARS,
   contestPar,
+  carryLine,
   contestTitle,
   holeCount,
   makeStake,
@@ -322,7 +323,7 @@ function StakeRow({
           type="checkbox"
           role="switch"
           checked={stake.on}
-          onChange={(e) => onChange(makeStake(e.target.checked, stake.each))}
+          onChange={(e) => onChange(makeStake(e.target.checked, stake.each, stake.carry))}
           className="h-6 w-6 shrink-0 accent-turf"
           aria-label={`Play for ${wagerUnit(item)}`}
         />
@@ -334,7 +335,7 @@ function StakeRow({
               type="button"
               className="btn btn-sm w-11 px-0"
               aria-label={`One less on ${wagerUnit(item)}`}
-              onClick={() => onChange(makeStake(true, stake.each - 1))}
+              onClick={() => onChange(makeStake(true, stake.each - 1, stake.carry))}
               disabled={stake.each <= STAKE_MIN}
             >
               −
@@ -345,13 +346,33 @@ function StakeRow({
               type="button"
               className="btn btn-sm ml-auto w-11 px-0"
               aria-label={`One more on ${wagerUnit(item)}`}
-              onClick={() => onChange(makeStake(true, stake.each + 1))}
+              onClick={() => onChange(makeStake(true, stake.each + 1, stake.carry))}
               disabled={stake.each >= STAKE_MAX}
             >
               +
             </button>
           </div>
           <p className="text-xs text-ink-2">{winningsLine(stake, players)}</p>
+          {/*
+            Only the two contests. A shot the team keeps has no hole to roll into, so a switch
+            here would be a control with nothing behind it.
+          */}
+          {wagerContest(item) && (
+            <label className="flex cursor-pointer items-start gap-2 border-t-2 border-line pt-2">
+              <input
+                type="checkbox"
+                role="switch"
+                checked={stake.carry}
+                onChange={(e) => onChange(makeStake(stake.on, stake.each, e.target.checked))}
+                className="mt-0.5 h-5 w-5 shrink-0 accent-turf"
+                aria-label={`Carry over ${wagerUnit(item)}`}
+              />
+              <span className="min-w-0">
+                <span className="block text-[13px] font-bold">Carry it over</span>
+                <span className="block text-xs text-ink-2">{carryLine(stake, players)}</span>
+              </span>
+            </label>
+          )}
         </>
       )}
     </div>

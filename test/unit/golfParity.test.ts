@@ -2,6 +2,9 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   SHARED_CARD_PREFIX,
+  contestResults,
+  pointsBoard,
+  settleUp,
   STAKE_MAX,
   STAKE_MIN,
   STANDARD_PARS,
@@ -121,10 +124,16 @@ describe("the two implementations agree about the round", () => {
    * surfaces proposing different ones would be two different games on one card.
    */
   it("proposes the same bet by default", () => {
-    const defaults: Record<string, { on: boolean; each: number }> = {};
-    for (const match of swift.sideContests.matchAll(/(\w+): Stake = Stake\(on: (true|false), each: (\d+)\)/g)) {
-      defaults[match[1]!] = { on: match[2] === "true", each: Number(match[3]) };
+    const defaults: Record<string, { on: boolean; each: number; carry: boolean }> = {};
+    for (const match of swift.sideContests.matchAll(
+      /(\w+): Stake = Stake\(on: (true|false), each: (\d+)(?:, carry: (true|false))?\)/g,
+    )) {
+      defaults[match[1]!] = { on: match[2] === "true", each: Number(match[3]), carry: match[4] === "true" };
     }
+    // The absent case has to agree too: Swift leaving `carry` off a default argument and the TS
+    // literal leaving the key out must mean the same thing, or a card made on one surface is a
+    // different bet from the same card made on the other.
+    expect(swift.sideContests, "Stake's memberwise init should default carry off").toContain("carry: Bool = false");
     const standard = standardPoints();
     expect(defaults.shotKept, "PointValues should default its stakes in one memberwise init").toEqual(standard.shotKept);
     expect(defaults.longestDrive).toEqual(standard.longestDrive);
@@ -186,8 +195,8 @@ describe("the two implementations agree about the round", () => {
       "Worth # to whoever takes it, # from each of the other #.",
     );
     expect(swift.tally).toContain('return "Nobody else to play it with yet."');
-    expect(winningsLine({ on: true, each: 10 }, 4)).toBe("Worth 30 to whoever takes it, 10 from each of the other 3.");
-    expect(winningsLine({ on: true, each: 10 }, 1)).toBe("Nobody else to play it with yet.");
+    expect(winningsLine({ on: true, each: 10, carry: false }, 4)).toBe("Worth 30 to whoever takes it, 10 from each of the other 3.");
+    expect(winningsLine({ on: true, each: 10, carry: false }, 1)).toBe("Nobody else to play it with yet.");
   });
 
   it("says each, on both, where the stake is named", () => {
@@ -268,5 +277,115 @@ describe("the two implementations agree about the round", () => {
     })!;
     expect(parsed).not.toHaveProperty("currentHole");
     expect(parsed).not.toHaveProperty("shareToken");
+  });
+
+  /**
+   * The carry is the most expensive thing in this file to get wrong.
+   *
+   * Everything else here drifts into a cosmetic disagreement; this one drifts into the phone and
+   * the browser printing different amounts owed for the same round — and the difference is not
+   * small, because a pot that has rolled three times is four times the money. So both halves of
+   * the rule are pinned in both languages: what makes a hole roll forward, and what stops it.
+   */
+  it("carries a pot on the same two conditions", () => {
+    const walk = swift.tally.slice(
+      swift.tally.indexOf("public static func contestResults("),
+      swift.tally.indexOf("public static func riding("),
+    );
+    expect(walk.length, "contestResults and riding should both be in ScrambleTally").toBeGreaterThan(0);
+    // The bet has to carry...
+    expect(walk).toContain("card.points[WagerItem(contest)].carry");
+    // ...and the hole has to be over. A hole still in front of you has not been missed yet, so
+    // its stake is not on the table — without this the back nine inflates the pot on the fourth tee.
+    expect(walk).toContain("card.entry(hole)?.finished == true");
+    // A claim settles what was waiting and resets it.
+    expect(walk).toContain("waiting[contest] = 0");
+
+    // The TypeScript answers the same questions about the same round.
+    const pars = [3, 3, 3];
+    const base = {
+      id: "carry",
+      players: [{ id: "a", name: "A" }, { id: "b", name: "B" }],
+      pars,
+      contests: { longestDrive: false, closestToPin: true },
+      points: {
+        enabled: true,
+        shotKept: { on: false, each: 0 },
+        longestDrive: { on: false, each: 0 },
+        closestToPin: { on: true, each: 10, carry: true },
+      },
+    };
+    const done = (hole: number, award?: string) => ({
+      hole,
+      strokes: [{ id: `s${hole}`, kind: "shot", playerId: "a" }],
+      finished: true,
+      updatedAt: "2026-09-19T12:00:00.000Z",
+      awards: award ? [{ contest: "closestToPin", playerId: award }] : [],
+    });
+
+    // One finished hole nobody claimed, then a claim: the second is worth two holes.
+    const rolled = parseCard({ ...base, holes: [done(1), done(2, "b")] })!;
+    expect(contestResults(rolled).map((r) => r.holes)).toEqual([1, 2, 1]);
+    expect(pointsBoard(rolled).find((r) => r.player.id === "b")?.points).toBe(20);
+
+    // The same card with hole 1 still open carries nothing into hole 2.
+    const open = parseCard({
+      ...base,
+      holes: [{ ...done(1), finished: false }, done(2, "b")],
+    })!;
+    expect(contestResults(open).map((r) => r.holes)).toEqual([1, 1, 1]);
+    expect(pointsBoard(open).find((r) => r.player.id === "b")?.points).toBe(10);
+
+    // And with the carry switched off, the finished hole is simply gone.
+    const flat = parseCard({
+      ...base,
+      points: { ...base.points, closestToPin: { on: true, each: 10, carry: false } },
+      holes: [done(1), done(2, "b")],
+    })!;
+    expect(contestResults(flat).map((r) => r.holes)).toEqual([1, 1, 1]);
+    expect(pointsBoard(flat).find((r) => r.player.id === "b")?.points).toBe(10);
+  });
+
+  /**
+   * Four people comparing three screens and finding different instructions is the argument the
+   * settle-up exists to end, so both sides have to resolve a tie the same way — deepest debt
+   * first, and the board's own order underneath that.
+   */
+  it("settles up in the same order", () => {
+    const swiftSettle = swift.tally.slice(swift.tally.indexOf("public static func settleUp("));
+    expect(swiftSettle).toContain("board.filter { $0.points < 0 }");
+    expect(swiftSettle).toContain("a.element.points < b.element.points");
+    // Swift's sorted is not stable, so the board position has to be the explicit tiebreak; the
+    // TypeScript gets the same thing free from a stable Array.prototype.sort.
+    expect(swiftSettle).toContain("a.offset < b.offset");
+
+    const board = parseCard({
+      id: "settle",
+      players: [
+        { id: "w", name: "Winner" },
+        { id: "x", name: "Xavier" },
+        { id: "y", name: "Yolanda" },
+      ],
+      pars: [3],
+      contests: { longestDrive: false, closestToPin: true },
+      points: {
+        enabled: true,
+        shotKept: { on: false, each: 0 },
+        longestDrive: { on: false, each: 0 },
+        closestToPin: { on: true, each: 10, carry: false },
+      },
+      holes: [{
+        hole: 1,
+        strokes: [{ id: "s", kind: "shot", playerId: "w" }],
+        finished: true,
+        updatedAt: "2026-09-19T12:00:00.000Z",
+        awards: [{ contest: "closestToPin", playerId: "w" }],
+      }],
+    })!;
+    // Two equal debts: they keep the board's order rather than being turned upside down.
+    expect(settleUp(board).map((p) => [p.from.name, p.to.name, p.amount])).toEqual([
+      ["Xavier", "Winner", 10],
+      ["Yolanda", "Winner", 10],
+    ]);
   });
 });

@@ -69,6 +69,17 @@ export interface ContestRules {
 export interface Stake {
   on: boolean;
   each: number;
+  /**
+   * Whether a hole nobody won rolls into the next one.
+   *
+   * Off, an unclaimed par three costs nobody anything. On, its stakes wait and whoever takes the
+   * next one takes both. Only a hole that is *over* can carry — one still in front of you has not
+   * been missed yet, so it is not money. `shotKept` ignores this: a shot has no hole to roll into.
+   *
+   * Absent means off, which is deliberately the opposite of the default for a new card: a round
+   * played before this existed was settled under the old rule and must keep reading the same.
+   */
+  carry: boolean;
 }
 
 export interface PointValues {
@@ -152,8 +163,8 @@ export function clampStake(each: number): number {
   return Math.min(Math.max(Math.round(each), STAKE_MIN), STAKE_MAX);
 }
 
-export function makeStake(on: boolean, each: number): Stake {
-  return { on, each: clampStake(each) };
+export function makeStake(on: boolean, each: number, carry = false): Stake {
+  return { on, each: clampStake(each), carry };
 }
 
 /** On, and for something. A stake of zero is switched on for nothing. */
@@ -213,13 +224,19 @@ export function playingWagers(points: PointValues, contests: ContestRules): Wage
 /**
  * Ten a head on each contest, shots kept left out — a group switches points on *because* of the
  * side games, and putting a stake on every shot the team keeps is the unusual choice.
+ *
+ * Both contests **carry** by default, which is the bet people think they are making: four tee
+ * shots that all miss the green is a story, and a group that has just watched three of them
+ * expects the fourth to be worth something. The setup sheet says so in a sentence and the Tally
+ * tab says what is riding all round, so it cannot be a surprise at the end. A card written before
+ * this existed decodes carry as off — see `Stake.carry`.
  */
 export function standardPoints(): PointValues {
   return {
     enabled: false,
-    shotKept: { on: false, each: 1 },
-    longestDrive: { on: true, each: 10 },
-    closestToPin: { on: true, each: 10 },
+    shotKept: { on: false, each: 1, carry: false },
+    longestDrive: { on: true, each: 10, carry: true },
+    closestToPin: { on: true, each: 10, carry: true },
   };
 }
 
@@ -551,15 +568,90 @@ export interface ContestResult {
   hole: number;
   contest: SideContest;
   winner: GolfPlayer | null;
+  /**
+   * How many holes' stakes were on this one — one, plus every finished hole behind it that nobody
+   * claimed, when the bet carries. A claim worth four holes settles exactly like four claims worth
+   * one, which is why the carry changes nothing else about the settlement.
+   */
+  holes: number;
 }
 
-/** Every hole hosting a contest today, in playing order, with whoever has claimed it. */
+/**
+ * Every hole hosting a contest today, in playing order, with whoever has claimed it and how many
+ * holes' stakes were on it.
+ *
+ * The walk is the carry rule, and it is a fold over the card's current state rather than a running
+ * total anybody keeps: nothing is stored, so there is no counter to get out of step with a par
+ * correction, a claim taken back, or a hole four people edited from three devices.
+ *
+ * A claim settles everything waiting and resets the run; a *finished* hole nobody claimed adds
+ * itself to it; a hole still in front of you does neither. A run still open when the round ends
+ * never settles — nobody pays for a bet nobody won.
+ */
 export function contestResults(card: ScrambleCard): ContestResult[] {
-  return contestHoles(card).flatMap((hole) => {
+  const waiting = new Map<SideContest, number>();
+  const out: ContestResult[] = [];
+  for (const hole of contestHoles(card)) {
     const contest = contestFor(card, hole);
-    if (!contest) return [];
-    return [{ hole, contest, winner: winnerOf(card, contest, hole) }];
-  });
+    if (!contest) continue;
+    const winner = winnerOf(card, contest, hole);
+    const carries = stakeFor(card.points, contest).carry;
+    const behind = carries ? waiting.get(contest) ?? 0 : 0;
+    out.push({ hole, contest, winner, holes: behind + 1 });
+    if (winner) waiting.set(contest, 0);
+    else if (carries && entryFor(card, hole)?.finished) waiting.set(contest, behind + 1);
+  }
+  return out;
+}
+
+/** How many holes rolled into this one. Zero is the ordinary case and says nothing on screen. */
+export function carriedInto(result: ContestResult): number {
+  return Math.max(result.holes - 1, 0);
+}
+
+/** A bet nobody has won yet, and what it is now worth. */
+export interface RidingPot {
+  contest: SideContest;
+  /** Finished holes nobody claimed, waiting on the next one. */
+  carried: number;
+  /** The next hole still to settle it, or null when the card has run out of them. */
+  nextHole: number | null;
+  /** What the winner of that next hole would take home, net. */
+  worth: number;
+}
+
+/**
+ * What is on the table and nobody has taken, per contest.
+ *
+ * Drawn for the whole round rather than revealed in the settlement: a group told on the fourth tee
+ * that it is playing for a hundred and sixty is having the best part of the bet, and a group that
+ * finds out afterwards is having an argument.
+ */
+export function ridingPots(card: ScrambleCard): RidingPot[] {
+  const results = contestResults(card);
+  const players = card.players.length;
+  const out: RidingPot[] = [];
+  for (const contest of SIDE_CONTESTS) {
+    const stake = stakeFor(card.points, contest);
+    if (!runsContest(card.contests, contest) || !stake.carry) continue;
+    const mine = results.filter((r) => r.contest === contest);
+    let lastClaim = -1;
+    mine.forEach((r, i) => {
+      if (r.winner) lastClaim = i;
+    });
+    const open = mine.slice(lastClaim + 1);
+    const carried = open.filter((r) => entryFor(card, r.hole)?.finished).length;
+    if (carried === 0) continue;
+    const next = open.find((r) => !entryFor(card, r.hole)?.finished)?.hole ?? null;
+    out.push({
+      contest,
+      carried,
+      nextHole: next,
+      // A bet nobody can win any more is worth nothing, however much went into it.
+      worth: next !== null && stakeLive(stake) ? (carried + 1) * stakeWinnings(stake, players) : 0,
+    });
+  }
+  return out;
 }
 
 export interface PointsRow {
@@ -603,7 +695,12 @@ export function pointsBoard(card: ScrambleCard): PointsRow[] {
   const rows = tallyRows(card);
   const kept = new Map(rows.map((r) => [r.player.id, r.kept]));
 
+  // Two different counts, and conflating them is how a carry goes wrong. `wins` is how many times
+  // somebody took a thing — what the board's columns show. `stakes` is how many holes' money that
+  // represents, which is the same number until a bet carries and then is not: one claim on a pot
+  // that has rolled three times settles four holes. Only the second settles.
   const wins = new Map<WagerItem, Map<string, number>>([["shotKept", new Map(kept)]]);
+  const stakes = new Map<WagerItem, Map<string, number>>([["shotKept", new Map(kept)]]);
   const claimed = new Map<WagerItem, number>([["shotKept", [...kept.values()].reduce((a, b) => a + b, 0)]]);
   for (const result of contestResults(card)) {
     if (!result.winner) continue;
@@ -611,16 +708,20 @@ export function pointsBoard(card: ScrambleCard): PointsRow[] {
     const forItem = wins.get(item) ?? new Map<string, number>();
     forItem.set(result.winner.id, (forItem.get(result.winner.id) ?? 0) + 1);
     wins.set(item, forItem);
-    claimed.set(item, (claimed.get(item) ?? 0) + 1);
+    const byHoles = stakes.get(item) ?? new Map<string, number>();
+    byHoles.set(result.winner.id, (byHoles.get(result.winner.id) ?? 0) + result.holes);
+    stakes.set(item, byHoles);
+    claimed.set(item, (claimed.get(item) ?? 0) + result.holes);
   }
   const mine = (item: WagerItem, id: string) => wins.get(item)?.get(id) ?? 0;
+  const held = (item: WagerItem, id: string) => stakes.get(item)?.get(id) ?? 0;
 
   const settle = (id: string) => {
     let won = 0;
     let paid = 0;
     for (const item of playing) {
       const stake = stakeFor(card.points, item);
-      const taken = mine(item, id);
+      const taken = held(item, id);
       won += taken * stakeWinnings(stake, players);
       // Everything somebody else won is a stake this player put in and did not take back.
       paid += ((claimed.get(item) ?? 0) - taken) * stake.each;
@@ -659,6 +760,65 @@ export function pointsBoard(card: ScrambleCard): PointsRow[] {
       place,
     });
   });
+  return out;
+}
+
+/**
+ * What happens to a hole nobody wins, said out loud on the tee rather than discovered at the bar.
+ *
+ * The sentence names the figure rather than saying "it rolls over", because "it rolls over" is
+ * what everybody already thinks the rule is and nobody has priced.
+ */
+export function carryLine(stake: Stake, players: number): string {
+  if (!stakeLive(stake) || players <= 1) {
+    return stake.carry ? "A hole nobody wins rolls into the next one." : "A hole nobody wins is simply gone.";
+  }
+  if (stake.carry) {
+    return `Nobody wins it, it rolls: the next one is worth ${2 * stakeWinnings(stake, players)}, and it keeps going.`;
+  }
+  return "Nobody wins it, nobody pays — that hole is simply gone.";
+}
+
+/** One payment that settles part of the board: who hands what to whom. */
+export interface Payment {
+  from: GolfPlayer;
+  to: GolfPlayer;
+  amount: number;
+}
+
+/**
+ * The board turned into the smallest set of payments that clears it.
+ *
+ * A signed column is the honest record and it is still not what anybody wants at the bar. This is
+ * that puzzle already solved — the biggest debt against the biggest credit, over and over, which
+ * needs at most one payment fewer than there are people and usually far fewer.
+ *
+ * The board's own order breaks every tie, so the same card produces the same list on a phone and
+ * in three browsers: people comparing screens and finding different instructions is precisely the
+ * argument this is here to end.
+ */
+export function settleUp(card: ScrambleCard): Payment[] {
+  const board = pointsBoard(card);
+  const creditors = board.filter((r) => r.points > 0);
+  // Deepest debt first, so the largest debt meets the largest credit and the list stays short.
+  // Sorted rather than reversed: reversing turns a tie upside down, and two people down the same
+  // amount would then be listed in the opposite order to the board they are reading it beside.
+  // Array sort is stable, so equal debts keep the board's own order.
+  const debtors = board.filter((r) => r.points < 0).sort((a, b) => a.points - b.points);
+  const credit = creditors.map((r) => r.points);
+  const debit = debtors.map((r) => -r.points);
+
+  const out: Payment[] = [];
+  let owed = 0;
+  let owing = 0;
+  while (owed < creditors.length && owing < debtors.length) {
+    if (credit[owed]! <= 0) { owed += 1; continue; }
+    if (debit[owing]! <= 0) { owing += 1; continue; }
+    const amount = Math.min(credit[owed]!, debit[owing]!);
+    out.push({ from: debtors[owing]!.player, to: creditors[owed]!.player, amount });
+    credit[owed]! -= amount;
+    debit[owing]! -= amount;
+  }
   return out;
 }
 
@@ -767,7 +927,14 @@ function asIsoDate(value: unknown, fallback: string): string {
 function asStake(value: unknown, fallback: Stake): Stake {
   if (!value || typeof value !== "object") return fallback;
   const raw = value as Record<string, unknown>;
-  return makeStake(typeof raw.on === "boolean" ? raw.on : fallback.on, typeof raw.each === "number" ? raw.each : fallback.each);
+  return makeStake(
+    typeof raw.on === "boolean" ? raw.on : fallback.on,
+    typeof raw.each === "number" ? raw.each : fallback.each,
+    // Absent means off, NOT the fallback's value: a stake written by an older build was settled
+    // without a carry, and the phone and every browser holding that card must keep agreeing about
+    // the money already on it. Only a brand new card takes the default above.
+    raw.carry === true,
+  );
 }
 
 /**

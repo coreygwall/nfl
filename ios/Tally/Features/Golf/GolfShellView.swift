@@ -129,6 +129,8 @@ struct CardMenu: View {
     @Environment(GolfModel.self) private var golf
     let cardId: String
     @State private var confirmDelete = false
+    /// Bound to the same key `Calls` reads, so the row and the sound are one fact.
+    @AppStorage(Calls.preferenceKey) private var callsOn = true
 
     var body: some View {
         Menu {
@@ -140,6 +142,23 @@ struct CardMenu: View {
             }
             Button { golf.showNewCard = true } label: {
                 Label("New golf card", systemImage: "plus.circle")
+            }
+            // Only drawn when the build actually has recordings in it. A switch that cannot make
+            // a sound is decoration, and decoration beside real controls is how somebody learns
+            // to stop reading them. The wording is *out loud* rather than *on* because a phone
+            // flipped to silent stays silent either way — that is the switch's decision, not ours.
+            if Calls.hasVoice {
+                Divider()
+                Button {
+                    Haptics.tap()
+                    callsOn.toggle()
+                    if !callsOn { Calls.hush() }
+                } label: {
+                    Label(
+                        callsOn ? "Stop calling the score out loud" : "Call the score out loud",
+                        systemImage: callsOn ? "speaker.slash" : "speaker.wave.2"
+                    )
+                }
             }
             Divider()
             Button(role: .destructive) { confirmDelete = true } label: {

@@ -117,6 +117,59 @@ test.describe.serial("a shared golf card", () => {
     await expect(page.getByText("Sunday scramble").first()).toBeVisible();
   });
 
+  /**
+   * The rule the group assumed they were playing and the app was not.
+   *
+   * Hole 2 is the first par 3 and hole 5 is the second. Finish 2 without naming anybody and its
+   * stakes roll: hole 5 is then worth two holes to whoever takes it, and the settle-up says so as
+   * an instruction rather than a column somebody has to solve.
+   */
+  test("a hole nobody wins rolls into the next one, and the board says who pays whom", async ({ page }) => {
+    const res = await page.request.post("/api/golf/cards", {
+      data: {
+        card: {
+          ...CARD,
+          id: "e2e-golf-carry",
+          name: "Carry it over",
+          points: {
+            ...CARD.points,
+            longestDrive: { on: false, each: 0, carry: false },
+            closestToPin: { on: true, each: 10, carry: true },
+          },
+        },
+      },
+    });
+    expect(res.ok()).toBe(true);
+    const { token: carried } = (await res.json()) as { token: string };
+
+    // Hole 2 is played out and nobody is named for the closest to the pin.
+    await page.goto(`/g/${carried}?hole=2`);
+    // By name and kept-count: hole 2 is a par 3, so the contest strip above has a "Corey" button
+    // of its own and that is exactly the one this must not press.
+    await page.getByRole("region", { name: "Log a stroke" }).getByRole("button", { name: /^Corey/ }).click();
+    await page.getByRole("button", { name: "Corey holed it" }).click();
+    await page.getByRole("region", { name: "Finish hole 2" }).getByRole("button", { name: "Finish the hole" }).click();
+
+    await page.getByRole("link", { name: "Tally" }).click();
+    const riding = page.getByLabel("Closest to the pin riding");
+    await expect(riding).toBeVisible();
+    await expect(riding.getByText("1 hole riding")).toBeVisible();
+    // Two holes at ten a head from three other players.
+    await expect(riding.getByText(/is worth 60 to whoever takes it/)).toBeVisible();
+
+    // Dan takes the next one and the whole pot goes with it.
+    await page.goto(`/g/${carried}?hole=5`);
+    await page.getByRole("region", { name: "Closest to the pin" }).getByRole("button", { name: "Dan" }).click();
+    await page.getByRole("link", { name: "Tally" }).click();
+    await expect(page.getByRole("region", { name: "Points" }).getByText("+60")).toBeVisible();
+    await expect(page.getByLabel("Closest to the pin riding")).toHaveCount(0);
+
+    // And the answer the group actually wanted: three names, one payee, no arithmetic.
+    const settling = page.getByRole("region", { name: "Settling up" });
+    await expect(settling.getByText("Corey")).toBeVisible();
+    await expect(settling.getByText(/3 payments and everybody.s square/)).toBeVisible();
+  });
+
   test("a link that names no card says so rather than pretending", async ({ page }) => {
     await page.goto("/g/ABCDEFGHJKMNPQRSTUVWXYZ2");
     await expect(page.getByText(/isn't here/)).toBeVisible();

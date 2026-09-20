@@ -78,6 +78,27 @@ enum Haptics {
         )
     }
 
+    /**
+     A hole just closed, and the buzz says which kind.
+
+     One gesture ends a hole, so the phone is the only thing that can tell you how it went without
+     looking at it — which in a cart, mid-conversation, holding a putter, is most of the time. The
+     four steps map onto the four things that actually happen: something rare, something good,
+     the expected thing, and the bad news.
+
+     An eagle borrows the week winner's roll rather than getting a fifth pattern of its own. That
+     is deliberate: the best thing that can happen in either contest should feel the same, and a
+     vocabulary of four things people can tell apart is worth more than one of five they cannot.
+     */
+    static func holed(toPar: Int) {
+        switch toPar {
+        case ..<(-1): wonTheWeek()
+        case -1: won()
+        case 0: lockedIn()
+        default: lost()
+        }
+    }
+
     /// Top of the season table. A climb: four taps, each one firmer than the last.
     static func tookTheLead() {
         play(

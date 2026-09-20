@@ -214,6 +214,32 @@ obvious once the first is true:
   and priced a closest to the pin did it to decide something, and the board that decides should not
   be the one you have to tap to reach. Shots kept is the other half of one segmented control.
 
+- **A bet nobody wins can roll into the next one**, per contest, and it is a *weight* rather than a
+  second settlement: `ContestResult.holes` is one plus every finished hole behind it that went
+  unclaimed, and `points` multiplies by it. A claim worth four holes settles exactly like four
+  claims worth one, so the pot arithmetic, the zero-sum column and the tests over it are untouched
+  by the feature. Two conditions gate the roll and the second is the one that is easy to miss:
+  the bet has to carry, **and the hole has to be over** — every par three is a contest hole from
+  the moment the card is dealt, so counting the ones nobody has reached would price the fourth tee
+  at the whole round. A run still open when the round ends never settles: money nobody won is
+  money nobody pays. The walk is a fold over current state and stores nothing, which is what keeps
+  it right through a par correction, a claim taken back, or three devices editing at once.
+  **`carry` decodes absent-as-off, which is deliberately not the default for a new card** — a
+  round played before this existed was settled under the old rule, and every phone and browser
+  holding it has to keep reading the same money out of it. A new card is offered the carry because
+  that is the bet people think they are making, and the setup sheet prices it in a sentence.
+  What is riding is on screen from the moment a hole goes begging (`riding` / `RidingStrip`),
+  not revealed at the end: a group told on the fourth tee that it is playing for 160 is having the
+  best part of the bet, and one that finds out afterwards is having an argument in the car park.
+- **The board is a record; the settle-up is an instruction.** `settleUp` turns the signed column
+  into the fewest payments that clear it — deepest debt against largest credit — because four
+  numbers adding to zero is a puzzle somebody solves badly at the bar while four people hold up
+  four screens. It sits *under* the board rather than replacing it: the column is how you check
+  the app is right, the payments are what you do about it. Ties keep the board's own order, and
+  `sorted` is not stable in Swift, so the board position is an explicit tiebreak there — three
+  browsers and a phone printing different instructions for the same round is precisely the
+  argument this ends.
+
 **A stroke on the Round tab is a menu, and the correction it makes is the one people actually
 make**: "that was Dan's, not Pete's", noticed once the hole is in and the tally has moved.
 `ScrambleCard.reassign` swaps the name (or makes it a penalty / nobody's) on the same stroke id,
@@ -330,6 +356,21 @@ light stroke on a dark ground swells where a dark stroke on a light one shrinks,
 light weights the dark cut nearly closed. The icon script, `TallyGlyph` and `TallyLoader.tsx` each
 carry both sets; change one and change all three. The tee is what makes the golf ball legible at
 22pt: a bare ball is a circle with specks on it.
+
+**A hole closes into three things at once, and one of them is not in the repo.** The swipe stamps
+the word, buzzes a pattern shaped by the score (`Haptics.holed(toPar:)` — four steps, because four
+is what somebody can tell apart through a cart holder) and calls the score out loud. The voice is
+recordings, not synthesis, and `ios/Tally/Resources/Calls/` is empty: the **file name is the whole
+wiring**, so `birdie.m4a` makes the app say birdie with no code change, and a word with no file is
+silent. Silence is the working state — a placeholder beep would have shipped and then become the
+sound the app makes — which is also why the mute row only appears in the card menu once a recording
+exists. `ScrambleTally.callNames` folds everything past a double bogey into one `worse`, because
+there is no recording of "+5". Two things about the audio session are decisions rather than
+defaults: the category is `.ambient` because the default `.soloAmbient` **pauses whatever is
+playing in the cart**, and `.ambient` also means the ring/silent switch wins — ducking is legal
+only on `.playback`, which overrides that switch, so the duck and the override are one choice and
+not two. `RoundView` holds the stamp for the length of the clip (capped) so the next tee does not
+slide up over the end of a word.
 
 The round's Live Activity is the one lock screen in the app that **needs no APNs key**: a scramble
 has no feed, so every change is a tap in this app and `RoundActivityService` updates the activity
