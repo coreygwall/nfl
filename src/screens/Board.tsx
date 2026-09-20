@@ -45,32 +45,49 @@ export function Board({ tab }: { tab: "week" | "season" }) {
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start lg:gap-8">
         <div>
           <EntryPicker />
-          {/* Both toggles share one line on a phone: two taps, no scrolling, nothing stacked. */}
-          <div className="grid grid-cols-2 gap-2 sm:gap-3">
-            <Segmented
-              value={tab}
-              label="Week or season"
-              pillId="board-range"
-              options={[
-                { value: "week", label: "Week" },
-                { value: "season", label: "Season" },
-              ]}
-              onChange={(v) => nav(v === "week" ? `/board/week/${boardWeek}${keepSort}` : `/board/season${keepSort}`)}
-            />
-            <Segmented
-              value={sort}
-              label="Sort the board"
-              pillId="board-sort"
-              options={[
-                { value: "points", label: "Points" },
-                { value: "possible", label: "Potential" },
-              ]}
-              onChange={setSort}
-            />
+          {/* Every way of reading the board together: which board, how it is sorted, and — on the
+              week — list or grid. The toggle is drawn for the whole of the week tab rather than
+              only once rows land, so the row does not reflow as the board loads.
+
+              The floor on the two segmented controls is what decides the shape. Three of these
+              across a phone leaves about forty pixels a label, and "Season" and "Potential" both
+              truncate at that width; the floor makes the toggle wrap to its own line instead, and
+              `ml-auto` keeps it against the right edge wherever it lands. A desktop fits all
+              three. Legible labels are worth more than the one short row this costs. */}
+          <div className="flex flex-wrap items-stretch gap-2 sm:gap-3">
+            <div className="min-w-[9.5rem] flex-1">
+              <Segmented
+                value={tab}
+                label="Week or season"
+                pillId="board-range"
+                options={[
+                  { value: "week", label: "Week" },
+                  { value: "season", label: "Season" },
+                ]}
+                onChange={(v) => nav(v === "week" ? `/board/week/${boardWeek}${keepSort}` : `/board/season${keepSort}`)}
+              />
+            </div>
+            <div className="min-w-[9.5rem] flex-1">
+              <Segmented
+                value={sort}
+                label="Sort the board"
+                pillId="board-sort"
+                options={[
+                  { value: "points", label: "Points" },
+                  { value: "possible", label: "Potential" },
+                ]}
+                onChange={setSort}
+              />
+            </div>
+            {tab === "week" && (
+              <div className="ml-auto flex items-center">
+                <LayoutToggle view={view} onChange={setView} />
+              </div>
+            )}
           </div>
           <div className="mt-4">
             {tab === "week" ? (
-              <WeekBoardView week={week!} sort={sort} view={view} onView={setView} onWeek={(w) => nav(`/board/week/${w}${keepSort}`)} />
+              <WeekBoardView week={week!} sort={sort} view={view} onWeek={(w) => nav(`/board/week/${w}${keepSort}`)} />
             ) : (
               <SeasonBoardView sort={sort} />
             )}
@@ -213,7 +230,7 @@ function PlaceBadge({ place, size = "md", muted = false }: { place: number; size
   );
 }
 
-function WeekBoardView({ week, sort, view, onView, onWeek }: { week: number; sort: BoardSort; view: BoardView; onView: (v: BoardView) => void; onWeek: (w: number) => void }) {
+function WeekBoardView({ week, sort, view, onWeek }: { week: number; sort: BoardSort; view: BoardView; onWeek: (w: number) => void }) {
   const board = useWeekBoard(week);
   const { player } = usePlayer();
   const [open, setOpen] = useState<string | null>(null);
@@ -226,20 +243,6 @@ function WeekBoardView({ week, sort, view, onView, onWeek }: { week: number; sor
         <ErrorState message={board.error.message} onRetry={() => board.refetch()} />
       ) : (
         <div className="mt-4">
-          <div className="flex items-baseline justify-between gap-3">
-            <p className="text-sm text-ink-2">
-              {board.data.lockedCount === 0
-                ? `Nothing has kicked off yet · ${board.data.rows.filter((r) => r.picksMade > 0).length} of ${board.data.rows.length} have picked`
-                : `${board.data.finalCount} of ${board.data.gameCount} games final`}
-            </p>
-            {board.data.rows.length > 0 && <LayoutToggle view={view} onChange={onView} />}
-          </div>
-          {/* Which of the two prizes this particular week is playing for. */}
-          <p className="mb-3 mt-0.5 text-xs text-ink-3">
-            {week < SEASON_START_WEEK
-              ? `Most points wins Week ${week}. These points don't carry into the season race — that starts in Week ${SEASON_START_WEEK}.`
-              : `Most points wins Week ${week}, and they all count towards the season.`}
-          </p>
           {board.data.rows.length === 0 ? (
             <EmptyState
               title="Nobody's on the board yet."
@@ -268,6 +271,21 @@ function WeekBoardView({ week, sort, view, onView, onWeek }: { week: number; sor
               ))}
             </motion.ul>
           )}
+          {/* How far through the week this is, and which of the two prizes it settles —
+              underneath, because it is a footnote about the standings rather than a heading over
+              them, and the top of this screen is for the standings and the ways of reading them. */}
+          <div className="mt-4">
+            <p className="text-sm text-ink-2">
+              {board.data.lockedCount === 0
+                ? `Nothing has kicked off yet · ${board.data.rows.filter((r) => r.picksMade > 0).length} of ${board.data.rows.length} have picked`
+                : `${board.data.finalCount} of ${board.data.gameCount} games final`}
+            </p>
+            <p className="mt-0.5 text-xs text-ink-3">
+              {week < SEASON_START_WEEK
+                ? `Most points wins Week ${week}. These points don't carry into the season race — that starts in Week ${SEASON_START_WEEK}.`
+                : `Most points wins Week ${week}, and they all count towards the season.`}
+            </p>
+          </div>
         </div>
       )}
     </div>

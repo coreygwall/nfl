@@ -7,16 +7,24 @@ import TallyKit
  */
 struct BoardView: View {
     @Environment(AppModel.self) private var model
+    /// List or grid. A preference rather than screen state, so the person who reads the board as
+    /// a table on Sunday finds it that way again on Monday. It lives up here with the other two
+    /// controls: all three are ways of looking at the same standings.
+    @AppStorage("tally.boardGrid") private var grid = false
 
     var body: some View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 10) {
+            HStack(spacing: 8) {
                 TallySegmented(value: $model.boardScope, options: [(.week, "Week"), (.season, "Season")])
                 TallySegmented(value: $model.boardSort, options: [(.points, "Points"), (.possible, "Potential")])
+                // Drawn for the whole of the week tab rather than only once rows land, so the row
+                // does not reflow under your thumb as the board loads. The season board has no
+                // grid, so it has no toggle.
+                if model.boardScope == .week { BoardLayoutToggle(grid: $grid) }
             }
             if model.boardScope == .week {
-                WeekBoardView(week: model.activeBoardWeek, sort: model.boardSort)
+                WeekBoardView(week: model.activeBoardWeek, sort: model.boardSort, grid: grid)
                     .id("\(model.player?.id ?? "-"):\(model.activeBoardWeek)")
             } else {
                 SeasonBoardView(sort: model.boardSort)
@@ -38,13 +46,12 @@ struct WeekBoardView: View {
     @Environment(AppModel.self) private var model
     let week: Int
     let sort: BoardSort
+    /// List or grid, decided by the toggle on the row above (`BoardView`).
+    let grid: Bool
     @State private var board: Loadable<WeekBoardResponse> = .idle
     @State private var open: String?
     @State private var celebrating = false
     @State private var confetti = 0
-    /// List or grid. A preference rather than screen state, so the person who reads the board as
-    /// a table on Sunday finds it that way again on Monday.
-    @AppStorage("tally.boardGrid") private var grid = false
 
     var body: some View {
         Group {
@@ -161,21 +168,6 @@ struct WeekBoardView: View {
             if !top.isEmpty {
                 WeekWinnerBanner(week: week, winners: top.map(\.name), points: top[0].points, isMe: iWon)
             }
-            VStack(alignment: .leading, spacing: 2) {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    Text(data.lockedCount == 0
-                         ? "Nothing has kicked off yet · \(data.rows.filter { $0.picksMade > 0 }.count) of \(data.rows.count) have picked"
-                         : "\(data.finalCount) of \(data.gameCount) games final")
-                        .sans(14).foregroundStyle(Color.ink2)
-                    Spacer(minLength: 8)
-                    if !data.rows.isEmpty { BoardLayoutToggle(grid: $grid) }
-                }
-                if week < model.seasonStartsAt {
-                    Text("Week \(week) has its own winner. The season race starts in Week \(model.seasonStartsAt).")
-                        .sans(12).foregroundStyle(Color.ink3)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
             if data.rows.isEmpty {
                 EmptyState(title: "Nobody's on the board yet.", body: "Be the first to lock in five picks.") {
                     Button("Make your picks") { model.pickWeek = week; model.tab = .picks }.buttonStyle(.tally(.primary, size: .small))
@@ -216,6 +208,21 @@ struct WeekBoardView: View {
                 }
                 .animation(Motion.settle, value: sort)
             }
+            // How far through the week this is, and which prize it settles — underneath, because
+            // it is a footnote about the standings rather than a heading over them, and the top
+            // of this screen is for the standings and the three ways of reading them.
+            VStack(alignment: .leading, spacing: 2) {
+                Text(data.lockedCount == 0
+                     ? "Nothing has kicked off yet · \(data.rows.filter { $0.picksMade > 0 }.count) of \(data.rows.count) have picked"
+                     : "\(data.finalCount) of \(data.gameCount) games final")
+                    .sans(13).foregroundStyle(Color.ink2)
+                if week < model.seasonStartsAt {
+                    Text("Week \(week) has its own winner. The season race starts in Week \(model.seasonStartsAt).")
+                        .sans(12).foregroundStyle(Color.ink3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(.top, 2)
         }
     }
 }

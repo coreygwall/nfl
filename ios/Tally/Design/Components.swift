@@ -317,26 +317,58 @@ struct Stamp: View {
  A row at the top of the scroll view is laid out by the same rules as everything under it, so the
  name is the width of the page and the bar keeps only the buttons that belong there.
  */
-struct ScreenHeader: View {
+/**
+ Where you are, and — for a contest that has controls — what you can do about it, on one line.
+
+ The name is still page content rather than a navigation-bar title: iOS 26 wraps a leading toolbar
+ item in glass sized to its own idea of the width, which for a pool's name was one letter. So the
+ pool's *controls* came down to the name instead of the name going up to them, and the bar is
+ hidden. That buys back a whole strip at the top of every tab, and the two things a header is for
+ — saying where you are and offering what belongs here — finally sit together.
+
+ `trailing` is empty for a family that has no controls (the app's own home, a golf card), which is
+ what the second initialiser is for.
+ */
+struct ScreenHeader<Trailing: View>: View {
     let mark: String
     let title: String
+    private let trailing: Trailing
+
+    init(mark: String, title: String, @ViewBuilder trailing: () -> Trailing) {
+        self.mark = mark
+        self.title = title
+        self.trailing = trailing()
+    }
 
     var body: some View {
         HStack(spacing: 10) {
-            Image(mark)
-                .resizable()
-                .scaledToFit()
-                .frame(width: 32, height: 32)
-            Text(title)
-                .font(TallyFont.display(26))
-                .foregroundStyle(Color.ink)
-                .lineLimit(1)
-                .minimumScaleFactor(0.7)
-            Spacer(minLength: 0)
+            HStack(spacing: 10) {
+                Image(mark)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(width: 32, height: 32)
+                Text(title)
+                    .font(TallyFont.display(26))
+                    .foregroundStyle(Color.ink)
+                    .lineLimit(1)
+                    // Lower than it was, because the name shares its line now. A long pool name
+                    // shrinks rather than pushing the controls off the right edge.
+                    .minimumScaleFactor(0.6)
+            }
+            // Only the name is the heading. Combining the whole row would swallow the controls,
+            // which are the reason the row exists.
+            .accessibilityElement(children: .combine)
+            .accessibilityAddTraits(.isHeader)
+            Spacer(minLength: 8)
+            trailing
         }
         .padding(.bottom, 12)
-        .accessibilityElement(children: .combine)
-        .accessibilityAddTraits(.isHeader)
+    }
+}
+
+extension ScreenHeader where Trailing == EmptyView {
+    init(mark: String, title: String) {
+        self.init(mark: mark, title: title) { EmptyView() }
     }
 }
 
