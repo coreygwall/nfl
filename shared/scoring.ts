@@ -139,7 +139,7 @@ export function assignPlaces<T extends Rankable & { place: number }>(rows: T[]):
  * picks for, so every one of those is *yours to see* — `revealIds` is that set, and the
  * requester alone is only the default for a caller that has not said otherwise.
  */
-function revealed(requesterId: string | null | undefined, revealIds: Iterable<string> | null | undefined): Set<string> {
+export function revealed(requesterId: string | null | undefined, revealIds: Iterable<string> | null | undefined): Set<string> {
   const set = new Set(revealIds ?? []);
   if (requesterId) set.add(requesterId);
   return set;

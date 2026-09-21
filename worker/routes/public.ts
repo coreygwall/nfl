@@ -9,6 +9,7 @@ import { isPoolCodeShaped, normalizePoolCode } from "../../shared/pool-codes.ts"
 import { clearedSessionCookie, hashToken, isLockedOut, lockUntil, MAX_CLAIM_ATTEMPTS, newToken, sessionCookie } from "../auth.ts";
 import { validatePicks } from "../../shared/picks.ts";
 import { buildSeasonBoard, buildWeekBoard } from "../../shared/scoring.ts";
+import { buildWinnings } from "../../shared/winnings.ts";
 import { boardWeek, gameStatus, isLocked, pickWeek, SEASON_START_WEEK, weekSummaries, WEEKS } from "../../shared/week.ts";
 import type { Game, Player } from "../../shared/types.ts";
 import type { PlayerPick } from "../../shared/scoring.ts";
@@ -23,6 +24,7 @@ import type {
   SeasonBoardResponse,
   WeekBoardResponse,
   WeekResponse,
+  WinningsResponse,
 } from "../../shared/api.ts";
 import {
   addDevice,
@@ -490,5 +492,19 @@ publicRoutes.get("/board/season", async (c) => {
   ]);
   const board = buildSeasonBoard({ season: SEASON, players: players.map(publicPlayer), picks, games, now, requesterId: c.get("player")?.id, revealIds });
   const res: SeasonBoardResponse = { now, ...board };
+  return c.json(res);
+});
+
+/** The real-money board: every week's pot and the season's, settled and split. */
+publicRoutes.get("/board/winnings", async (c) => {
+  const now = c.get("now");
+  const [games, players, picks, revealIds] = await Promise.all([
+    listGames(c.env.DB, SEASON),
+    listPlayers(c.env.DB),
+    listAllPicks(c.env.DB),
+    revealFor(c),
+  ]);
+  const board = buildWinnings({ season: SEASON, players: players.map(publicPlayer), picks, games, now, requesterId: c.get("player")?.id, revealIds });
+  const res: WinningsResponse = { now, ...board };
   return c.json(res);
 });

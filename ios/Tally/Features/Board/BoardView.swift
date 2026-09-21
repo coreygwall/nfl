@@ -349,7 +349,107 @@ struct SeasonBoardView: View {
                 }
                 .animation(Motion.settle, value: sort)
             }
+            WinningsCard()
         }
+    }
+}
+
+/**
+ The real-money board: what every entry has actually won, running. It sits under the season
+ standings rather than inside them — the points column already means something on every other
+ screen, and this is a different number entirely, so it gets its own card and its own `$` rather
+ than borrowing the points row's big digit. Mirrors `WinningsCard` on the web.
+ */
+struct WinningsCard: View {
+    @Environment(AppModel.self) private var model
+    @State private var board: Loadable<WinningsResponse> = .idle
+
+    var body: some View {
+        Group {
+            switch board {
+            // Real money is worth showing only once it is right — say nothing rather than guess,
+            // and the season standings above already carry the loading state for this screen.
+            case .idle, .loading, .failed: EmptyView()
+            case .loaded(let data): content(data)
+            }
+        }
+        .task { await load() }
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(300))
+                await load()
+            }
+        }
+    }
+
+    private func load() async {
+        if let fresh = try? await model.service.winnings() { board = .loaded(fresh) }
+    }
+
+    @ViewBuilder
+    private func content(_ data: WinningsResponse) -> some View {
+        // Nothing has settled yet — nothing to show.
+        if data.rows.contains(where: { $0.total > 0 }) {
+            VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("WINNINGS")
+                        .sans(10, weight: .bold).tracking(1)
+                        .foregroundStyle(Color.ink3)
+                    Text("\(Winnings.label(data.weeklyPot)) to each week's winner, \(Winnings.label(data.seasonPot)) to the season's\(data.seasonSettled ? "" : " once it's decided") — a tie splits the pot evenly.")
+                        .sans(12).foregroundStyle(Color.ink3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                ForEach(data.rows.filter { $0.total > 0 }) { row in
+                    WinningsRowView(row: row, isMe: row.playerId == model.player?.id)
+                }
+                if !data.weeks.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Rectangle().fill(Color.line).frame(height: 1)
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(data.weeks) { week in
+                                Text(weekLine(week)).sans(12).foregroundStyle(Color.ink2)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .cardFlat()
+        }
+    }
+
+    /// "Week 1 — Joseph Philbin — $18" alone, "Week 2 — Athens G & Parker split $9 each" tied.
+    private func weekLine(_ week: WeekWinnings) -> String {
+        let names = week.winnerNames.joined(separator: " & ")
+        let tail = week.winnerNames.count > 1 ? "split \(Winnings.label(week.share)) each" : "— \(Winnings.label(week.share))"
+        return "Week \(week.week) — \(names) \(tail)"
+    }
+}
+
+private struct WinningsRowView: View {
+    let row: WinningsRow
+    let isMe: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            PlaceBadge(place: row.place, small: true)
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 6) {
+                    Text(row.name).font(TallyFont.display(15, weight: .bold)).lineLimit(1)
+                    if isMe { Chip(text: "you", size: 10) }
+                    if row.mine && !isMe { Chip(text: "yours", size: 10) }
+                }
+                Text("\(row.weeksWon) week\(row.weeksWon == 1 ? "" : "s") won\(row.season > 0 ? " · season" : "")")
+                    .sans(11).foregroundStyle(Color.ink2)
+            }
+            Spacer(minLength: 8)
+            Text(Winnings.label(row.total))
+                .font(TallyFont.display(18, weight: .bold)).monospacedDigit()
+        }
+        .padding(8)
+        .background(isMe ? Color.flagSoft : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 

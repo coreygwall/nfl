@@ -545,6 +545,45 @@ took last week. (A golf card has its own three; see above.)
   place — so anything that has to be reachable mid-pick needs its own route out. That is what the
   flow's "Go to pool home" link is for, and why the e2e helpers reach Account by address.
 
+## Real money is a different board, computed once, on the server
+
+The points board and the money are two different numbers about the same picks, and they used to
+live nowhere: everyone in High Five knows there is $18 a week and $51 for the season, and nobody
+had anywhere the app actually said who had won which. `shared/winnings.ts` (`buildWinnings`) is
+that board — every week's pot and the season's, settled and split — served at `GET
+/board/winnings` and drawn as its own card under the season standings on both surfaces, never
+folded into the points column: "points" and "possible" already mean something else on every other
+screen, so this is always spoken of as **winnings** and always drawn with a `$`, on both surfaces,
+so nobody mistakes one column for the other.
+
+- **A week pays out the moment every one of its games has a result** — `buildWeekBoard`'s own
+  `place === 1` rows, same as the confetti the board already throws for a week's winner — not on
+  `SEASON_START_WEEK`, which only decides which weeks count towards the season pot. Week 1 crowns
+  its own winner same as any other, so it pays its own $18 same as any other. A week nobody picked
+  settles with no winner and no split; that is different from a week that has not finished yet,
+  and conflating them would either pay out early or swallow a pot nobody claimed.
+- **A tie splits the pot evenly, to the cent** — three people level at the top of a week share one
+  $18 pot three ways ($6.00 each), they do not each get $18. `split` rounds to the cent, which
+  means a pot that does not divide clean (say, seven ways) can land a cent or two short of the
+  total; that is the commissioner's to eat by hand, not something this board tries to solve, the
+  same posture the golf card's `settleUp` takes toward its own rounding.
+- **The season pot waits for the season's own last week (`WEEKS`), not the current leader.** A
+  board that paid the $51 out on whoever was ahead with games still to come would be paying out a
+  guess wearing a dollar sign. `buildSeasonBoard` already has the right tiebreak for who that is
+  once the season is actually over (points, correct, fives, name), so `buildWinnings` reuses its
+  `place` rather than re-deriving it — and refuses to hand the pot to a field that never played a
+  single counted week, which without that guard would read as a tie for first at zero and zero.
+- **The board is computed entirely by the Worker.** Neither client re-derives a split or a
+  tiebreak; both decode the same `WinningsResponse` and draw it. That is simpler than the golf
+  card's parity (there is no offline card to keep in sync), so only the two pot amounts and the
+  `$` label are typed out twice — `Winnings.swift` in TallyKit, pinned to `shared/winnings.ts` by
+  `winningsParity.test.ts` — because a Swift build cannot see the TypeScript and the cost of
+  drift here, same as golf's, is somebody's actual payout being wrong.
+- **The weekly log underneath the totals is the receipt.** "Week 1 — Philbin — $18", "Week 2 —
+  Parker & Athens G split $9 each" — the same sentence a commissioner would read out loud, so a
+  running total is never the only thing on screen: anyone can check *why* a number is what it is
+  without doing the arithmetic themselves.
+
 ## A pool has two ways in, and only one of them can be said out loud
 
 A link was the only way into a pool until `migrations/0012_pool_codes.sql`. It works when the

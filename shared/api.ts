@@ -3,6 +3,7 @@ import type { WeekSummary } from "./week.ts";
 import type { SeasonBoard, WeekBoard } from "./scoring.ts";
 import type { PickInput } from "./picks.ts";
 import type { ScrambleCard } from "./golf.ts";
+import type { WinningsBoard } from "./winnings.ts";
 
 export interface GameDTO extends Game {
   locked: boolean;
@@ -122,6 +123,9 @@ export interface WeekBoardResponse extends WeekBoard {
   now: string;
 }
 export interface SeasonBoardResponse extends SeasonBoard {
+  now: string;
+}
+export interface WinningsResponse extends WinningsBoard {
   now: string;
 }
 

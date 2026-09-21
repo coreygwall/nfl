@@ -46,6 +46,10 @@ public struct PoolService: Sendable {
         try await client.get("/board/season")
     }
 
+    public func winnings() async throws -> WinningsResponse {
+        try await client.get("/board/winnings")
+    }
+
     // MARK: Identity
 
     private struct NameBody: Encodable { let name: String }

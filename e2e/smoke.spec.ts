@@ -802,3 +802,49 @@ test("a settled season week is a labelled column, and the rest of the season is 
   await expect(page.getByLabel("Week 3: not played yet")).toBeVisible();
   await expect(page.getByLabel("Week 18: not played yet")).toBeVisible();
 });
+
+test("a lone winner takes the week's pot, and a tie splits it", async ({ page, request }) => {
+  const stamp = Date.now().toString(36);
+  const philbin = await (await request.post("/api/players", { data: { name: `Philbin ${stamp}` } })).json();
+  const parker = await (await request.post("/api/players", { data: { name: `Parker ${stamp}` } })).json();
+  const athens = await (await request.post("/api/players", { data: { name: `Athens G ${stamp}` } })).json();
+
+  // Weeks 9 and 10 — untouched by the rest of this suite, so nothing else's results or picks
+  // can turn Philbin's lone week or the tie into a bigger crowd than the test expects.
+  //
+  // Week 9: only Philbin picks, and picks right. Nobody to split the pot with.
+  const week9 = await (await request.get(`/api/league/weeks/9?now=${BEFORE}`, { headers: { "x-admin-pin": "1234" } })).json();
+  const games9 = week9.games as { id: string; home: string }[];
+  await request.put(`/api/weeks/9/picks?now=${BEFORE}`, {
+    headers: { "x-player-token": philbin.token },
+    data: { picks: [{ gameId: games9[0]!.id, team: games9[0]!.home, rank: 1 }] },
+  });
+  for (const g of games9) {
+    await request.put(`/api/league/games/${g.id}/result?now=${BEFORE}`, { headers: { "x-admin-pin": "1234" }, data: { winner: g.home } });
+  }
+
+  // Week 10: Parker and Athens G both pick the same winner. A tie for the top of the week.
+  const week10 = await (await request.get(`/api/league/weeks/10?now=${BEFORE}`, { headers: { "x-admin-pin": "1234" } })).json();
+  const games10 = week10.games as { id: string; home: string }[];
+  for (const p of [parker, athens]) {
+    await request.put(`/api/weeks/10/picks?now=${BEFORE}`, {
+      headers: { "x-player-token": p.token },
+      data: { picks: [{ gameId: games10[0]!.id, team: games10[0]!.home, rank: 1 }] },
+    });
+  }
+  for (const g of games10) {
+    await request.put(`/api/league/games/${g.id}/result?now=${BEFORE}`, { headers: { "x-admin-pin": "1234" }, data: { winner: g.home } });
+  }
+
+  const after = "2026-09-22T12:00:00Z";
+  await page.goto(`/welcome?claim=${philbin.player.id}&code=${philbin.code}&now=${after}`);
+  await page.waitForURL(/\/week\/\d+$/);
+  await page.goto(`/board/season?now=${after}`);
+
+  const winnings = page.getByRole("region", { name: "Winnings" });
+  await expect(winnings).toBeVisible();
+  // Alone in Week 1: the whole pot. Tied in Week 2: split down the middle.
+  await expect(winnings.getByText(`Philbin ${stamp}`).first()).toBeVisible();
+  await expect(winnings.getByText(/Week 9 —/)).toContainText("$18");
+  await expect(winnings.getByText(/Week 10 —/)).toContainText("split $9 each");
+});
