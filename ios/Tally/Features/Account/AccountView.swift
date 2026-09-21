@@ -45,6 +45,8 @@ struct AccountView: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 24) {
+            Text("Account").display(32)
+                .accessibilityAddTraits(.isHeader)
             header
             if inPool {
                 entriesSection
@@ -74,14 +76,14 @@ struct AccountView: View {
             if let account = accountIdentity, renaming?.id == account.id {
                 RenameForm(identity: account, onDone: { renaming = nil }, onCancel: { renaming = nil })
             } else {
-                HStack(spacing: 10) {
-                    Text(accountName).display(28).lineLimit(1).minimumScaleFactor(0.7)
+                VStack(alignment: .leading, spacing: 8) {
+                    Text(accountName).display(28)
+                        .fixedSize(horizontal: false, vertical: true)
                     if let account = accountIdentity {
-                        Button("Edit") { renaming = account }
+                        Button("Change display name") { renaming = account }
                             .buttonStyle(.tally(.plain, size: .small))
-                            .accessibilityLabel("Change your name")
+                            .accessibilityHint("Changes the name shown to other players. You stay signed in to the same account.")
                     }
-                    Spacer(minLength: 0)
                 }
             }
         }
@@ -449,7 +451,11 @@ private struct SettingsGroup<Content: View>: View {
 }
 
 private struct SettingsDivider: View {
-    var body: some View { DashedDivider().padding(.horizontal, 12) }
+    var body: some View {
+        Rectangle().fill(Color.line).frame(height: 1)
+            .padding(.horizontal, 12)
+            .accessibilityHidden(true)
+    }
 }
 
 /// Every signed-in account can create a named entry it owns.
@@ -722,7 +728,8 @@ private struct RenameForm: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            TextField("Name", text: $name)
+            Text("Display name").sans(13, weight: .semibold)
+            TextField("Display name", text: $name)
                 .tallyField()
                 .textInputAutocapitalization(.words)
                 .autocorrectionDisabled()
@@ -735,14 +742,14 @@ private struct RenameForm: View {
                     .fixedSize(horizontal: false, vertical: true)
             }
             HStack(spacing: 10) {
-                Button(busy ? "Saving…" : "Save") { Task { await submit() } }
+                Button(busy ? "Saving…" : "Save name") { Task { await submit() } }
                     .buttonStyle(.tally(.primary, size: .small))
                     .disabled(busy || !ready)
                 Button("Cancel", action: onCancel)
                     .buttonStyle(.tally(.plain, size: .small))
                     .disabled(busy)
             }
-            Text("This is the name on the board, so everybody in the pool sees it change.")
+            Text("Other players will see this name on the standings. Changing it keeps the same account, entry and picks.")
                 .sans(12).foregroundStyle(Color.ink3)
                 .fixedSize(horizontal: false, vertical: true)
         }
