@@ -3,6 +3,14 @@
 This is the durable list of product behavior intentionally shipped on web first. Update it when a
 web-only decision is made, and remove an item only after the native implementation ships.
 
+## Current native navigation (September 21, 2026)
+
+Later native work superseded the announcement placement described below: the feed now lives behind
+the consistent megaphone/peek, rather than inline on Pool. Home is the cross-contest switcher and
+Pool is the current pool's summary. See `navigation.md` and `ios-ux-review.md` for the current
+structure and the native-only navigation/accessibility changes in this review. These changes need
+an iOS build; a web deployment does not deliver them to installed apps.
+
 ## Pool home and navigation
 
 - [x] Make the native pool home the default destination for an old/shared pool link. It should let

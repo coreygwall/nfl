@@ -11,9 +11,25 @@ struct BoardView: View {
     var body: some View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 10) {
+            VStack(alignment: .leading, spacing: 10) {
                 TallySegmented(value: $model.boardScope, options: [(.week, "Week"), (.season, "Season")])
-                TallySegmented(value: $model.boardSort, options: [(.points, "Points"), (.possible, "Potential")])
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel("Standings period")
+                if model.boardScope == .week {
+                    WeekContext(week: model.activeBoardWeek, currentWeek: model.boot.value?.boardWeek ?? model.currentWeek, destination: "standings") {
+                        model.boardWeek = nil
+                    }
+                } else {
+                    Text("Season standings").display(22).accessibilityAddTraits(.isHeader)
+                }
+                TallySegmented(value: $model.boardSort, options: [(.points, "Points earned"), (.possible, "Potential points")])
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel("Sort standings by")
+                if model.boardSort == .possible {
+                    Text("Potential includes points still available from undecided picks. Rank badges show the actual standings.")
+                        .sans(12).foregroundStyle(Color.ink2)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
             }
             if model.boardScope == .week {
                 WeekBoardView(week: model.activeBoardWeek, sort: model.boardSort)
@@ -56,7 +72,7 @@ struct WeekBoardView: View {
         .task(id: week) { await load() }
         .task {
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(60))
+                do { try await Task.sleep(for: .seconds(60)) } catch { return }
                 await load(quiet: true)
             }
         }
@@ -228,7 +244,7 @@ struct SeasonBoardView: View {
         .task { await load() }
         .task {
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(60))
+                do { try await Task.sleep(for: .seconds(60)) } catch { return }
                 await load(quiet: true)
             }
         }

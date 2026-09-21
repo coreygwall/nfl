@@ -456,6 +456,7 @@ struct TallySegmented<T: Hashable>: View {
                         .minimumScaleFactor(0.85)
                         .frame(maxWidth: .infinity)
                         .padding(.vertical, 9)
+                        .frame(minHeight: 44)
                         .background {
                             if active {
                                 RoundedRectangle(cornerRadius: 14, style: .continuous)
