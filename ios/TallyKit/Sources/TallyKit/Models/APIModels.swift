@@ -334,6 +334,45 @@ public struct SeasonBoardResponse: Codable, Sendable {
     public var notStarted: Bool { throughWeek == 0 }
 }
 
+/// One settled week: who was alone (or tied) in first once every one of its games had a result,
+/// and what the pot came to for each of them. Mirrors `WeekWinnings` in `shared/winnings.ts`.
+public struct WeekWinnings: Codable, Hashable, Sendable, Identifiable {
+    public let week: Int
+    public let winnerIds: [String]
+    public let winnerNames: [String]
+    /// What each winner gets. Rounded to the cent — see `Winnings.label(_:)`.
+    public let share: Double
+    public var id: Int { week }
+}
+
+/// Mirrors `WinningsRow` in `shared/winnings.ts` — see there for what each field means.
+public struct WinningsRow: Codable, Hashable, Sendable, Identifiable {
+    public let playerId: String
+    public let name: String
+    public let isMe: Bool
+    public let mine: Bool
+    public let place: Int
+    public let weeksWon: Int
+    public let weekly: Double
+    public let season: Double
+    public let total: Double
+    public var id: String { playerId }
+}
+
+/// The real-money board: every week's pot and the season's, settled and split. Mirrors
+/// `WinningsBoard` in `shared/winnings.ts`.
+public struct WinningsResponse: Codable, Sendable {
+    public let now: Date
+    public let weeklyPot: Double
+    public let seasonPot: Double
+    /// Whether the season pot has a winner yet.
+    public let seasonSettled: Bool
+    /// Sorted by `total`, richest first.
+    public let rows: [WinningsRow]
+    /// One entry per week that has fully settled, in week order.
+    public let weeks: [WeekWinnings]
+}
+
 public struct SessionResponse: Codable, Sendable {
     public let player: Player
 }

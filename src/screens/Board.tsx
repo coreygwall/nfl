@@ -1,12 +1,13 @@
 import { useState } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router";
 import { AnimatePresence, motion } from "motion/react";
-import { useBootstrap, useSeasonBoard, useWeekBoard } from "../api/queries.ts";
+import { useBootstrap, useSeasonBoard, useWeekBoard, useWinnings } from "../api/queries.ts";
 import { usePlayer } from "../lib/player.tsx";
 import { useHeaderWeek } from "../components/Chrome.tsx";
 import { EntryPicker } from "../components/EntryPicker.tsx";
 import { TEAMS } from "../../shared/teams.ts";
 import { MAX_WEEK_POINTS, ordinal, type ScoredPick, type SeasonRow, type WeekRow } from "../../shared/scoring.ts";
+import { moneyLabel, SEASON_POT, WEEKLY_POT, type WinningsRow } from "../../shared/winnings.ts";
 import { SEASON_START_WEEK, WEEKS } from "../../shared/week.ts";
 import { CountUp, EmptyState, ErrorState, RankBadge, Segmented } from "../components/Common.tsx";
 import { BoardSkeleton } from "../components/TallyLoader.tsx";
@@ -485,7 +486,69 @@ function SeasonBoardView({ sort }: { sort: BoardSort }) {
           ))}
         </motion.ul>
       )}
+      <WinningsCard />
     </div>
+  );
+}
+
+/**
+ * The real-money board: what every entry has actually won, running. It sits under the season
+ * standings rather than inside them — the points column already means something on every other
+ * screen, and this is a different number entirely, so it gets its own card and its own `$` rather
+ * than borrowing the points row's big digit.
+ */
+function WinningsCard() {
+  const winnings = useWinnings();
+  const { player } = usePlayer();
+  if (winnings.isPending) return null; // the season standings above already carried the loading state
+  if (winnings.error) return null; // real money is worth showing only once it is right; say nothing rather than guess
+  const { rows, weeks, seasonSettled } = winnings.data;
+  if (rows.every((r) => r.total === 0)) return null; // nothing has settled yet — nothing to show
+  return (
+    <section className="card-flat mt-6 bg-surface p-4" aria-label="Winnings">
+      <h2 className="font-display mb-1 text-xs font-extrabold uppercase tracking-[0.12em] text-ink-3">Winnings</h2>
+      <p className="mb-3 text-xs text-ink-3">
+        {moneyLabel(WEEKLY_POT)} to each week's winner, {moneyLabel(SEASON_POT)} to the season's
+        {seasonSettled ? "" : " once it's decided"} — a tie splits the pot evenly.
+      </p>
+      <ul className="space-y-2">
+        {rows
+          .filter((r) => r.total > 0)
+          .map((row) => (
+            <WinningsRowItem key={row.playerId} row={row} isMe={row.playerId === player?.id} />
+          ))}
+      </ul>
+      {weeks.length > 0 && (
+        <ul className="mt-4 space-y-1 border-t-2 border-dashed border-line pt-3 text-xs text-ink-2">
+          {weeks.map((w) => (
+            <li key={w.week}>
+              <span className="font-bold text-ink-3">Week {w.week}</span> — {w.winnerNames.join(" & ")}
+              {w.winnerNames.length > 1 ? ` split ${moneyLabel(w.share)} each` : ` — ${moneyLabel(w.share)}`}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function WinningsRowItem({ row, isMe }: { row: WinningsRow; isMe: boolean }) {
+  return (
+    <li className={`flex items-center gap-3 rounded-2xl p-2 ${isMe ? "bg-flag-soft" : ""}`}>
+      <PlaceBadge place={row.place} size="sm" />
+      <div className="min-w-0 flex-1">
+        <div className="font-display flex items-center gap-2 truncate text-[15px] font-extrabold">
+          <span className="truncate">{row.name}</span>
+          {isMe && <span className="chip bg-surface py-0 text-[10px]">you</span>}
+          {row.mine && !isMe && <span className="chip bg-surface py-0 text-[10px]">yours</span>}
+        </div>
+        <p className="text-xs text-ink-2">
+          {row.weeksWon} week{row.weeksWon === 1 ? "" : "s"} won
+          {row.season > 0 ? " · season" : ""}
+        </p>
+      </div>
+      <span className="font-display shrink-0 tabular text-xl font-extrabold">{moneyLabel(row.total)}</span>
+    </li>
   );
 }
 

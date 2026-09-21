@@ -18,6 +18,7 @@ import type {
   SeasonBoardResponse,
   WeekBoardResponse,
   WeekResponse,
+  WinningsResponse,
 } from "../../shared/api.ts";
 import { api } from "./client.ts";
 import { usePlayer } from "../lib/player.tsx";
@@ -82,6 +83,21 @@ export function useSeasonBoard(enabled = true) {
   return useQuery({
     queryKey: ["board", "season", player?.id ?? null],
     queryFn: () => api<SeasonBoardResponse>("/board/season"),
+    enabled,
+    refetchInterval: 5 * 60_000,
+  });
+}
+
+/**
+ * The real-money board: every week's pot and the season's, settled and split. It scores the same
+ * ground `useSeasonBoard` does — every pick of every week, for everyone — so it moves on the same
+ * unhurried cadence: nobody's winnings change until a game finishes.
+ */
+export function useWinnings(enabled = true) {
+  const { player } = usePlayer();
+  return useQuery({
+    queryKey: ["board", "winnings", player?.id ?? null],
+    queryFn: () => api<WinningsResponse>("/board/winnings"),
     enabled,
     refetchInterval: 5 * 60_000,
   });
