@@ -1,7 +1,7 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../env.ts";
 import { callerIp } from "../env.ts";
-import { ApiError, badRequest, notFound } from "../errors.ts";
+import { ApiError, badRequest, notFound, refuseDeleted } from "../errors.ts";
 import { nameKey, validateName } from "../../shared/names.ts";
 import { isVulgar, VULGAR_MESSAGE } from "../../shared/profanity.ts";
 import { codesMatch, generateCode } from "../../shared/codes.ts";
@@ -28,6 +28,7 @@ import type {
 } from "../../shared/api.ts";
 import {
   addDevice,
+  anonymiseAccount,
   attachEntry,
   clearClaimFailures,
   countPasskeys,
@@ -129,7 +130,9 @@ publicRoutes.get("/bootstrap", async (c) => {
     boardWeek: boardWeek(games, now),
     seasonFromWeek: SEASON_START_WEEK,
     weeks: weekSummaries(games, now),
-    players: players.map((p) => ({ ...publicPlayer(p), claimed: (devices.get(p.id) ?? 0) > 0 || managedIds.has(p.id) })),
+    // A deleted account is still on the board (its picks are part of other people's results) but
+    // not on the roster: nobody should be offered "Former player" as a name to tap.
+    players: players.filter((p) => !p.deletedAt).map((p) => ({ ...publicPlayer(p), claimed: (devices.get(p.id) ?? 0) > 0 || managedIds.has(p.id) })),
     me,
     account,
     myEntries: account ? players.filter((p) => ids.has(p.id)).map(publicPlayer) : [],
@@ -352,6 +355,7 @@ publicRoutes.post("/players/:id/claim", async (c) => {
   const now = c.get("now");
   const player = await getPlayer(c.env.DB, c.req.param("id"));
   if (!player) throw notFound("NO_PLAYER", "That name is not in the pool.");
+  refuseDeleted(player);
   if (await c.env.DB.prepare("SELECT player_id FROM entry_owners WHERE player_id = ?").bind(player.id).first()) {
     throw new ApiError(403, "MANAGED_ENTRY", "This entry is managed through its owner's account. Sign in to that account.");
   }
@@ -403,6 +407,22 @@ publicRoutes.post("/session", async (c) => {
 });
 
 publicRoutes.delete("/session", (c) => {
+  c.header("set-cookie", clearedSessionCookie(c.req.url));
+  return c.json({ ok: true });
+});
+
+/**
+ * Delete your account (App Store Guideline 5.1.1(v): an app that makes accounts has to let people
+ * delete them from inside it). Anonymised rather than erased — see `anonymiseAccount` for exactly
+ * what goes and why the picks stay. The body has to say `confirm: true`, so a stray request from a
+ * half-built client can never do this by accident; both clients ask the person first.
+ */
+publicRoutes.delete("/me", async (c) => {
+  const account = c.get("account");
+  if (!account) throw new ApiError(401, "NO_PLAYER", "Sign in to delete your account.");
+  const body = (await c.req.json().catch(() => ({}))) as { confirm?: unknown };
+  if (body.confirm !== true) throw badRequest("CONFIRM_REQUIRED", "Confirm that you want to delete your account.");
+  await anonymiseAccount(c.env.DB, account.id, c.get("now"));
   c.header("set-cookie", clearedSessionCookie(c.req.url));
   return c.json({ ok: true });
 });

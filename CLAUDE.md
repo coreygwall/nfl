@@ -730,6 +730,35 @@ in the pull request that does the work. `docs/launch/listing.md` is the listing,
 and the review notes as drafts; the privacy manifests (`ios/Tally/PrivacyInfo.xcprivacy`,
 `ios/TallyWidgets/PrivacyInfo.xcprivacy`) have to keep saying the same thing as it and `/privacy`.
 
+### Four launch decisions that hold the code in shape
+
+- **A fresh install opens on the front door, not in a pool.** `AppModel.needsPool` is true on a
+  phone whose catalogue is empty, and `RootView` shows `FrontDoorView`: a code, a link, or the demo
+  pool. It used to seed the catalogue with High Five, which dropped every stranger from the App
+  Store onto a private group's roster with a name box. `switchPool` is what clears it, and it
+  treats choosing the placeholder pool as a real arrival, since `pool` holds `PoolRef.default`
+  meanwhile only so the model never has to be optional. Never re-seed the catalogue with a
+  default pool.
+- **A deleted account is anonymised, and `deleted_at` keeps it that way.** `DELETE /api/me` →
+  `anonymiseAccount`: the name becomes "Former player", with a `name_key` of `deleted:<id>`, and
+  every device, passkey, push token, role and managed entry goes. The picks stay, so nobody
+  else's past weeks or payouts move. Without `deleted_at` the row would read as a name nobody
+  holds, and the first device to tap it would get it. So `refuseDeleted` (410) guards claim,
+  commissioner attach, rename, reset-access and entering picks, and the bootstrap roster leaves
+  deleted players out. **Any new route that can put somebody into a player must call it.**
+- **The demo pool is a second deployment, not a second pool.** One Worker serves one pool, so
+  `demo.playtally.app` is `env.demo` in `wrangler.jsonc`: its own name (`nfl-demo`), its own D1,
+  one cron, `DEMO=true`. `worker/demo.ts` tops up its made-up players on every firing. The build
+  picks the environment (`CLOUDFLARE_ENV=demo npm run build`, because the Vite plugin decides at
+  build time), and `docs/launch/demo-pool.md` covers deploying it. App Review's code lives in that
+  database, never in the repo.
+- **Teams are drawn as colours and letters, never logos.** The logos are NFL trademarks nobody has
+  licensed to Tally, and Guideline 5.2.1 rejects pick'em apps for them. `TeamSticker` (both
+  surfaces) fills with the primary, rings with the secondary and sets the abbreviation in whichever
+  of white or black reads (`labelIsDark`, one per language; `teamBadge.test.ts` checks all 32). The
+  app bundle carries no logo images, and `build-ios-assets.ts` no longer makes them. The web still
+  uses them in three places: tracker item W1.
+
 ## Before opening a pull request
 
 The `CI` check runs these, and a pull request cannot merge until it passes — but running them first

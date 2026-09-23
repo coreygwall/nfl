@@ -60,5 +60,43 @@
     // (it travels in the header of every push), but useless without the key.
     "APNS_KEY_ID": ""
   },
-  "observability": { "enabled": true }
+  "observability": { "enabled": true },
+  // The demo pool: the same Worker, a database of its own, at demo.playtally.app. Made-up players
+  // pick every week (`worker/demo.ts`, switched on by DEMO), the games and results are the real
+  // ones, and nothing in it can reach a real pool. It is what the iOS front door's "look around"
+  // opens and where App Review signs in. Deployed with `npx wrangler deploy --env demo`; see
+  // docs/launch/demo-pool.md for how it is wired up.
+  //
+  // One cron, not two: the free plan's five are per account, and the demo takes its daily
+  // schedule sync from the 10:00 UTC firing of this one instead. No APNs key, deliberately: a
+  // made-up pool has nobody to notify, and a reviewer should not be woken by one.
+  "env": {
+    "demo": {
+      "name": "nfl-demo",
+      "workers_dev": false,
+      "routes": [{ "pattern": "demo.playtally.app", "custom_domain": true }],
+      "d1_databases": [
+        {
+          "binding": "DB",
+          "database_name": "nfl-demo",
+          "database_id": "254f2862-3f6c-4bad-94c5-a9d25af62624",
+          "migrations_dir": "migrations"
+        }
+      ],
+      "triggers": { "crons": ["*/30 * * * *"] },
+      "vars": {
+        "ENVIRONMENT": "production",
+        "APP_NAME": "Tally",
+        "POOL_TYPE": "High Five",
+        "POOL_SLUG": "demo",
+        "POOL_NAME": "Tally Demo",
+        "DEMO": "true",
+        "APPLE_APP_IDS": "8445LWRG3B.app.playtally.ios",
+        "APPLE_APP_STORE_ID": "",
+        "APPLE_TEAM_ID": "8445LWRG3B",
+        "APPLE_BUNDLE_ID": "app.playtally.ios",
+        "APNS_KEY_ID": ""
+      }
+    }
+  }
 }

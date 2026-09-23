@@ -1,6 +1,6 @@
 import { Hono } from "hono";
 import type { AppEnv } from "../env.ts";
-import { ApiError, badRequest, notFound } from "../errors.ts";
+import { ApiError, badRequest, notFound, refuseDeleted } from "../errors.ts";
 import { nameKey, validateName } from "../../shared/names.ts";
 import { validatePicks } from "../../shared/picks.ts";
 import type {
@@ -121,6 +121,7 @@ commissionerRoutes.post("/players/:id/attach", async (c) => {
   if (!account) throw new ApiError(401, "NO_PLAYER", "Sign in to attach an entry to your account.");
   const player = await getPlayer(c.env.DB, c.req.param("id"));
   if (!player) throw notFound("NO_PLAYER", "No such player");
+  refuseDeleted(player);
   if (player.id === account.id) throw badRequest("SELF", "That's already your own entry.");
   const owner = await ownerOfEntry(c.env.DB, player.id);
   if (owner) {
@@ -154,6 +155,7 @@ commissionerRoutes.put("/players/:id/ready", async (c) => {
 commissionerRoutes.patch("/players/:id", async (c) => {
   const player = await getPlayer(c.env.DB, c.req.param("id"));
   if (!player) throw notFound("NO_PLAYER", "No such player");
+  refuseDeleted(player);
   const body = (await c.req.json().catch(() => ({}))) as { name?: unknown };
   const check = validateName(body.name);
   if (!check.ok) throw badRequest("INVALID_NAME", check.message);
@@ -179,6 +181,7 @@ commissionerRoutes.delete("/players/:id", async (c) => {
 commissionerRoutes.post("/players/:id/reset-access", async (c) => {
   const player = await getPlayer(c.env.DB, c.req.param("id"));
   if (!player) throw notFound("NO_PLAYER", "No such player");
+  refuseDeleted(player);
   const owner = await ownerOfEntry(c.env.DB, player.id);
   if (owner) {
     throw new ApiError(409, "MANAGED_ENTRY", `${player.name} is managed through ${owner.name}'s account, so there is no separate recovery code.`);
@@ -222,6 +225,7 @@ commissionerRoutes.get("/weeks/:week", async (c) => {
 commissionerRoutes.put("/players/:id/weeks/:week/picks", async (c) => {
   const player = await getPlayer(c.env.DB, c.req.param("id"));
   if (!player) throw notFound("NO_PLAYER", "No such player");
+  refuseDeleted(player);
   const week = parseWeek(c.req.param("week"));
   const now = c.get("now");
   const body = (await c.req.json().catch(() => ({}))) as { picks?: unknown };

@@ -24,6 +24,8 @@ export interface Env {
   APNS_KEY_ID?: string;
   APPLE_TEAM_ID?: string;
   APPLE_BUNDLE_ID?: string;
+  /** "true" only on the demo pool (`env.demo` in wrangler.jsonc): made-up players who pick every week. */
+  DEMO?: string;
 }
 
 export type AppEnv = {

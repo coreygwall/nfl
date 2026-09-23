@@ -412,6 +412,9 @@ struct WinningsCard: View {
                         }
                     }
                 }
+                Text(Winnings.noMoneyNote)
+                    .sans(11).foregroundStyle(Color.ink3)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .padding(12)
             .frame(maxWidth: .infinity, alignment: .leading)

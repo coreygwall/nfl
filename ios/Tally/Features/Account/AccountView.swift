@@ -29,6 +29,9 @@ struct AccountView: View {
     @State private var adding = false
     @State private var attaching = false
     @State private var confirmSignOut = false
+    @State private var confirmDelete = false
+    @State private var deleting = false
+    @State private var deleteError: String?
     @State private var renaming: Identity?
     @State private var showLabs = false
     /// Drawn from the pool's shell, or from a golf card's. The account is the same person either
@@ -366,6 +369,7 @@ struct AccountView: View {
                 .padding(12)
             }
             signOutRow
+            deleteRow
         }
     }
 
@@ -397,6 +401,51 @@ struct AccountView: View {
         } message: {
             Text("Your picks stay on the board and nothing is deleted. Signing back in on this phone needs \(Biometry.label) or your code.")
         }
+    }
+}
+
+extension AccountView {
+    /**
+     Deleting the account (App Store Guideline 5.1.1(v)). This *is* irreversible, so it is the one
+     control here that takes the solid `.danger` fill that signing out deliberately does not — and
+     it asks first, saying the part nobody would guess: the picks stay on the board as "Former
+     player", because they are part of other people's results. It waits for the server rather than
+     firing and forgetting, since a deletion that quietly failed would leave somebody believing
+     they were gone.
+     */
+    var deleteRow: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            Button(deleting ? "Deleting…" : "Delete account") {
+                Haptics.tap()
+                confirmDelete = true
+            }
+            .buttonStyle(.tally(.danger, fullWidth: true))
+            .disabled(deleting)
+            if let deleteError {
+                Text(deleteError).sans(13, weight: .semibold).foregroundStyle(Color.danger)
+            }
+        }
+        .padding(.top, 18)
+        .confirmationDialog("Delete \(accountName)?", isPresented: $confirmDelete, titleVisibility: .visible) {
+            Button("Delete my account", role: .destructive) {
+                deleting = true
+                deleteError = nil
+                Task {
+                    deleteError = await model.deleteAccount()
+                    deleting = false
+                }
+            }
+            Button("Keep it", role: .cancel) {}
+        } message: {
+            Text(deleteMessage)
+        }
+    }
+
+    private var deleteMessage: String {
+        var lines = ["Your name comes off the pool and every device signed in as you is signed out."]
+        if entries.count > 1 { lines.append("The other entries you pick for are deleted with it.") }
+        lines.append("Your past picks stay on the board as “Former player”, so other people's results don't change. This can't be undone.")
+        return lines.joined(separator: " ")
     }
 }
 

@@ -11,6 +11,7 @@ import rolesSchema from "../migrations/0010_roles.sql?raw";
 import messagesSchema from "../migrations/0011_messages.sql?raw";
 import poolCodesSchema from "../migrations/0012_pool_codes.sql?raw";
 import golfCardsSchema from "../migrations/0013_golf_cards.sql?raw";
+import accountDeletionSchema from "../migrations/0014_account_deletion.sql?raw";
 import schedule from "../shared/schedule-2026.json";
 import { finalsFromCsv, gamesFromCsv, NFLVERSE_GAMES_CSV } from "../shared/nflverse.ts";
 import { applyResults, ensurePool, getMeta, listGames, setMeta, updateKickoffs, upsertGames } from "./db.ts";
@@ -28,8 +29,8 @@ const split = (sql: string) =>
 
 const statements = split(schema);
 // Everything after the initial schema: additive, and safe to re-run.
-const alterStatements = [...split(devicesSchema), ...split(householdSchema), ...split(readySchema), ...split(passkeySchema), ...split(entriesSchema), ...split(rateLimitSchema), ...split(pickHistorySchema), ...split(pushSchema), ...split(rolesSchema), ...split(messagesSchema), ...split(poolCodesSchema), ...split(golfCardsSchema)];
-const SCHEMA_REVISION = "0013_golf_cards";
+const alterStatements = [...split(devicesSchema), ...split(householdSchema), ...split(readySchema), ...split(passkeySchema), ...split(entriesSchema), ...split(rateLimitSchema), ...split(pickHistorySchema), ...split(pushSchema), ...split(rolesSchema), ...split(messagesSchema), ...split(poolCodesSchema), ...split(golfCardsSchema), ...split(accountDeletionSchema)];
+const SCHEMA_REVISION = "0014_account_deletion";
 const SCHEMA_REVISION_KEY = "app_schema_revision";
 const RUNTIME_REVISION_KEY = "app_runtime_revision";
 
@@ -74,7 +75,11 @@ async function hasCurrentLegacySchema(db: D1Database): Promise<boolean> {
   const cards = await db.prepare(
     "SELECT count(*) AS n FROM sqlite_master WHERE type = 'table' AND name = ?",
   ).bind("golf_cards").first<{ n: number }>();
-  return cards?.n === 1;
+  if (cards?.n !== 1) return false;
+  const deleted = await db.prepare("SELECT count(*) AS n FROM pragma_table_info('players') WHERE name = ?")
+    .bind("deleted_at")
+    .first<{ n: number }>();
+  return deleted?.n === 1;
 }
 
 async function prepareRuntime(env: Env): Promise<void> {

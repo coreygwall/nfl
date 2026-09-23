@@ -1,19 +1,19 @@
-// Rasterises the team logos, the marks and the app icon into the iOS asset catalogue, and the
-// web's touch icon from the same artwork.
+// Rasterises the marks and the app icon into the iOS asset catalogue, and the web's touch icon
+// from the same artwork. It used to rasterise the 32 team logos as well; the app draws a team as
+// its colours and abbreviation now (`TeamSticker.swift`), because the logos are trademarks Tally
+// has no licence for, so they are deliberately not shipped in the app bundle.
 // Usage: node scripts/build-ios-assets.ts   (fonts are scripts/build-ios-fonts.py)
 //
 // PNG at 1x/2x/3x rather than the SVGs themselves: Xcode's SVG support covers a subset of the
-// format, and a logo it cannot render fails the build. A bitmap at three scales is boring and
-// cannot fail. 128pt is the largest a sticker is ever drawn, so 3x is 384px.
-import { existsSync, mkdirSync, mkdtempSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+// format, and artwork it cannot render fails the build. A bitmap at three scales is boring and
+// cannot fail.
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import path from "node:path";
 import { chromium } from "@playwright/test";
 
 const ROOT = path.resolve(new URL("..", import.meta.url).pathname);
-const LOGOS = path.join(ROOT, "public/logos");
 const CATALOG = path.join(ROOT, "ios/Tally/Assets.xcassets");
-const STICKER_PT = 128;
 const MARK_PT = 64;
 
 const contents = (images: object[], extra: object = {}) =>
@@ -45,21 +45,6 @@ async function main() {
       if (!ok) throw new Error(`Could not render ${src}`);
       await page.screenshot({ path: `${out}${scale === 1 ? "" : `@${scale}x`}.png`, omitBackground: true });
     }
-  }
-
-  // Team stickers: one imageset per team, named team-<ABBR>.
-  const files = readdirSync(LOGOS).filter((f) => /\.(svg|png)$/.test(f));
-  for (const file of files) {
-    const abbr = file.replace(/\.(svg|png)$/, "");
-    const dir = path.join(CATALOG, `team-${abbr}.imageset`);
-    rmSync(dir, { recursive: true, force: true });
-    mkdirSync(dir, { recursive: true });
-    await render(path.join(LOGOS, file), STICKER_PT, path.join(dir, abbr));
-    writeFileSync(
-      path.join(dir, "Contents.json"),
-      contents([1, 2, 3].map((s) => ({ idiom: "universal", filename: `${abbr}${s === 1 ? "" : `@${s}x`}.png`, scale: `${s}x` }))),
-    );
-    console.log(`team-${abbr}`);
   }
 
   // The marks: the app's own, and one per family of contest. Same badge every time — yellow ground,

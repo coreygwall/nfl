@@ -83,9 +83,8 @@ football,confidence,pool,pickem,nfl,office pool,friends,family,league,standings,
 ```
 
 Before submitting, check that "nfl" in keywords is acceptable. Apple rejects **trademarked terms
-you have no rights to** in keywords (Guideline 2.3.7). The app already shows real team names and
-logos, so that is a wider question: see *Risks* below. The safe version replaces `nfl` with
-`gridiron`.
+you have no rights to** in keywords (Guideline 2.3.7), and a keyword isn't describing a game the
+way a team name on a pick is. The safe version replaces `nfl` with `gridiron`. See *Risks* below.
 
 ### Categories
 
@@ -148,20 +147,25 @@ Let the questionnaire set the rating. Don't pick a rating first and fill in answ
 
 ## Review notes
 
-Paste into *App Review Information → Notes*. Fill in the sign-in once the demo pool exists
-(decision D2).
+Paste into *App Review Information → Notes*. The code comes out of the demo database once it is
+deployed (`demo-pool.md`, "The App Review sign-in"). It never goes in this file.
 
 ```
 Tally is a free football confidence pool for private groups of friends and family. Each week a
 player picks five games and ranks them; a correct pick scores 5 down to 1 point by rank.
 
 SIGNING IN
-Tally has no email or password. A pool is joined with a short code:
-  1. Open the app and tap "Join a pool". Enter the pool code: ___-___
+Tally has no email or password. To see a pool in the middle of a season:
+  1. Open the app and tap "Look around the demo pool".
   2. Tap "Already in this pool?", then tap the name "App Review".
   3. Enter the sign-in code: ________
-That signs in to a demonstration pool with a season of picks already made.
-Face ID (a passkey) is offered after sign-in and is optional.
+That signs in to a demonstration pool whose players are made up, as a player with a season of
+picks already made. Typing any new name on that screen also works: it joins the demo pool as a
+new player. Face ID (a passkey) is offered after sign-in and is optional.
+
+DELETING AN ACCOUNT
+Account > Delete account. The name is removed and every device is signed out; past picks stay on
+the board as "Former player" so other players' results don't change.
 
 MONEY
 Tally takes no payments, holds no money and pays nothing out. Some groups agree a small weekly
@@ -179,11 +183,12 @@ Contact: cwall800@gmail.com
 
 ## Risks to clear before submitting
 
-- **Team names and logos.** The app shows real NFL team names and logos. Apple can reject an app
-  for using third-party marks without permission (Guideline 5.2.1), and pick'em apps are a known
-  target. Options, from the least work: keep the names and drop the logos in favour of colour and
-  abbreviation (the board's grid already does this); or keep both and be ready to prove rights.
-  This needs a look before the first submission, not after the rejection.
-- **The winnings card** (decision D3).
-- **The reviewer's pool** (decision D2): a reviewer who can't sign in rejects on the spot, and
-  that is the most common rejection there is.
+- **Team names.** The logos are gone from the app (D7): a team is its colours and its
+  abbreviation. The names remain, used to say which real game a pick is on, which is how every
+  pick'em and scores app on the Store uses them. `nfl` in the keywords is the one use that isn't
+  describing a game; swap it for `gridiron` if Apple objects.
+- **The winnings card** (D3). It now says under it, on both surfaces, that Tally doesn't collect,
+  hold or pay out money, and the review notes say the same.
+- **The reviewer's pool** (D2). A reviewer who can't sign in rejects on the spot, and that is the
+  most common rejection there is. The demo pool has to be deployed (C11) and the code pasted in
+  before submitting.

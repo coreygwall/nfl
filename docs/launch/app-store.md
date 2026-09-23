@@ -25,23 +25,24 @@ not have.
 
 | # | Item | Owner | Status | Notes |
 | --- | --- | --- | --- | --- |
-| B1 | **Delete your account in the app** (Guideline 5.1.1(v)). Any app that creates accounts must let a person delete theirs from inside the app. Today `/privacy` says "ask your commissioner". Needs a route (`DELETE /api/me`), a confirmed button on Account (iOS and web) and a new line on `/privacy`. | — | decide | Blocked on D1. |
+| B1 | **Delete your account in the app** (Guideline 5.1.1(v)). `DELETE /api/me` anonymises the account (D1), with a confirmed button on Account on both iOS and the web, and `/privacy` says what happens. | Claude | done | PR #68. `deleteAccount.test.ts`, plus an e2e test. |
 | B2 | **Privacy manifests** for the app and the widget extension. They're needed because the app reads and writes `UserDefaults`. | Claude | done | This PR: `ios/Tally/PrivacyInfo.xcprivacy`, `ios/TallyWidgets/PrivacyInfo.xcprivacy`. |
-| B3 | **A way in for App Review.** The reviewer has to be able to sign in and see a live pool, with a name and code written into the review notes. | — | decide | Blocked on D2. |
+| B3 | **A way in for App Review.** The demo pool (D2) has a made-up **App Review** player with a season of picks. | Claude | blocked | The code is written. Blocked on C11 (deploying the demo), then an agent reads the code out of the demo database (`demo-pool.md`). |
 | B4 | **Report and block for user content** (Guideline 1.2). Names, announcements and golf card names are user content. A profanity screen exists (`shared/profanity.ts`), and announcements are commissioner-only. Still missing: a "Report" action on an announcement and on a board row, plus a published contact. Smallest version: a mailto to `SUPPORT_EMAIL` with the pool, the item and the reporter prefilled. | — | todo | Either agent. |
-| B5 | **Support URL.** App Store Connect wants a web page, not an email address. Add `/support` on the web: the contact address, how to recover a lost device, and how to delete your account (after B1). | — | todo | Either agent. |
+| B5 | **Support URL.** App Store Connect wants a web page, not an email address. Add `/support` on the web: the contact address, how to recover a lost device, and how to delete your account (Account ▸ Delete account). | — | todo | Either agent. |
+| B6 | **A fresh install must not land in High Five.** It used to open straight onto a private group's pool, roster and all. Now it opens on a front door with three ways in: a code, a link, or the demo pool. | Claude | done | PR #68. `FrontDoorView`, `AppModel.needsPool`. |
 
 ## 2. Decisions for Corey
 
-| # | Question | Recommendation |
+| # | Question | Decided |
 | --- | --- | --- |
-| D1 | **What deleting an account does to the board.** Removing the player row outright rewrites history: past weekly winners and the winnings log change under everyone. | **Anonymise, don't erase.** Drop the name (show "Former player"), every device, passkey, push token and session, and the entries it owns if nobody else manages them. Keep the picks so past weeks and payouts stay true. Say exactly that on `/privacy`. |
-| D2 | **Where App Review signs in.** Putting a reviewer into High Five puts a stranger on your friends' board. | **A demo pool on its own host** (`demo.playtally.app`, its own D1) with a dozen made-up players and a season of picks. It's also where the screenshots come from (A2). If that's too much work before launch, a "App Review" entry in High Five that you remove afterwards also works. |
-| D3 | **The winnings board shows dollars.** Guideline 5.3.4 is about real-money gaming, and a reviewer can read "$18 pot" as that. | **Keep it, and explain it in the review notes**: Tally takes no money, moves no money and offers no odds. It records what a private group agreed among themselves, like the spreadsheet it replaces. If it's rejected, drop the card from iOS; the web keeps it. Don't hide it for review and turn it on afterwards: that breaks Guideline 2.3.1 and gets apps pulled. |
-| D4 | **iPhone only for 1.0?** The project targets iPhone and iPad (`TARGETED_DEVICE_FAMILY = "1,2"`). That means 13" iPad screenshots and a review of the iPad layouts. | **iPhone only for 1.0.** Set `"1"` in the project and `project.yml`; iPads still run it in compatibility mode. Add iPad in 1.1 once it has had a real look. |
-| D5 | **The name on the Store.** "Tally" is almost certainly taken. The name on the Store must be unique, and can differ from the icon's name, which stays Tally. | Try **"Tally: Pick'em Pools"**, then "Tally Pick'em" as a fallback. |
-| D6 | **Golf in 1.0.** It's behind Labs and off by default. | **Leave it in, off**, and tell the reviewer where the switch is (the review notes say so). |
-| D7 | **Team logos.** The app draws real NFL team logos, which are trademarks. Guideline 5.2.1 lets Apple reject an app that uses them without permission, and pick'em apps get checked for it. | **Settle it before the first submission.** The cheapest safe version keeps the team names and draws each team as its colours and abbreviation (the board's grid already does). Keeping the logos means being able to show you have the rights. See `listing.md` → *Risks*. |
+| D1 | What deleting an account does to the board | **Anonymise, don't erase** (Corey, 23 Sep). The name becomes "Former player", and every device, passkey, push token, session and role goes, along with the entries the account manages. The picks stay, so past weeks and payouts don't change. Done: B1. |
+| D2 | Where App Review signs in | **A demo pool on its own host** (Corey, 23 Sep): `demo.playtally.app`, its own database, made-up players who pick every week. The code is done. Deploying it is C11. See `demo-pool.md`. |
+| D3 | The winnings board shows dollars | **Keep it, and say plainly that no money changes hands** (Corey, 23 Sep). Both surfaces put `NO_MONEY_NOTE` under the card, and the review notes say it too. |
+| D4 | iPhone only for 1.0? | **Yes** (Corey, 23 Sep). `TARGETED_DEVICE_FAMILY = 1`. |
+| D5 | The name on the Store | **Still open.** Try "Tally: Pick'em Pools", then "Tally Pick'em". |
+| D6 | Golf in 1.0 | **Leave it in, off**; the review notes say where the switch is. |
+| D7 | Team logos | **Drop them in the app** (Corey, 23 Sep). A team is drawn as its colours with its abbreviation ("KC", "LAR"), on iOS and in the web's pick screens. The logo images aren't in the app bundle any more. The web still uses them in three places: see W1. |
 
 ## 3. App Store Connect and the developer portal (Corey)
 
@@ -57,6 +58,7 @@ not have.
 | C8 | Export compliance: *uses encryption: yes, exempt (HTTPS only)*. | todo | Or L3 answers it in the build, so the question goes away. |
 | C9 | TestFlight: an external group and a public link. Beta review takes about a day. Aim for a week of real use before submitting. | todo | |
 | C10 | Upload the screenshots (A2) and paste the listing text (`listing.md`). | todo | |
+| C11 | **Deploy the demo pool.** Cloudflare → Workers & Pages → Import `coreygwall/nfl` as `nfl-demo`, build command `CLOUDFLARE_ENV=demo npm run build`. Step by step in `demo-pool.md`. | todo | Blocks B3 and A2. The database already exists. |
 
 ## 4. Build and configuration (agents)
 
@@ -68,13 +70,15 @@ not have.
 | L4 | `APPLE_APP_STORE_ID` in `wrangler.jsonc`, after C1. It turns on Safari's "Open in the app" banner. | — | blocked | Blocked on C1. |
 | L5 | Copyright (`INFOPLIST_KEY_NSHumanReadableCopyright` is empty). | — | todo | "© 2026 Corey Wall", unless Corey wants a company name. |
 | L6 | `project.yml` says `UIUserInterfaceStyle: Light`, but the app has a dark mode and the checked-in project doesn't pin it. Make the fallback file agree with the project. | — | todo | Housekeeping. It only matters if someone regenerates the project. |
+| L7 | iPhone only (D4). | Claude | done | PR #68. |
+| W1 | **The web's last logos**: the drifting band on the landing page (`Welcome.tsx`), the loader (`TallyLoader.tsx`), and both share images (`og.jpg`, `og-tally.jpg`, `scripts/build-og.ts`). Draw them the way `TeamSticker` does now, then delete `public/logos` and the `logo` field in `shared/teams.ts`. | — | todo | Not an App Review item: Apple doesn't review the website. It's the same trademark question, though. |
 
 ## 5. Listing assets
 
 | # | Item | Owner | Status | Notes |
 | --- | --- | --- | --- | --- |
 | A1 | Listing copy: name, subtitle, keywords, description, promotional text, review notes. | Claude | done | First draft in `listing.md`. Corey edits it. |
-| A2 | Screenshots, 6.9" iPhone (1320 × 2868). Three to six of them: picks, the board, the week in progress, the Live Activity, Home. Best made by a script on the macOS runner against the demo pool (D2), so they can be remade whenever the UI changes. | — | blocked | Blocked on D2. |
+| A2 | Screenshots, 6.9" iPhone (1320 × 2868). Three to six of them: picks, the board, the week in progress, the Live Activity, Home. Best made by a script on the macOS runner against the demo pool, so they can be remade whenever the UI changes. | — | blocked | Blocked on C11. |
 | A3 | App icon check: the 1024 `AppIcon.png` has no transparency and nothing important in the corners. | — | todo | `scripts/build-ios-assets.ts` makes it. |
 | A4 | Optional: an App Preview video (15–30 s) of making picks. | — | todo | After 1.0 is fine. |
 
@@ -82,7 +86,8 @@ not have.
 
 - [ ] A full week played in TestFlight by people who aren't you: picks, the lock screen, widgets, Face ID.
 - [ ] A fresh install signs in with a code, adds Face ID, signs out and signs back in.
-- [ ] Deleting an account works end to end (B1), and the board still reads right afterwards.
+- [ ] Deleting an account works end to end on a phone (B1), and the board still reads right afterwards.
+- [ ] A fresh install opens on the front door, and *Look around the demo pool* lands in Tally Demo.
 - [ ] `curl -s https://playtally.app/.well-known/apple-app-site-association` lists `8445LWRG3B.app.playtally.ios`.
 - [ ] The entitlements don't have `?mode=developer`.
 - [ ] `/privacy`, the privacy manifest and the App Store label all say the same thing.
