@@ -277,8 +277,14 @@ struct ReorderList: View {
 
     @State private var dragging: String?
     @State private var dragOffset: CGFloat = 0
-    private let rowHeight: CGFloat = 70
+    /// Each row's height as it actually laid out. The slots used to be a constant 70pt, which
+    /// stopped being true the day the chevrons grew to 44pt apiece: a row is ~110pt tall, so each
+    /// card was drawn over the bottom of the one above it, the first over the subtitle and the last
+    /// over the footnote. Measured, the slots follow the row — chevrons, Dynamic Type and all.
+    @State private var heights: [String: CGFloat] = [:]
     private let gap: CGFloat = 8
+
+    private var rowHeight: CGFloat { order.compactMap { heights[$0] }.max() ?? 70 }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -307,6 +313,8 @@ struct ReorderList: View {
                             if case .second(_, nil) = value { dragging = nil; dragOffset = 0 }
                         }
                 )
+                .fixedSize(horizontal: false, vertical: true)
+                .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { heights[gameId] = $0 }
                 .frame(height: rowHeight)
                 .offset(y: CGFloat(i) * (rowHeight + gap) + (isDragging ? dragOffset : shift))
                 .zIndex(isDragging ? 10 : 0)
