@@ -1,20 +1,23 @@
 import { useState } from "react";
 import { Link, Navigate, useNavigate, useParams, useSearchParams } from "react-router";
 import { AnimatePresence, motion } from "motion/react";
-import { useBootstrap, useSeasonBoard, useWeekBoard } from "../api/queries.ts";
+import { useBootstrap, useSeasonBoard, useWeekBoard, useWinnings } from "../api/queries.ts";
 import { usePlayer } from "../lib/player.tsx";
 import { useHeaderWeek } from "../components/Chrome.tsx";
 import { EntryPicker } from "../components/EntryPicker.tsx";
 import { TEAMS } from "../../shared/teams.ts";
-import { ordinal, type ScoredPick, type SeasonRow, type WeekRow } from "../../shared/scoring.ts";
+import { MAX_WEEK_POINTS, ordinal, type ScoredPick, type SeasonRow, type WeekRow } from "../../shared/scoring.ts";
+import { moneyLabel, SEASON_POT, WEEKLY_POT, type WinningsRow } from "../../shared/winnings.ts";
 import { SEASON_START_WEEK, WEEKS } from "../../shared/week.ts";
 import { CountUp, EmptyState, ErrorState, RankBadge, Segmented } from "../components/Common.tsx";
 import { BoardSkeleton } from "../components/TallyLoader.tsx";
 import { TeamSticker } from "../components/TeamSticker.tsx";
 import { Lock } from "../components/Icons.tsx";
+import { BoardGrid } from "../components/BoardGrid.tsx";
 import { fallbackPoolWeeks } from "../lib/poolFallback.ts";
 
 export type BoardSort = "points" | "possible";
+export type BoardView = "list" | "grid";
 
 export function Board({ tab }: { tab: "week" | "season" }) {
   const nav = useNavigate();
@@ -25,39 +28,67 @@ export function Board({ tab }: { tab: "week" | "season" }) {
   if (tab === "week" && (!Number.isInteger(week) || week! < 1 || week! > WEEKS)) return <Navigate to="/board" replace />;
   const boardWeek = boot.data?.boardWeek ?? fallbackPoolWeeks().boardWeek;
   const sort: BoardSort = params.get("sort") === "possible" ? "possible" : "points";
-  const setSort = (v: BoardSort) => setParams(v === "possible" ? { sort: v } : {}, { replace: true });
-  const keepSort = sort === "possible" ? "?sort=possible" : "";
+  // The grid is a way of looking at the week, not a different board, so it rides in the query
+  // beside the sort — and like the sort, only when it is not the default.
+  const view: BoardView = params.get("view") === "grid" ? "grid" : "list";
+  const query = (next: { sort: BoardSort; view: BoardView }) => {
+    const q: Record<string, string> = {};
+    if (next.sort === "possible") q.sort = "possible";
+    if (next.view === "grid") q.view = "grid";
+    return q;
+  };
+  const setSort = (v: BoardSort) => setParams(query({ sort: v, view }), { replace: true });
+  const setView = (v: BoardView) => setParams(query({ sort, view: v }), { replace: true });
+  const kept = new URLSearchParams(query({ sort, view })).toString();
+  const keepSort = kept ? `?${kept}` : "";
   return (
     <div className="mx-auto w-full max-w-[760px] lg:max-w-[1060px]">
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start lg:gap-8">
         <div>
           <EntryPicker />
-          {/* Both toggles share one line on a phone: two taps, no scrolling, nothing stacked. */}
-          <div className="grid grid-cols-2 gap-2 sm:gap-3">
-            <Segmented
-              value={tab}
-              label="Week or season"
-              pillId="board-range"
-              options={[
-                { value: "week", label: "Week" },
-                { value: "season", label: "Season" },
-              ]}
-              onChange={(v) => nav(v === "week" ? `/board/week/${boardWeek}${keepSort}` : `/board/season${keepSort}`)}
-            />
-            <Segmented
-              value={sort}
-              label="Sort the board"
-              pillId="board-sort"
-              options={[
-                { value: "points", label: "Points" },
-                { value: "possible", label: "Potential" },
-              ]}
-              onChange={setSort}
-            />
+          {/* Every way of reading the board together: which board, how it is sorted, and — on the
+              week — list or grid. The toggle is drawn for the whole of the week tab rather than
+              only once rows land, so the row does not reflow as the board loads.
+
+              The floor on the two segmented controls is what decides the shape. Three of these
+              across a phone leaves about forty pixels a label, and "Season" and "Potential" both
+              truncate at that width; the floor makes the toggle wrap to its own line instead, and
+              `ml-auto` keeps it against the right edge wherever it lands. A desktop fits all
+              three. Legible labels are worth more than the one short row this costs. */}
+          <div className="flex flex-wrap items-stretch gap-2 sm:gap-3">
+            <div className="min-w-[9.5rem] flex-1">
+              <Segmented
+                value={tab}
+                label="Week or season"
+                pillId="board-range"
+                options={[
+                  { value: "week", label: "Week" },
+                  { value: "season", label: "Season" },
+                ]}
+                onChange={(v) => nav(v === "week" ? `/board/week/${boardWeek}${keepSort}` : `/board/season${keepSort}`)}
+              />
+            </div>
+            <div className="min-w-[9.5rem] flex-1">
+              <Segmented
+                value={sort}
+                label="Sort the board"
+                pillId="board-sort"
+                options={[
+                  { value: "points", label: "Points" },
+                  { value: "possible", label: "Potential" },
+                ]}
+                onChange={setSort}
+              />
+            </div>
+            {tab === "week" && (
+              <div className="ml-auto flex items-center">
+                <LayoutToggle view={view} onChange={setView} />
+              </div>
+            )}
           </div>
           <div className="mt-4">
             {tab === "week" ? (
-              <WeekBoardView week={week!} sort={sort} onWeek={(w) => nav(`/board/week/${w}${keepSort}`)} />
+              <WeekBoardView week={week!} sort={sort} view={view} onWeek={(w) => nav(`/board/week/${w}${keepSort}`)} />
             ) : (
               <SeasonBoardView sort={sort} />
             )}
@@ -158,6 +189,36 @@ function sortRows<T extends { place: number; possible: number }>(rows: T[], sort
  * Before anything has been scored everyone shares first place, which is true but reads as a wall
  * of gold — and gold that every row has stops meaning anything. Muted until there is a race.
  */
+/**
+ * List or grid, on the week board. Two glyphs rather than a third segmented control: the line
+ * already holds two, and this is a way of looking rather than a different board.
+ */
+function LayoutToggle({ view, onChange }: { view: BoardView; onChange: (v: BoardView) => void }) {
+  const glyph = (value: BoardView, label: string, path: string) => {
+    const active = view === value;
+    return (
+      <button
+        type="button"
+        aria-pressed={active}
+        aria-label={label}
+        title={label}
+        onClick={() => !active && onChange(value)}
+        className={`flex h-7 w-9 items-center justify-center rounded-lg transition-colors ${active ? "bg-ink text-paper" : "text-ink-2 hover:bg-paper-3"}`}
+      >
+        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+          <path d={path} />
+        </svg>
+      </button>
+    );
+  };
+  return (
+    <div className="flex shrink-0 gap-0.5 rounded-[10px] bg-paper-2 p-0.5" role="group" aria-label="Board layout">
+      {glyph("list", "List", "M2 4h12M2 8h12M2 12h12")}
+      {glyph("grid", "Grid", "M2 2h12v12H2zM2 6.7h12M2 11.3h12M6.7 2v12M11.3 2v12")}
+    </div>
+  );
+}
+
 function PlaceBadge({ place, size = "md", muted = false }: { place: number; size?: "md" | "sm"; muted?: boolean }) {
   const tone = muted
     ? "bg-paper-2 text-ink-3"
@@ -170,7 +231,7 @@ function PlaceBadge({ place, size = "md", muted = false }: { place: number; size
   );
 }
 
-function WeekBoardView({ week, sort, onWeek }: { week: number; sort: BoardSort; onWeek: (w: number) => void }) {
+function WeekBoardView({ week, sort, view, onWeek }: { week: number; sort: BoardSort; view: BoardView; onWeek: (w: number) => void }) {
   const board = useWeekBoard(week);
   const { player } = usePlayer();
   const [open, setOpen] = useState<string | null>(null);
@@ -183,17 +244,6 @@ function WeekBoardView({ week, sort, onWeek }: { week: number; sort: BoardSort; 
         <ErrorState message={board.error.message} onRetry={() => board.refetch()} />
       ) : (
         <div className="mt-4">
-          <p className="text-sm text-ink-2">
-            {board.data.lockedCount === 0
-              ? `Nothing has kicked off yet · ${board.data.rows.filter((r) => r.picksMade > 0).length} of ${board.data.rows.length} have picked`
-              : `${board.data.finalCount} of ${board.data.gameCount} games final`}
-          </p>
-          {/* Which of the two prizes this particular week is playing for. */}
-          <p className="mb-3 mt-0.5 text-xs text-ink-3">
-            {week < SEASON_START_WEEK
-              ? `Most points wins Week ${week}. These points don't carry into the season race — that starts in Week ${SEASON_START_WEEK}.`
-              : `Most points wins Week ${week}, and they all count towards the season.`}
-          </p>
           {board.data.rows.length === 0 ? (
             <EmptyState
               title="Nobody's on the board yet."
@@ -204,6 +254,8 @@ function WeekBoardView({ week, sort, onWeek }: { week: number; sort: BoardSort; 
                 </Link>
               }
             />
+          ) : view === "grid" ? (
+            <BoardGrid rows={sortRows(board.data.rows, sort)} started={board.data.lockedCount > 0} activeId={player?.id ?? null} />
           ) : (
             <motion.ul layout className="space-y-2">
               {sortRows(board.data.rows, sort).map((row, i) => (
@@ -220,6 +272,21 @@ function WeekBoardView({ week, sort, onWeek }: { week: number; sort: BoardSort; 
               ))}
             </motion.ul>
           )}
+          {/* How far through the week this is, and which of the two prizes it settles —
+              underneath, because it is a footnote about the standings rather than a heading over
+              them, and the top of this screen is for the standings and the ways of reading them. */}
+          <div className="mt-4">
+            <p className="text-sm text-ink-2">
+              {board.data.lockedCount === 0
+                ? `Nothing has kicked off yet · ${board.data.rows.filter((r) => r.picksMade > 0).length} of ${board.data.rows.length} have picked`
+                : `${board.data.finalCount} of ${board.data.gameCount} games final`}
+            </p>
+            <p className="mt-0.5 text-xs text-ink-3">
+              {week < SEASON_START_WEEK
+                ? `Most points wins Week ${week}. These points don't carry into the season race — that starts in Week ${SEASON_START_WEEK}.`
+                : `Most points wins Week ${week}, and they all count towards the season.`}
+            </p>
+          </div>
         </div>
       )}
     </div>
@@ -242,6 +309,9 @@ export function WeekRowItem({ row, index, open, onToggle, isMe, week, started }:
           <div className="font-display flex items-center gap-2 truncate text-[17px] font-extrabold">
             <span className="truncate">{row.name}</span>
             {isMe && <span className="chip bg-surface py-0 text-[10px]">you</span>}
+            {/* One of the account's other entries: not who you are picking as, but yours all the
+                same — and, since the server knows that too, its picks open whole below. */}
+            {row.mine && !isMe && <span className="chip bg-surface py-0 text-[10px]">yours</span>}
           </div>
           <div className="text-xs text-ink-2">
             {row.picksMade === 0 ? (
@@ -412,18 +482,136 @@ function SeasonBoardView({ sort }: { sort: BoardSort }) {
       ) : (
         <motion.ul layout className="space-y-2">
           {rows.map((row, i) => (
-            <SeasonRowItem key={row.playerId} row={row} index={i} isMe={row.playerId === player?.id} open={open === row.playerId} onToggle={() => setOpen(open === row.playerId ? null : row.playerId)} throughWeek={board.data.throughWeek} />
+            <SeasonRowItem key={row.playerId} row={row} index={i} isMe={row.playerId === player?.id} open={open === row.playerId} onToggle={() => setOpen(open === row.playerId ? null : row.playerId)} throughWeek={board.data.throughWeek} fromWeek={board.data.fromWeek} />
           ))}
         </motion.ul>
       )}
+      <WinningsCard />
     </div>
   );
 }
 
-export function SeasonRowItem({ row, index, isMe, open, onToggle, throughWeek }: { row: SeasonRow; index: number; isMe: boolean; open: boolean; onToggle: () => void; throughWeek: number }) {
-  const first = SEASON_START_WEEK;
-  const weeks = Array.from({ length: Math.max(throughWeek - first + 1, 1) }, (_, i) => i + first);
-  const max = Math.max(15, ...Object.values(row.byWeek));
+/**
+ * The real-money board: what every entry has actually won, running. It sits under the season
+ * standings rather than inside them — the points column already means something on every other
+ * screen, and this is a different number entirely, so it gets its own card and its own `$` rather
+ * than borrowing the points row's big digit.
+ */
+function WinningsCard() {
+  const winnings = useWinnings();
+  const { player } = usePlayer();
+  if (winnings.isPending) return null; // the season standings above already carried the loading state
+  if (winnings.error) return null; // real money is worth showing only once it is right; say nothing rather than guess
+  const { rows, weeks, seasonSettled } = winnings.data;
+  if (rows.every((r) => r.total === 0)) return null; // nothing has settled yet — nothing to show
+  return (
+    <section className="card-flat mt-6 bg-surface p-4" aria-label="Winnings">
+      <h2 className="font-display mb-1 text-xs font-extrabold uppercase tracking-[0.12em] text-ink-3">Winnings</h2>
+      <p className="mb-3 text-xs text-ink-3">
+        {moneyLabel(WEEKLY_POT)} to each week's winner, {moneyLabel(SEASON_POT)} to the season's
+        {seasonSettled ? "" : " once it's decided"} — a tie splits the pot evenly.
+      </p>
+      <ul className="space-y-2">
+        {rows
+          .filter((r) => r.total > 0)
+          .map((row) => (
+            <WinningsRowItem key={row.playerId} row={row} isMe={row.playerId === player?.id} />
+          ))}
+      </ul>
+      {weeks.length > 0 && (
+        <ul className="mt-4 space-y-1 border-t-2 border-dashed border-line pt-3 text-xs text-ink-2">
+          {weeks.map((w) => (
+            <li key={w.week}>
+              <span className="font-bold text-ink-3">Week {w.week}</span> — {w.winnerNames.join(" & ")}
+              {w.winnerNames.length > 1 ? ` split ${moneyLabel(w.share)} each` : ` — ${moneyLabel(w.share)}`}
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+function WinningsRowItem({ row, isMe }: { row: WinningsRow; isMe: boolean }) {
+  return (
+    <li className={`flex items-center gap-3 rounded-2xl p-2 ${isMe ? "bg-flag-soft" : ""}`}>
+      <PlaceBadge place={row.place} size="sm" />
+      <div className="min-w-0 flex-1">
+        <div className="font-display flex items-center gap-2 truncate text-[15px] font-extrabold">
+          <span className="truncate">{row.name}</span>
+          {isMe && <span className="chip bg-surface py-0 text-[10px]">you</span>}
+          {row.mine && !isMe && <span className="chip bg-surface py-0 text-[10px]">yours</span>}
+        </div>
+        <p className="text-xs text-ink-2">
+          {row.weeksWon} week{row.weeksWon === 1 ? "" : "s"} won
+          {row.season > 0 ? " · season" : ""}
+        </p>
+      </div>
+      <span className="font-display shrink-0 tabular text-xl font-extrabold">{moneyLabel(row.total)}</span>
+    </li>
+  );
+}
+
+/** How tall a column's track is. A perfect week fills it exactly. */
+const TRACK = 52;
+
+/**
+ * One player's season as a chart: a column per week from the first week that counts to the last
+ * of the season, so the weeks still to come are *on screen* as placeholders rather than implied.
+ *
+ * It used to draw only the weeks that had been played, which in Week 2 meant a single column
+ * filling the whole width — and because a nothing week was drawn as a two-pixel sliver, that
+ * column read as a horizontal rule with a stray "2" under it. Nobody could tell it was a chart.
+ *
+ * Three states, and the dashes mean here what they mean on the grid: nothing here.
+ *
+ * | Column | Week | Drawn as |
+ * | --- | --- | --- |
+ * | scored | played, points on the board | turf fill, its number above |
+ * | blank | played, nothing scored | an empty track |
+ * | ahead | not played yet | a dashed outline |
+ *
+ * The scale is a *perfect week* rather than this row's own best, so a five-point column is the
+ * same height on everybody's chart — which is the whole point of putting them one above another.
+ */
+function SeasonWeekChart({ row, fromWeek, throughWeek }: { row: SeasonRow; fromWeek: number; throughWeek: number }) {
+  const weeks = Array.from({ length: Math.max(WEEKS - fromWeek + 1, 1) }, (_, i) => i + fromWeek);
+  return (
+    <div>
+      <p className="mb-1.5 text-[10px] font-bold uppercase tracking-wider text-ink-3">Points by week</p>
+      <div className="flex items-end gap-[2px]">
+        {weeks.map((w) => {
+          const pts = row.byWeek[w] ?? 0;
+          const played = w <= throughWeek;
+          const said = played ? `Week ${w}: ${pts} point${pts === 1 ? "" : "s"}` : `Week ${w}: not played yet`;
+          return (
+            <Link key={w} to={`/board/week/${w}`} className="flex flex-1 flex-col items-center gap-1" title={said} aria-label={said}>
+              {/* The score is the thing to read, so it is the only ink-black text here. */}
+              <span className="h-3.5 text-[10px] font-extrabold leading-[14px] tabular text-ink">{played && pts > 0 ? pts : ""}</span>
+              {/* Every track is the same. A dashed outline on the weeks still to come was doing the
+                  job a green bar already does — saying which weeks have happened — and seventeen
+                  dashed boxes at this size is a texture, not information. */}
+              <span className="relative w-full overflow-hidden rounded-[3px] border border-line bg-paper-2" style={{ height: TRACK }}>
+                {pts > 0 && (
+                  <motion.span
+                    initial={{ height: 0 }}
+                    animate={{ height: Math.max((pts / MAX_WEEK_POINTS) * TRACK, 6) }}
+                    className="absolute inset-x-0 bottom-0 block rounded-t-[3px] border-2 border-b-0 border-ink bg-turf"
+                  />
+                )}
+              </span>
+              {/* Every week is numbered, but quietly: the axis is for orienting yourself once, and
+                  it should never compete with the scores above it. */}
+              <span className="h-3 text-[8px] font-bold leading-3 tabular text-ink-3/70">{w}</span>
+            </Link>
+          );
+        })}
+      </div>
+    </div>
+  );
+}
+
+export function SeasonRowItem({ row, index, isMe, open, onToggle, throughWeek, fromWeek = SEASON_START_WEEK }: { row: SeasonRow; index: number; isMe: boolean; open: boolean; onToggle: () => void; throughWeek: number; fromWeek?: number }) {
   return (
     <motion.li
       layout
@@ -438,6 +626,7 @@ export function SeasonRowItem({ row, index, isMe, open, onToggle, throughWeek }:
           <div className="font-display flex items-center gap-2 truncate text-[17px] font-extrabold">
             <span className="truncate">{row.name}</span>
             {isMe && <span className="chip bg-surface py-0 text-[10px]">you</span>}
+            {row.mine && !isMe && <span className="chip bg-surface py-0 text-[10px]">yours</span>}
           </div>
           <div className="text-xs text-ink-2">
             {row.weeksPlayed === 0
@@ -456,21 +645,7 @@ export function SeasonRowItem({ row, index, isMe, open, onToggle, throughWeek }:
         {open && (
           <motion.div initial={{ height: 0, opacity: 0 }} animate={{ height: "auto", opacity: 1 }} exit={{ height: 0, opacity: 0 }} transition={{ duration: 0.2 }} className="overflow-hidden">
             <div className="border-t-2 border-dashed border-line px-3 pb-3 pt-3">
-              <div className="flex h-16 items-end gap-1">
-                {weeks.map((w) => {
-                  const pts = row.byWeek[w] ?? 0;
-                  return (
-                    <Link key={w} to={`/board/week/${w}`} className="group flex flex-1 flex-col items-center gap-1" title={`Week ${w}: ${pts}`}>
-                      <motion.div
-                        initial={{ height: 0 }}
-                        animate={{ height: `${Math.max((pts / max) * 48, pts ? 6 : 2)}px` }}
-                        className={`w-full rounded-t-md border-2 border-b-0 border-ink ${pts ? "bg-turf" : "bg-paper-3"}`}
-                      />
-                      <span className="text-[9px] font-bold text-ink-3">{w}</span>
-                    </Link>
-                  );
-                })}
-              </div>
+              <SeasonWeekChart row={row} fromWeek={fromWeek} throughWeek={throughWeek} />
             </div>
           </motion.div>
         )}

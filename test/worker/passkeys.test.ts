@@ -1,5 +1,6 @@
 import { SELF } from "cloudflare:test";
 import { describe, expect, it } from "vitest";
+import { uniqueName } from "./names.ts";
 
 /**
  * The crypto itself is @simplewebauthn's business; what matters here is that the endpoints are
@@ -22,9 +23,8 @@ async function api<T = any>(path: string, opts: Opts = {}): Promise<{ status: nu
   return { status: res.status, body: (await res.json()) as T };
 }
 
-let seq = 0;
 async function join() {
-  const name = `Passkey ${Date.now().toString(36)}${(seq++).toString(36)}`;
+  const name = uniqueName("Passkey");
   const res = await SELF.fetch("http://pool.test/api/players", {
     method: "POST",
     headers: { "content-type": "application/json" },

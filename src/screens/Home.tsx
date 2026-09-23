@@ -9,7 +9,7 @@ import { SEASON_START_WEEK } from "../../shared/week.ts";
 import { Announcements } from "../components/Announcements.tsx";
 import { PoolPlays } from "../components/PoolPlays.tsx";
 import { fallbackPoolWeeks } from "../lib/poolFallback.ts";
-import { joinPromptOpen, latestCompletedWeek } from "../lib/poolHome.ts";
+import { joinPromptOpen, previewWeek } from "../lib/poolHome.ts";
 import { SeasonRowItem, WeekRowItem } from "./Board.tsx";
 import { Share } from "../components/Icons.tsx";
 import { poolUrl } from "../lib/basename.ts";
@@ -110,7 +110,7 @@ function PoolOpenCard({ now }: { now: string }) {
   };
 
   return (
-    <section className="card mt-4 overflow-hidden bg-flag-soft p-5" aria-labelledby="pool-open-heading">
+    <section className="card mt-4 overflow-hidden bg-surface p-5" aria-labelledby="pool-open-heading">
       <div className="flex items-start gap-3">
         <div className="min-w-0 flex-1">
           <p className="text-xs font-bold uppercase tracking-wider text-ink-3">Invite your people</p>
@@ -159,8 +159,13 @@ function PoolCard() {
         ? `${summary.gameCount - summary.lockedCount} still open`
         : `first game ${formatKickoff(summary.firstKickoff)}`;
 
+  // Something of yours is missing and there is still time to fix it. It is the only state on this
+  // page worth shouting about, so it is the only one that gets the flag — see `PoolOpenCard`,
+  // which gave its yellow up for this.
+  const owingNow = Boolean(player) && Boolean(week.data) && owing.length > 0;
+
   return (
-    <div className="card p-5">
+    <div className={`card p-5 ${owingNow ? "bg-flag-soft" : ""}`}>
       <div className="flex items-start gap-3">
         <div className="min-w-0">
           <h1 className="font-display truncate text-2xl font-extrabold">{boot.data?.poolName}</h1>
@@ -195,20 +200,35 @@ function PoolCard() {
             <Link className="btn btn-sm mt-3" to="/welcome">Join to make picks</Link>
           </>
         ) : owing.length === 0 ? (
-          <p className="mt-2 font-display font-extrabold text-turf">
-            {entries.length > 1 ? `All ${entries.length} sets of picks are in.` : "Your picks are in."}
-          </p>
+          <>
+            <p className="mt-2 font-display font-extrabold text-turf">
+              {entries.length > 1 ? `All ${entries.length} sets of picks are in.` : "Your picks are in."}
+            </p>
+            {/* Someone who already picked comes back to ask one question, and it is not "did I
+                pick". It is "can I still change it" — so the answer is on the screen they land
+                on, next to the way to do it, rather than in the rules. */}
+            <Link className="btn btn-sm mt-3" to={`/week/${currentWeek}`}>
+              Review or change your picks
+            </Link>
+            <p className="mt-2 text-xs text-ink-2">Each pick stays editable until that game kicks off.</p>
+          </>
         ) : (
           <>
-            <p className="mt-2 font-display font-extrabold">
+            <p className="mt-2 font-display text-xl font-extrabold">
               {entries.length === 1
                 ? "Your picks aren't in yet."
                 : owing.length === entries.length
                   ? `None of your ${entries.length} entries have picked yet.`
                   : `${owing.map((e) => e.name).join(", ")} still ${owing.length === 1 ? "needs" : "need"} picks.`}
             </p>
+            {/* What the task actually is. Somebody who plays once a week does not carry the rules
+                around in their head, and "Make your picks" alone does not say how long this takes
+                or what it asks of them. */}
+            <p className="mt-1 text-sm text-ink-2">
+              Pick {MAX_PICKS} winners and rank them — your surest call is worth {MAX_PICKS} points, your shakiest 1.
+            </p>
             <button
-              className="btn btn-primary btn-sm mt-3"
+              className="btn btn-primary mt-4 w-full sm:w-auto"
               onClick={() => {
                 // The button names someone; switching to them is the half that does the naming true.
                 const first = owing[0];
@@ -218,6 +238,9 @@ function PoolCard() {
             >
               {owing.length === 1 && entries.length > 1 && owing[0] ? `Make ${owing[0].name}'s picks` : "Make your picks"}
             </button>
+            <p className="mt-2 text-xs text-ink-2">
+              Takes a minute, and there is no deadline for the week — each game locks at its own kickoff.
+            </p>
           </>
         )}
       </div>
@@ -252,13 +275,14 @@ function BrowsePool() {
   const { player } = usePlayer();
   const currentWeek = boot.data?.currentWeek ?? 1;
   const boardWeek = boot.data?.boardWeek ?? currentWeek;
-  const completedWeek = latestCompletedWeek(boot.data?.weeks ?? []);
-  const weekBoard = useWeekBoard(completedWeek);
+  // The week being played, not the last one that finished — see `previewWeek`.
+  const preview = previewWeek(boot.data?.weeks ?? []);
+  const weekBoard = useWeekBoard(preview?.week ?? null);
   const seasonBoard = useSeasonBoard();
   const [openWeekPlayer, setOpenWeekPlayer] = useState<string | null>(null);
   const [openSeasonPlayer, setOpenSeasonPlayer] = useState<string | null>(null);
   const pastWeeks = (boot.data?.weeks ?? [])
-    .filter((week) => week.gameCount > 0 && week.finalCount === week.gameCount && week.week !== completedWeek)
+    .filter((week) => week.gameCount > 0 && week.finalCount === week.gameCount && week.week !== preview?.week)
     .map((week) => week.week);
 
   return (
@@ -271,26 +295,32 @@ function BrowsePool() {
         <section className="card p-4" aria-labelledby="latest-week-heading">
           <div className="flex items-start justify-between gap-3">
             <div>
-              <p className="text-xs font-bold uppercase tracking-wider text-ink-3">Latest weekly winner</p>
+              <p className="text-xs font-bold uppercase tracking-wider text-ink-3">
+                {preview?.final ? "Latest weekly winner" : "This week so far"}
+              </p>
               <h3 id="latest-week-heading" className="font-display mt-0.5 text-xl font-extrabold">
-                {completedWeek ? `Week ${completedWeek} results` : "Weekly standings"}
+                {preview ? `Week ${preview.week} ${preview.final ? "results" : "standings"}` : "Weekly standings"}
               </h3>
             </div>
-            {completedWeek && <span className="chip bg-turf-soft text-xs">Final</span>}
+            {preview && (
+              <span className={`chip text-xs ${preview.final ? "bg-turf-soft" : "bg-flag-soft"}`}>
+                {preview.final ? "Final" : "In progress"}
+              </span>
+            )}
           </div>
 
-          {completedWeek === null ? (
+          {preview === null ? (
             <>
-              <p className="mt-3 text-sm text-ink-2">The first top three will appear here when Week 1 is final.</p>
+              <p className="mt-3 text-sm text-ink-2">The first top three will appear here once Week 1 kicks off.</p>
               <Link className="btn btn-sm mt-3" to={`/board/week/${boardWeek}`}>Week {boardWeek}</Link>
             </>
           ) : weekBoard.isPending ? (
             <PreviewSkeleton />
           ) : !weekBoard.data ? (
-            <p className="mt-3 text-sm text-ink-2">Couldn’t load the latest results.</p>
+            <p className="mt-3 text-sm text-ink-2">Couldn’t load this week’s standings.</p>
           ) : (
             <>
-              <ul className="mt-3 space-y-2" aria-label={`Week ${completedWeek} top three`}>
+              <ul className="mt-3 space-y-2" aria-label={`Week ${preview.week} top three`}>
                 {weekBoard.data.rows.slice(0, 3).map((row, index) => (
                   <WeekRowItem
                     key={row.playerId}
@@ -299,13 +329,13 @@ function BrowsePool() {
                     open={openWeekPlayer === row.playerId}
                     onToggle={() => setOpenWeekPlayer(openWeekPlayer === row.playerId ? null : row.playerId)}
                     isMe={row.playerId === player?.id}
-                    week={completedWeek}
+                    week={preview.week}
                     started
                   />
                 ))}
               </ul>
-              <Link className="btn btn-sm mt-3 w-full" to={`/board/week/${completedWeek}`}>
-                See the full Week {completedWeek} leaderboard
+              <Link className="btn btn-sm mt-3 w-full" to={`/board/week/${preview.week}`}>
+                See the full Week {preview.week} leaderboard
               </Link>
             </>
           )}
@@ -345,6 +375,7 @@ function BrowsePool() {
                   open={openSeasonPlayer === row.playerId}
                   onToggle={() => setOpenSeasonPlayer(openSeasonPlayer === row.playerId ? null : row.playerId)}
                   throughWeek={seasonBoard.data.throughWeek}
+                  fromWeek={seasonBoard.data.fromWeek}
                 />
               ))}
             </ul>

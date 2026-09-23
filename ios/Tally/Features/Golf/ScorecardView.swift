@@ -18,37 +18,46 @@ struct ScorecardView: View {
     var body: some View {
         if let card {
             let initials = ScrambleTally.initials(card.players)
+            // The hole column only widens when there is a contest badge to fit in it, so a card
+            // with no side games is laid out exactly as it always was.
+            let holeWidth: CGFloat = card.contests.any ? 68 : 42
             VStack(alignment: .leading, spacing: 14) {
                 header(card)
                 VStack(spacing: 0) {
-                    ScorecardHeaderRow()
+                    ScorecardHeaderRow(holeWidth: holeWidth)
                     ForEach(Array(card.holeNumbers), id: \.self) { hole in
                         DashedDivider().padding(.horizontal, 10)
-                        ScorecardRow(card: card, hole: hole, initials: initials) {
+                        ScorecardRow(card: card, hole: hole, initials: initials, holeWidth: holeWidth) {
                             Haptics.tap()
                             golf.go(card: card.id, to: hole)
                             golf.tab = .round
                         }
                         if hole == 9, card.holeCount > 9 {
-                            TotalRow(label: "OUT", par: total(card, 1...9, par: true), score: total(card, 1...9, par: false))
+                            TotalRow(label: "OUT", par: total(card, 1...9, par: true), score: total(card, 1...9, par: false), holeWidth: holeWidth)
                         }
                         if hole == card.holeCount, card.holeCount > 9 {
-                            TotalRow(label: "IN", par: total(card, 10...card.holeCount, par: true), score: total(card, 10...card.holeCount, par: false))
+                            TotalRow(label: "IN", par: total(card, 10...card.holeCount, par: true), score: total(card, 10...card.holeCount, par: false), holeWidth: holeWidth)
                         }
                     }
                     TotalRow(
                         label: "TOTAL",
                         par: card.totalPar,
                         score: card.strokesTaken,
+                        holeWidth: holeWidth,
                         trailing: ScrambleTally.toParText(card.toPar),
                         emphasis: true
                     )
                 }
                 .padding(.vertical, 8)
                 .cardFlat()
-                Text("Initials are whose shots the team kept. A dash is a stroke nobody earned: a tap-in, a penalty, or nobody's ball.")
-                    .sans(12).foregroundStyle(Color.ink3)
-                    .fixedSize(horizontal: false, vertical: true)
+                VStack(alignment: .leading, spacing: 4) {
+                    Text("Initials are whose shots the team kept. A dash is a stroke nobody earned: a tap-in, a penalty, or nobody's ball.")
+                    if card.contests.any {
+                        Text("LD and CTP mark the side-game holes, with the winner's initial once somebody has taken it. The Tally tab has the whole list.")
+                    }
+                }
+                .sans(12).foregroundStyle(Color.ink3)
+                .fixedSize(horizontal: false, vertical: true)
             }
         } else {
             EmptyState(title: "This card is gone", body: "Pick another from the menu, or start a new one.")
@@ -79,9 +88,11 @@ struct ScorecardView: View {
 }
 
 private struct ScorecardHeaderRow: View {
+    let holeWidth: CGFloat
+
     var body: some View {
         HStack(spacing: 8) {
-            Text("HOLE").frame(width: 42, alignment: .leading)
+            Text("HOLE").frame(width: holeWidth, alignment: .leading)
             Text("PAR").frame(width: 34, alignment: .trailing)
             Text("SCORE").frame(width: 46, alignment: .trailing)
             Text("KEPT BY").frame(maxWidth: .infinity, alignment: .trailing)
@@ -98,10 +109,18 @@ private struct ScorecardRow: View {
     let card: ScrambleCard
     let hole: Int
     let initials: [String: String]
+    let holeWidth: CGFloat
     let onOpen: () -> Void
 
     private var entry: HoleEntry? { card.entry(hole) }
     private var standing: Bool { card.currentHole == hole }
+    /// Who has the hole's contest, as the same initial the KEPT BY column uses — so "CTP D" on
+    /// the card reads the way the paper one would. Nil while it is still open.
+    private var winnerInitial: String? {
+        guard let contest = card.contest(for: hole), let winner = card.winner(of: contest, on: hole) else { return nil }
+        return initials[winner.id]
+    }
+    private var claimed: Bool { winnerInitial != nil }
 
     var body: some View {
         let entry = entry
@@ -113,8 +132,20 @@ private struct ScorecardRow: View {
                     if standing {
                         Circle().fill(Color.turf).frame(width: 6, height: 6)
                     }
+                    // A contest hole says so here and nowhere else on this screen: the column is
+                    // two characters wide, and the Side games card on the Tally tab is where the
+                    // winners live. Solid once it is claimed, outlined while it is open.
+                    if let contest = card.contest(for: hole) {
+                        Text(winnerInitial.map { "\(contest.initials) \($0)" } ?? contest.initials)
+                            .font(TallyFont.sans(8, weight: .bold))
+                            .foregroundStyle(claimed ? Color.onFill : Color.ink3)
+                            .padding(.horizontal, 3)
+                            .padding(.vertical, 1)
+                            .background(Capsule().fill(claimed ? Color.turf : Color.clear))
+                            .overlay(Capsule().strokeBorder(claimed ? Color.clear : Color.line, lineWidth: 1))
+                    }
                 }
-                .frame(width: 42, alignment: .leading)
+                .frame(width: holeWidth, alignment: .leading)
                 Text("\(card.par(hole))")
                     .font(TallyFont.sans(14)).monospacedDigit().foregroundStyle(Color.ink2)
                     .frame(width: 34, alignment: .trailing)
@@ -168,7 +199,10 @@ private struct ScorecardRow: View {
     private func label(_ entry: HoleEntry?, played: Bool) -> String {
         guard played, let entry else { return "Hole \(hole), par \(card.par(hole)), not played. Go to it." }
         let word = ScrambleTally.label(score: entry.score, par: card.par(hole))
-        return "Hole \(hole), par \(card.par(hole)), \(entry.score) — \(word). Go to it."
+        let side = card.contest(for: hole).map { contest in
+            card.winner(of: contest, on: hole).map { " \($0.name) \(contest.took)." } ?? " \(contest.title) unclaimed."
+        } ?? ""
+        return "Hole \(hole), par \(card.par(hole)), \(entry.score) — \(word).\(side) Go to it."
     }
 }
 
@@ -176,6 +210,7 @@ private struct TotalRow: View {
     let label: String
     let par: Int
     let score: Int
+    let holeWidth: CGFloat
     var trailing: String? = nil
     var emphasis = false
 
@@ -184,7 +219,7 @@ private struct TotalRow: View {
             Text(label)
                 .font(TallyFont.display(emphasis ? 14 : 12))
                 .tracking(0.8)
-                .frame(width: 42, alignment: .leading)
+                .frame(width: holeWidth, alignment: .leading)
             Text("\(par)")
                 .font(TallyFont.sans(14, weight: .bold)).monospacedDigit().foregroundStyle(Color.ink2)
                 .frame(width: 34, alignment: .trailing)

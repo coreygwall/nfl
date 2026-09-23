@@ -8,12 +8,13 @@ import { api } from "../api/client.ts";
 import { Sheet } from "../components/AppShell.tsx";
 import { PoolPlays } from "../components/PoolPlays.tsx";
 import { ThemePicker } from "../components/ThemeControl.tsx";
-import { Bank, Cards, Check, ChevronRight, CircleHelp, Device, Key, Palette } from "../components/Icons.tsx";
+import { Bank, Cards, Check, ChevronRight, CircleHelp, Device, Key, Mail, Palette, Pencil, Shield } from "../components/Icons.tsx";
 import { useToast } from "../components/Toast.tsx";
 import { addPasskey, passkeysSupported, wasCancelled } from "../lib/passkey.ts";
 import { CODE_LENGTH, formatCode, normalizeCode } from "../../shared/codes.ts";
 import { poolUrl } from "../lib/basename.ts";
 import { isVulgar, VULGAR_MESSAGE } from "../../shared/profanity.ts";
+import { supportMailto } from "../../shared/contact.ts";
 import type { Identity } from "../lib/identity.ts";
 
 /**
@@ -41,6 +42,8 @@ export function Account() {
   const [adding, setAdding] = useState(false);
   const [attaching, setAttaching] = useState(false);
   const [plays, setPlays] = useState(false);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [confirmSignOut, setConfirmSignOut] = useState(false);
 
   const accountName = boot.data?.account?.name ?? player?.name ?? "";
   const poolName = boot.data?.poolName ?? "this pool";
@@ -50,7 +53,23 @@ export function Account() {
     <div className="mx-auto w-full max-w-[640px]">
       <section aria-labelledby="account-who">
         <SectionLabel id="account-who">Signed in as</SectionLabel>
-        <h1 className="font-display mt-1 text-3xl font-extrabold">{accountName}</h1>
+        {renaming === boot.data?.account?.id && boot.data?.account ? (
+          <RenameName
+            id={boot.data.account.id}
+            current={accountName}
+            onDone={() => setRenaming(null)}
+            onCancel={() => setRenaming(null)}
+          />
+        ) : (
+          <div className="mt-1 flex flex-wrap items-center gap-3">
+            <h1 className="font-display text-3xl font-extrabold">{accountName}</h1>
+            {boot.data?.account && (
+              <button className="btn btn-sm" onClick={() => setRenaming(boot.data!.account!.id)}>
+                Edit
+              </button>
+            )}
+          </div>
+        )}
         <PasskeyRow key={player?.accountId ?? player?.id} hasPasskey={(boot.data?.myPasskeys ?? 0) > 0} />
       </section>
 
@@ -58,11 +77,29 @@ export function Account() {
         <SectionLabel id="account-entries">Entries in {poolName}</SectionLabel>
         <ul className="mt-2 space-y-2">
           {people.map((p) => (
-            <li key={p.id} className="card-flat flex items-center gap-2 bg-surface p-3">
-              <span className="font-display truncate font-extrabold">{p.name}</span>
-              {p.managed && <span className="chip shrink-0 bg-paper-2 py-0 text-[10px]">you manage</span>}
-              {p.id === player?.id && (
-                <span className="chip ml-auto shrink-0 bg-flag py-0 text-[10px]">picking</span>
+            <li key={p.id} className="card-flat bg-surface p-3">
+              {renaming === p.id && p.id !== boot.data?.account?.id ? (
+                <RenameName
+                  id={p.id}
+                  current={p.name}
+                  onDone={() => setRenaming(null)}
+                  onCancel={() => setRenaming(null)}
+                />
+              ) : (
+                <div className="flex items-center gap-2">
+                  <span className="font-display truncate font-extrabold">{p.name}</span>
+                  {p.managed && <span className="chip shrink-0 bg-paper-2 py-0 text-[10px]">you manage</span>}
+                  {p.id === player?.id && (
+                    <span className="chip ml-auto shrink-0 bg-flag py-0 text-[10px]">picking</span>
+                  )}
+                  <button
+                    className={`${p.id === player?.id ? "" : "ml-auto "}shrink-0 rounded-lg p-1.5 text-ink-3 hover:bg-paper-2`}
+                    aria-label={`Rename ${p.name}`}
+                    onClick={() => setRenaming(p.id)}
+                  >
+                    <Pencil size={15} />
+                  </button>
+                </div>
               )}
             </li>
           ))}
@@ -179,14 +216,43 @@ export function Account() {
             onClick={() => setPlays(true)}
           />
           <RowDivider />
+          <RowLink to="/privacy" icon={<Shield size={18} />} title="Privacy" detail="What Tally keeps, and what it never asks for" />
+          <RowDivider />
+          <a
+            className="row-hover flex min-h-14 items-center gap-3 rounded-card p-3 hover:bg-paper-2"
+            href={supportMailto(`Tally support · ${__BUILD_ID__.slice(0, 8)}`)}
+          >
+            <RowBody icon={<Mail size={18} />} title="Get help" detail="Something wrong, or an idea — write to Tally" />
+            <ChevronRight size={18} className="shrink-0 text-ink-3" />
+          </a>
+          <RowDivider />
           <p className="px-3 py-3 text-xs text-ink-3">Version {__BUILD_ID__.slice(0, 8)}</p>
         </div>
-        <button className="mt-3 text-sm font-bold text-danger underline" onClick={signOut}>
-          Sign out on this device
-        </button>
-        <p className="mt-1 text-xs text-ink-3">
-          Your picks stay on the board. Signing back in needs Face ID, a fingerprint, or your code.
-        </p>
+        {/* A real button that asks first, the same as the app's. The word is red and the fill is
+            not: a solid danger fill is this design system's word for irreversible, and signing out
+            keeps every pick on the board. The reassurance moved into the asking, where somebody is
+            actually deciding. */}
+        {confirmSignOut ? (
+          <div className="card-flat mt-3 bg-flag-soft p-4">
+            <p className="font-display text-sm font-extrabold">Sign out?</p>
+            <p className="mt-1 text-sm text-ink-2">
+              Your picks stay on the board and nothing is deleted. Signing back in on this device needs Face ID, a
+              fingerprint, or your code.
+            </p>
+            <div className="mt-3 flex flex-wrap gap-3">
+              <button className="btn btn-sm text-danger" onClick={signOut}>
+                Sign out
+              </button>
+              <button className="btn btn-sm" onClick={() => setConfirmSignOut(false)}>
+                Stay signed in
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button className="btn mt-3 w-full text-danger sm:w-auto" onClick={() => setConfirmSignOut(true)}>
+            Sign out
+          </button>
+        )}
       </section>
 
       <AnimatePresence>
@@ -532,5 +598,94 @@ function DeviceCode({ code, name, accountId }: { code: string; name: string; acc
         </div>
       </div>
     </div>
+  );
+}
+
+/**
+ * Changing a name you are responsible for: your own, or one of the entries you manage.
+ *
+ * Inline rather than a dialog, which is what every other edit on this page already is. The server
+ * decides whether the id is yours — the same route the app calls — so this only has to show the
+ * control for names the page already lists, and report what comes back.
+ */
+function RenameName({
+  id,
+  current,
+  onDone,
+  onCancel,
+}: {
+  id: string;
+  current: string;
+  onDone: () => void;
+  onCancel: () => void;
+}) {
+  const [name, setName] = useState(current);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const toast = useToast();
+  const qc = useQueryClient();
+  const trimmed = name.trim();
+
+  return (
+    <form
+      className="w-full"
+      onSubmit={async (event) => {
+        event.preventDefault();
+        if (busy || trimmed.length < 2 || trimmed === current) return;
+        setBusy(true);
+        setError(null);
+        if (isVulgar(trimmed)) {
+          setError(VULGAR_MESSAGE);
+          setBusy(false);
+          return;
+        }
+        try {
+          const r = await api<{ player: { id: string; name: string } }>(`/players/${id}/name`, {
+            method: "PATCH",
+            body: { name: trimmed },
+          });
+          void qc.invalidateQueries({ queryKey: ["bootstrap"] });
+          void qc.invalidateQueries({ queryKey: ["board"] });
+          toast(`Now ${r.player.name}.`, "success");
+          onDone();
+        } catch (err) {
+          setError(err instanceof Error ? err.message : "Couldn't change the name.");
+          setBusy(false);
+        }
+      }}
+    >
+      <label htmlFor={`rename-${id}`} className="sr-only">
+        Name
+      </label>
+      <input
+        id={`rename-${id}`}
+        autoFocus
+        autoComplete="off"
+        maxLength={24}
+        value={name}
+        onChange={(e) => setName(e.target.value)}
+        disabled={busy}
+        aria-describedby={error ? `rename-error-${id}` : undefined}
+        className="card-flat w-full px-3 py-2 outline-none focus:shadow-hard"
+      />
+      {error && (
+        <p id={`rename-error-${id}`} role="alert" className="mt-2 text-sm font-semibold text-danger">
+          {error}
+        </p>
+      )}
+      <div className="mt-2 flex flex-wrap items-center gap-2">
+        <button
+          type="submit"
+          className="btn btn-primary btn-sm"
+          disabled={busy || trimmed.length < 2 || trimmed === current}
+        >
+          {busy ? "Saving…" : "Save"}
+        </button>
+        <button type="button" className="btn btn-sm" disabled={busy} onClick={onCancel}>
+          Cancel
+        </button>
+        <span className="text-xs text-ink-3">This is the name on the board.</span>
+      </div>
+    </form>
   );
 }

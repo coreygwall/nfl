@@ -339,6 +339,16 @@ export async function renamePlayer(db: D1Database, id: string, name: string, nam
   await db.prepare("UPDATE players SET name = ?, name_key = ? WHERE id = ?").bind(name, nameKey, id).run();
 }
 
+/**
+ * Every entry an account picks for: its own row, then whatever `entry_owners` says it manages.
+ * The board hands this to the scorer so a family phone sees all of its own picks before kickoff,
+ * not just the one name it happens to be standing on.
+ */
+export async function ownedEntryIds(db: D1Database, accountId: string): Promise<Set<string>> {
+  const owned = await db.prepare("SELECT player_id FROM entry_owners WHERE owner_id = ?").bind(accountId).all<{ player_id: string }>();
+  return new Set([accountId, ...owned.results.map((row) => row.player_id)]);
+}
+
 export async function deletePlayer(db: D1Database, id: string): Promise<void> {
   // An account owns any entries it created. Removing an account from the commissioner view is
   // therefore an explicit family removal, not a foreign-key failure or an orphaned child.

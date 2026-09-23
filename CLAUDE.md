@@ -180,6 +180,155 @@ score is the count, a **tap-in** counts on the card and credits nobody, a **pena
 distinction the whole feature exists for. One phone keeps the card today; every hole carries
 `updatedAt` so sharing is a merge rule rather than a rewrite.
 
+Beside the round are **the two bets** (`SideContests.swift`): longest drive and closest to the pin,
+each switched on per card. Three rules hold the feature together, and the second and third are only
+obvious once the first is true:
+
+- **Par decides where a contest runs, and nothing else does.** A par five hosts a longest drive, a
+  par three a closest to the pin; there is no stored list of contest holes. There cannot be, because
+  par is corrected from the tee you are standing on (`ParChip`) — a list written at setup would be
+  wrong the moment the fourth turned out to be a three, and derived it is right the instant the par
+  is.
+- **So an award stores which contest it was**, not just who won. Par can move *under* a claim, and
+  an award that only said "Dan" would be silently reinterpreted as the other contest when it did.
+  Stored, it stops counting (hole 7 hosts nothing now) without being destroyed, and comes back
+  whole if the par comes back — the same posture as shortening a round to nine.
+- **Points are a pot, not a prize.** A `Stake` of ten on the closest to the pin means every player
+  puts ten in on every par three and whoever is nearest takes the lot: four playing, the winner is
+  **+30** and the other three are −10 apiece. `ScrambleTally.points` settles it, so a row is a
+  signed net and **the column adds to zero** — which `ScrambleTests` pins, because a board that
+  does not is one somebody has to settle with a calculator. Only *claimed* holes settle: an
+  unclaimed par three has no pot, and charging for it would be asking people to pay for a hole
+  still in front of them.
+  The first shape of this was one Int an item meaning "the winner scores this much", which is a
+  different game — nobody could lose, and a player who took nothing finished level with a player
+  who was not there. `PointValues.init(from:)` migrates those numbers into stakes (the number
+  typed becomes the stake, a zero comes back switched off).
+  Each of the three things has **its own switch** (`WagerItem`: a shot kept, a longest drive, a
+  closest to the pin), because "I don't want to play for shots kept" is a normal thing to want and
+  a stake of zero is not the same sentence as not being in the game. The setup sheet says **each**
+  on every stepper and works the arithmetic out loud underneath for the number of names currently
+  on the card — the difference between "10 to the winner" and "10 from everybody" is the whole
+  feature, and a bare "10" reads as the first one.
+  When points are on they are the board the Tally tab shows *first*, because a group that sat down
+  and priced a closest to the pin did it to decide something, and the board that decides should not
+  be the one you have to tap to reach. Shots kept is the other half of one segmented control.
+
+- **A bet nobody wins can roll into the next one**, per contest, and it is a *weight* rather than a
+  second settlement: `ContestResult.holes` is one plus every finished hole behind it that went
+  unclaimed, and `points` multiplies by it. A claim worth four holes settles exactly like four
+  claims worth one, so the pot arithmetic, the zero-sum column and the tests over it are untouched
+  by the feature. Two conditions gate the roll and the second is the one that is easy to miss:
+  the bet has to carry, **and the hole has to be over** — every par three is a contest hole from
+  the moment the card is dealt, so counting the ones nobody has reached would price the fourth tee
+  at the whole round. A run still open when the round ends never settles: money nobody won is
+  money nobody pays. The walk is a fold over current state and stores nothing, which is what keeps
+  it right through a par correction, a claim taken back, or three devices editing at once.
+  **`carry` decodes absent-as-off, which is deliberately not the default for a new card** — a
+  round played before this existed was settled under the old rule, and every phone and browser
+  holding it has to keep reading the same money out of it. A new card is offered the carry because
+  that is the bet people think they are making, and the setup sheet prices it in a sentence.
+  What is riding is on screen from the moment a hole goes begging (`riding` / `RidingStrip`),
+  not revealed at the end: a group told on the fourth tee that it is playing for 160 is having the
+  best part of the bet, and one that finds out afterwards is having an argument in the car park.
+- **The board is a record; the settle-up is an instruction.** `settleUp` turns the signed column
+  into the fewest payments that clear it — deepest debt against largest credit — because four
+  numbers adding to zero is a puzzle somebody solves badly at the bar while four people hold up
+  four screens. It sits *under* the board rather than replacing it: the column is how you check
+  the app is right, the payments are what you do about it. Ties keep the board's own order, and
+  `sorted` is not stable in Swift, so the board position is an explicit tiebreak there — three
+  browsers and a phone printing different instructions for the same round is precisely the
+  argument this ends.
+
+**A stroke on the Round tab is a menu, and the correction it makes is the one people actually
+make**: "that was Dan's, not Pete's", noticed once the hole is in and the tally has moved.
+`ScrambleCard.reassign` swaps the name (or makes it a penalty / nobody's) on the same stroke id,
+and is allowed on a finished hole because the count — the score — does not change; `remove` takes a
+stroke out of the middle and is refused on a finished hole for the same reason `record` is, so the
+posture is one rule: anything that moves the score needs Reopen first, anything that only moves a
+mark does not. Before this the fix was Reopen, Undo back past the stroke and re-enter everything
+after it. The finishing button also names who it is about to credit ("Dan holed it") — a bare
+*Holed it* was a guess about the one fact the card exists to get right — and it does not finish
+the hole: it opens a **review** (`HoleReviewCard`: the score and its word, each name's shots on
+the hole, how the ball went in, the side game or the yellow note that nobody has been named for
+it) and the hole closes on a **swipe**, the pool's `SlideToLock` with golf's words on it, because
+a swipe is a decision and a tap is a reflex. `finishHole(advance: false)` then `advance(card:from:)`
+are deliberately two calls so the word can be stamped over the page for a beat before the next tee
+slides up on its own; the second is guarded by the hole so a stamp landing late never moves
+somebody twice.
+
+Claiming one is a row of names under the hole header on the Round tab — tapping the name already on
+it takes it back, so claim, change and undo are one gesture with no mode to be in. It is drawn on a
+finished hole too, because an award changes no score and the argument about who was closest outlives
+the putt. The **Side games** card on the Tally tab is the separate component: a tile per contest
+hole, dashed while it is open, and every tile is a way back to that tee.
+
+## A card can leave the phone, and the link is the whole credential
+
+`migrations/0013_golf_cards.sql` is the day a scramble stopped being local. It had to be: three of
+the four people round a card are holding a browser and nothing else, and asking them to install an
+app to find out the score is asking the wrong question. **The app is still the only way to make a
+card**; publishing one (`POST /api/golf/cards`) stores it and hands back a link, and from then on
+the phone and every browser holding that link are keeping the same round — every stroke, every side
+game, the stakes, the pars and the names.
+
+Four things hold it together, and each is load-bearing:
+
+- **The token in the URL authorises everything, and there is no other door.** No session, no
+  account — a person can own a golf card without being in a pool. 24 characters of the claim
+  code's alphabet is 120 bits, so it is found rather than guessed, and there is deliberately **no
+  route that lists cards**: no index, no search, no "recent". What that costs is said out loud
+  rather than papered over — anyone with the link can *edit* the card, because that is what the
+  link is for — and the blast radius is a handful of first names and some golf.
+- **The server merges; its answer is the truth.** `mergeCards` runs on every write, and the hole is
+  the unit: the newer of the two takes it whole, because a hole's strokes and its awards belong
+  together and merging *inside* one would invent a round nobody played. Settings (names, pars,
+  contests, stakes) move as a second unit on `settingsUpdatedAt`, because renaming a player and
+  shortening a round are not changes you would want half of. It has to be the server: two browsers
+  and a phone each hold a version and each thinks its own is current, and only one party sees both.
+  A push therefore comes back carrying holes the pusher never logged, and that is the feature
+  working.
+- **`currentHole` and `shareToken` never cross the wire.** Which tee a device is standing on is a
+  fact about the device — two people on one card are on different holes all afternoon, and syncing
+  it would have them dragging each other backwards — so the phone keeps its own and the browser
+  keeps its own (in the query string, which also makes "look at 7" a link). The token is the
+  server's to know. `GolfService.wire` strips both; `ScrambleCard.merging(_:)` keeps them local.
+- **Not discoverable means two things, not one.** `X-Robots-Tag: noindex` on every `/g/*` answer —
+  including the 404s, or the error page becomes the thing that gets indexed — and `Disallow: /g/`
+  in `public/robots.txt`. They cover different failures: the file stops a well-behaved crawler
+  fetching the page, the header stops one that ignored the file from keeping what it found.
+
+`shared/golf.ts` is the rules in TypeScript, because a browser cannot import a Swift package. That
+makes it the third parity pairing after the live activity and the pool code, and the most dangerous
+of them: the others describe a week or check a string, while these two settle **money** between
+four people who have just spent an afternoon arguing about it. `golfParity.test.ts` holds the two
+together on everything that would drift quietly — which par hosts which contest, the stake range
+and the defaults, the words for a score, the real minus sign, the sentences that do the pot's
+arithmetic out loud, the merge rule's shape and the address a card is shared at.
+
+The card's web shell is its own, not the pool's (`src/screens/GolfCard.tsx`). Same grammar as
+`AppShell` — the mark and the name, tabs inline on a desktop and fixed to the bottom on a phone,
+the same pill sliding under the active one — with the contest's three: **Round · Tally ·
+Scorecard**. There is no Account because there is no account, and no way *out* of a card, because
+a tab bar offering a football pool to somebody who arrived from a group chat is a pop-up. The
+client is local-first: a tap redraws immediately, pushes are coalesced and serialised, and a poll
+never clobbers an unsent edit. **Deleting is not on the web.** The link is a capability, not
+ownership; somebody sent a card so they could keep score should not be able to destroy the round
+for the other three.
+
+**`ScrambleCard` and `HoleEntry` decode by hand, and every field added to them from here on must
+too.** Swift's synthesised decoder throws on a missing key rather than falling back to the
+property's default, and `CardCatalog.load` turns a throw into an empty catalogue — silently. A
+synthesised decoder on either of them would have deleted every round anybody had ever kept on the
+update that shipped `contests`, `points` and `awards`. `ScrambleTests` pins the old shape.
+
+Sharing is now two acts behind one button (`ShareCardSheet`): **Play together**, the link and a QR
+code that gets everybody onto the card *during* the round, and **Poster**, the picture that goes in
+the group chat *after* it. The link leads on a round still being played and the poster on a
+finished one, because a poster of a half-finished round is nobody's trophy. The QR is always drawn
+in the light palette for the same reason the poster is, but a harder one: a camera looks for dark
+modules on a light ground, and an inverted code is one half the phones in the group cannot scan.
+
 A round reaches the other three as a **drawn card, not a paragraph** (`ShareCardView` rendered by
 `ImageRenderer` at 3x, previewed in `ShareCardSheet`): a result is text, a trophy is a picture, and
 a picture is what gets re-shared in a thread. It is also the only marketing this feature does, which
@@ -208,6 +357,21 @@ light weights the dark cut nearly closed. The icon script, `TallyGlyph` and `Tal
 carry both sets; change one and change all three. The tee is what makes the golf ball legible at
 22pt: a bare ball is a circle with specks on it.
 
+**A hole closes into three things at once, and one of them is not in the repo.** The swipe stamps
+the word, buzzes a pattern shaped by the score (`Haptics.holed(toPar:)` — four steps, because four
+is what somebody can tell apart through a cart holder) and calls the score out loud. The voice is
+recordings, not synthesis, and `ios/Tally/Resources/Calls/` is empty: the **file name is the whole
+wiring**, so `birdie.m4a` makes the app say birdie with no code change, and a word with no file is
+silent. Silence is the working state — a placeholder beep would have shipped and then become the
+sound the app makes — which is also why the mute row only appears in the card menu once a recording
+exists. `ScrambleTally.callNames` folds everything past a double bogey into one `worse`, because
+there is no recording of "+5". Two things about the audio session are decisions rather than
+defaults: the category is `.ambient` because the default `.soloAmbient` **pauses whatever is
+playing in the cart**, and `.ambient` also means the ring/silent switch wins — ducking is legal
+only on `.playback`, which overrides that switch, so the duck and the override are one choice and
+not two. `RoundView` holds the stamp for the length of the clip (capped) so the next tee does not
+slide up over the end of a word.
+
 The round's Live Activity is the one lock screen in the app that **needs no APNs key**: a scramble
 has no feed, so every change is a tap in this app and `RoundActivityService` updates the activity
 itself with `pushType` left nil. Do not give it a token it would never use. It starts on the first
@@ -231,6 +395,13 @@ took last week. (A golf card has its own three; see above.)
   the pool's own tabs (`ScreenHeader`) is the mark and the pool name, and it is a label rather
   than a menu — and it is page content, not a toolbar item, because iOS 26 wraps a leading
   toolbar item in glass sized to its own idea of the width, which for a name was one letter.
+  **The pool's controls came down to the name rather than the name going up to them**: the
+  megaphone, the rules and the week now sit on the header's own line, in `ScreenHeader`'s
+  `trailing` slot, and the navigation bar is hidden outright. Two lines that each held one thing
+  became one line holding both, on every tab, and an empty inline bar is forty-odd points of
+  glass saying nothing. Only the name carries `.isHeader`; combining the whole row would swallow
+  the controls that are the reason it exists. A family with no controls (the app's own home, a
+  golf card) uses the `EmptyView` initialiser and draws exactly as it did.
   `PoolsView` is only join / start / the catalogue, the way in at the bottom of Home. The pool's
   page does not list the other pools; Home says everything that strip used to. Behind Labs
   (`poolPager`) the Pool tab wears a `PoolPager` row — chevrons, dots, a contained flick — as a
@@ -238,24 +409,83 @@ took last week. (A golf card has its own three; see above.)
   catalogue's last-opened order, or the pool you just switched to would jump to the front and
   left/right would shuffle under your thumb. The page reloads rather than slides: a pool is a
   session and a bootstrap, not a page.
-- **The web has no switcher, and stopped pretending to.** A pool *is* an address there: the Worker
-  serving a page serves exactly one, so a second pool is a second host, and browser storage is per
-  origin — a catalogue of them is not something a tab can hold. `PoolSheet` off the lockup names
-  the pool you are standing in and hands over to `PoolPlays` (join / start / what Tally plays),
-  which is one component behind three doors: that sheet, the account page and the fold at the
-  bottom of Home. The iOS app keeps a catalogue because it can talk to each host in turn.
+- **The web has no switcher at all, and the lockup opens nothing.** A pool *is* an address there:
+  the Worker serving a page serves exactly one, so a second pool is a second host, and browser
+  storage is per origin — a catalogue of them is not something a tab can hold. The lockup used to
+  open a sheet that named the one pool this origin serves and then offered to join another, which
+  is a switcher with nothing to switch to; it is a label now, the mark over the pool's name.
+  `PoolPlays` (join / start / what Tally plays) is one component behind the two doors that mean
+  something here: the account page, and the fold at the bottom of Home. The iOS app keeps a
+  catalogue because it can talk to each host in turn.
 - **The entry switcher is not in the navigation bar, on either surface.** It is `EntryPicker`, a
   row of names above the picks and above the board — the two places the answer changes anything —
   drawn only when there is more than one name. Home shows every entry already and Account manages
   them. On iOS it used to sit next to the megaphone, which made the megaphone look like part of
   it; on the web the same chip was *also* the account door, so one control held both the
-  mid-week question and the once-a-season one.
+  mid-week question and the once-a-season one. **Past three names it is one control** — the
+  current name and a menu (`chipLimit` / `CHIP_LIMIT`, the same number on both) — because twelve
+  chips wrap to three lines on the web and scroll off the edge on the phone, and at that count
+  nobody is scanning for a name, they are looking for theirs. If the picker is *missing* on a
+  phone the account has three names on, the phone's bootstrap is reporting one entry: see *The
+  roster is the server's*, not this component.
+- **The board reveals every entry the account owns, not just the one it is picking as.**
+  `buildWeekBoard` used to hide a pick before kickoff from everyone but `requesterId`, which made
+  a family phone worse than a browser: picking as Parker, you could not see what you had put in
+  for Declan without switching, and switching is a bootstrap. `revealIds` is the account's whole
+  entry set (`ownedEntryIds`), those rows are marked `mine` — `isMe` stays the active one — and
+  wear a `yours` chip rather than the flag fill, because two highlighted rows would leave nobody
+  sure which the picks tab is on. Tapping one opens its picks whole. A stranger still sees a lock,
+  and `entries.test.ts` proves it from both sides. `mine` is optional in Swift (`isMine`) so a
+  board from an older Worker still decodes, falling back to the requester.
+- **The week board has a grid, and it replaces nothing.** Entries down the side, 5·4·3·2·1
+  across, points at the end — the answer to *who took whom* for the whole pool at once, which is
+  a different question from the list's *how is everybody doing*. It draws only what the server
+  sent, so it hides exactly what the list hides. Cells are three letters rather than logos: at
+  six columns on a phone a logo is twenty points and the Giants and the Jets are the same blue
+  smudge. Web keeps it in the query (`view=grid`, beside `sort`, only when not the default); iOS
+  keeps it as a preference (`tally.boardGrid`), because the person who reads the board as a table
+  on Sunday wants it that way on Monday. **The toggle rides with the scope and the sort**, since
+  all three are ways of reading the same standings, and it is drawn for the whole of the week tab
+  rather than appearing once rows land — a control that arrives with the data reflows the row
+  under your thumb. **Three on one line when three fit, and the toggle takes its own row when
+  they do not**, which is a measurement rather than a breakpoint: `ViewThatFits` offers the
+  one-line arrangement first on iOS, and the web gives its two segmented controls a width floor
+  so the toggle wraps. The two surfaces resolve it differently at the same width because their
+  labels are set differently — iOS puts no horizontal padding inside a segment and fits all three
+  on a phone; the web's `px-2` does not, and "Season" and "Potential" truncate rather than shrink.
+  Both follow the same rule, and a bigger type size pushes either one to two rows.
+- **"6 of 16 games final" sits under the board, not over it.** It is a footnote about the
+  standings rather than a heading for them, and it was the last thing between the controls and
+  the leaderboard on a screen whose top is the part people came for. The prize line ("most points
+  wins Week 2") travels with it, because they answer the same question about the week rather than
+  about anybody's row.
+- **The season drawer is a chart of the whole season, not of the weeks played.** It used to draw
+  only `fromWeek` through `throughWeek`, so in Week 2 it was one column filling the width — and
+  since a nothing week was a two-pixel sliver, that column read as a horizontal rule with a stray
+  "2" under it. It runs to `WEEKS` now, and **every track is identical** — the
+  green bar is the only thing that varies, because saying which weeks have happened is the one
+  job it already does. Dashing the weeks still to come said it a second time, and seventeen
+  dashed boxes at this size is a texture rather than information. The scale is `MAX_WEEK_POINTS`
+  rather than the row's own best, so a five-point column is the same height on everybody's chart,
+  which is the only reason stacking them one above another says anything. **Only the score is
+  loud**: full ink above its bar, while every week is numbered underneath in a smaller, faded
+  hand — an axis is for orienting yourself once and must never compete with the numbers it sits
+  under. Every column opens its week, including one still to come, since they all look alike and
+  a board of fixtures is a fair answer to the tap. `SeasonWeekChart` and `WeekBars` are the pair.
 - **Account is a tab on the web too**, which is how the offices became reachable: `/commissioner`
   and `/league` were routes with nothing in the app linking to them, so a commissioner had to
   remember the address. Both are rows on `src/screens/Account.tsx`, drawn from `roles` in the
   bootstrap, the same rule the app follows. Switching entries clears the pick flow's `step` from
   the query (`EntryPicker`), or the previous entry's "locked in" screen follows you.
-- **Rules is not a tab.** `RulesSheet` on iOS, `/rules` on web, linked from Home and the board.
+- **Rules is not a tab, and on iOS it is not a setting either.** `RulesSheet` on iOS, `/rules` on
+  web, linked from Home and the board — and on iOS opened by a question mark in the pool's bar,
+  immediately right of the megaphone, on every one of the pool's tabs. It used to be the first row
+  under *About Tally* on the account page, which put a fact about **one pool** one line above the
+  app's version number; a phone holding two pools had a settings page claiming to explain both.
+  Beside the megaphone it is the pool's, the way the megaphone is, and reachable at the moment the
+  question actually arrives — mid-pick, where leaving the flow to find an answer means not finding
+  it. It opens at a medium detent, draggable to full, which is the announcements peek's shape: two
+  controls that behave alike because they are the same kind of thing.
 - **Announcements is not a tab either**, and the megaphone differs by surface on purpose. On iOS it
   always opens a peek — a medium sheet of the announcements, whole, with the like in each row —
   from every pool tab, and there is no announcements section on the pool's page; reading a notice
@@ -266,6 +496,47 @@ took last week. (A golf card has its own three; see above.)
   the *device* has looked at (`AnnouncementRead`, mirrored from `src/lib/announcementRead.ts`),
   never a count or a timestamp, and never per entry: a phone that picks for the family is one
   reader.
+- **The account page has no section called "Settings".** It had one, which was a tautology on a
+  page that is entirely settings — and a drawer: notifications, the appearance control and two
+  feature flags shared a heading because none of them had a better one. The sections name what
+  they are now — *Signed in as*, *Entries*, *Run the pool*, *Preferences*, *Signing in*, *About
+  Tally* — and two things moved to where they belong. `PasskeyRow` was a caption under your name
+  at the top; it is a way back into your account, so it sits in *Signing in* with the other one,
+  and the *Another device* section (one row, its own heading) folded in beside it. Labs was two
+  switches and two paragraphs sitting open in the middle of the page, about 200pt of experiments
+  that pushed everything after them below the fold; it is `LabsSheet` behind one row that says how
+  many are on.
+- **A name is yours to fix.** `PATCH /api/players/:id/name` renames the calling account, or a
+  player in its `entry_owners` — every check the commissioner's rename runs plus the profanity
+  screen `POST /entries` applies, because a commissioner typing somebody's unusual name is not the
+  same risk as anyone at all choosing any string. Before it, the page showed your name and let you
+  change nothing about it, so a typo in your own name was an errand to whoever runs the pool —
+  which nobody runs, which is how a pool fills up with names nobody meant. `AppModel.renamed` moves
+  the Keychain cache *and* refreshes the bootstrap, in that order, and takes care not to let
+  `SessionStore.save` make the renamed entry the active one: renaming a child from the account page
+  must not quietly start picking as them.
+- **`/privacy` is a page, and the only copy of it.** There was no privacy policy anywhere, which
+  Apple will not accept at submission and which a pool that keeps picks forever ought to say out
+  loud regardless. Every claim on it is checked against the schema rather than written from a
+  template — no email, no password, no analytics, no ad tech, tokens stored only as SHA-256, an IP
+  address kept as a rate-limit key that expires. iOS links to the web page rather than keeping its
+  own copy: a policy has to live at a public address anyway, and two copies is how one goes stale.
+  The support address is `shared/contact.ts` + `Contact.swift`, a plain constant, with
+  `contactParity.test.ts` holding the two together — a Swift build cannot see the TypeScript, and
+  the cost of drift on this particular string is somebody writing in and never being answered,
+  which looks exactly like being ignored. It was a build-time `VITE_SUPPORT_EMAIL` first, which
+  was wrong twice over: `.env` is gitignored, so every production build would have read it as
+  undefined and shipped the page with no way to reach anybody — and a support address is published
+  on purpose anyway, because the App Store listing needs one and a settings page with no way to
+  get help sends people to their commissioner for things that are not their pool's fault.
+- **Signing out is a button that asks first**, and its word is red while its fill is not.
+  `.danger` as a *fill* is the app's vocabulary for irreversible — deleting a golf card takes
+  every hole with it — and signing out keeps every pick on the board, so spending the loud red
+  there is how it stops meaning anything where it matters. `TallyButtonStyle.label` is the
+  override that makes a plain button carry a red word, the same way `Chip` names its label colour.
+  It was an underlined link with the reassurance in grey beneath it: a footnote's weight on the
+  one control that ends a session, directly under a column of full-width rows that all look like
+  the things you tap. The reassurance is in the confirmation now, where somebody is deciding.
 - **Pinch does nothing.** `.noZoom()` on the root and on each sheet — there is no zoomable content
   in Tally, so a pinch that scales the page is always an accident.
 - Web keeps the pick flow's step in the query string, and `PickFlowRoute` keys the flow by
@@ -273,6 +544,45 @@ took last week. (A golf card has its own three; see above.)
 - **The web tab bar is not drawn while picks are being made** (`useHideNav`) — the tray takes its
   place — so anything that has to be reachable mid-pick needs its own route out. That is what the
   flow's "Go to pool home" link is for, and why the e2e helpers reach Account by address.
+
+## Real money is a different board, computed once, on the server
+
+The points board and the money are two different numbers about the same picks, and they used to
+live nowhere: everyone in High Five knows there is $18 a week and $51 for the season, and nobody
+had anywhere the app actually said who had won which. `shared/winnings.ts` (`buildWinnings`) is
+that board — every week's pot and the season's, settled and split — served at `GET
+/board/winnings` and drawn as its own card under the season standings on both surfaces, never
+folded into the points column: "points" and "possible" already mean something else on every other
+screen, so this is always spoken of as **winnings** and always drawn with a `$`, on both surfaces,
+so nobody mistakes one column for the other.
+
+- **A week pays out the moment every one of its games has a result** — `buildWeekBoard`'s own
+  `place === 1` rows, same as the confetti the board already throws for a week's winner — not on
+  `SEASON_START_WEEK`, which only decides which weeks count towards the season pot. Week 1 crowns
+  its own winner same as any other, so it pays its own $18 same as any other. A week nobody picked
+  settles with no winner and no split; that is different from a week that has not finished yet,
+  and conflating them would either pay out early or swallow a pot nobody claimed.
+- **A tie splits the pot evenly, to the cent** — three people level at the top of a week share one
+  $18 pot three ways ($6.00 each), they do not each get $18. `split` rounds to the cent, which
+  means a pot that does not divide clean (say, seven ways) can land a cent or two short of the
+  total; that is the commissioner's to eat by hand, not something this board tries to solve, the
+  same posture the golf card's `settleUp` takes toward its own rounding.
+- **The season pot waits for the season's own last week (`WEEKS`), not the current leader.** A
+  board that paid the $51 out on whoever was ahead with games still to come would be paying out a
+  guess wearing a dollar sign. `buildSeasonBoard` already has the right tiebreak for who that is
+  once the season is actually over (points, correct, fives, name), so `buildWinnings` reuses its
+  `place` rather than re-deriving it — and refuses to hand the pot to a field that never played a
+  single counted week, which without that guard would read as a tie for first at zero and zero.
+- **The board is computed entirely by the Worker.** Neither client re-derives a split or a
+  tiebreak; both decode the same `WinningsResponse` and draw it. That is simpler than the golf
+  card's parity (there is no offline card to keep in sync), so only the two pot amounts and the
+  `$` label are typed out twice — `Winnings.swift` in TallyKit, pinned to `shared/winnings.ts` by
+  `winningsParity.test.ts` — because a Swift build cannot see the TypeScript and the cost of
+  drift here, same as golf's, is somebody's actual payout being wrong.
+- **The weekly log underneath the totals is the receipt.** "Week 1 — Philbin — $18", "Week 2 —
+  Parker & Athens G split $9 each" — the same sentence a commissioner would read out loud, so a
+  running total is never the only thing on screen: anyone can check *why* a number is what it is
+  without doing the arithmetic themselves.
 
 ## A pool has two ways in, and only one of them can be said out loud
 
@@ -372,6 +682,16 @@ It strips comments first, because the comments quote the sentences they explain.
 holds the pairing on the number: before anything settles the *stake* leads ("15 to play"), because
 a big honest 0 is discouraging; after that the points lead with what is still out there behind them.
 
+The home page's weekly card follows the same instinct one level up. `previewWeek`
+(`src/lib/poolHome.ts`, mirrored by `PoolHome.previewWeek` in TallyKit) picks **the newest week
+that has kicked off**, not the newest week that has finished: `latestCompletedWeek` led with Week 1
+for the four days between Thursday night and Sunday afternoon of Week 2, so the game everybody had
+just watched went unmentioned on the page that exists to mention it. `final` is a separate fact —
+every game has a result — and only it may wear the `Final` chip and the words "results" and
+"Latest weekly winner"; a week in flight says "This week so far" behind an `In progress` chip. The
+chip was always the problem, not the week: a live board under a `Final` chip is a lie, a live board
+under an honest one is the most interesting thing on the page.
+
 ## Two offices, one PIN that is no longer a login
 
 `migrations/0010_roles.sql` split what used to be "admin" in two:
@@ -387,16 +707,25 @@ attaches both offices to the calling account — and stays valid as a break-glas
 route groups. There is one `pools` row today, seeded from `POOL_SLUG`/`POOL_NAME`; `currentPool()`
 in `worker/roles.ts` is the seam where a second one arrives.
 
-## Deploying is a push, and only to one branch
+## Deploying is a merge into `main`
 
-There is no `main`. Cloudflare Workers Builds deploys from **`claude/nfl-pool-app-9tv2om`**, so a
-push there is a release and anything else is only a preview URL. This matters for Apple: the app's
-entitlements name `playtally.app`, so the association file has to reach production before the app
-will honour it. `README.md` has the plan for moving to `main`.
+Cloudflare Workers Builds deploys from **`main`**, so a merge there is a release and every other
+branch is only a preview URL. Nothing is pushed to `main` directly: work goes on a feature branch
+and arrives through a pull request, which is what lets the `CI` check stand between a mistake and
+the people making picks.
 
-## Before pushing
+`claude/nfl-pool-app-9tv2om` is the branch that used to deploy, kept only because old pull requests
+and links name it. **Pushing to it releases nothing** — which is the one way this move can still
+bite, because a push there looks exactly as successful as it always did.
 
-CI does not gate the deploy, so run these first — they take about a minute:
+This matters for Apple: the app's entitlements name `playtally.app`, so the association file has to
+reach production — a merged pull request — before the app will honour it. A preview URL is never
+enough. `README.md` has the cutover steps, kept for the next time a branch has to change.
+
+## Before opening a pull request
+
+The `CI` check runs these, and a pull request cannot merge until it passes — but running them first
+is faster than a review cycle, and they take about a minute:
 
 ```sh
 npm run typecheck && npm test && npm run test:e2e

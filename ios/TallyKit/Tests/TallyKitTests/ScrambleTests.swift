@@ -139,6 +139,226 @@ final class ScrambleTests: XCTestCase {
         XCTAssertEqual(c.entry(1)?.score, 0)
     }
 
+    // MARK: Fixing a stroke after the fact
+
+    /// The correction that actually happens: the hole is in, the tally has moved, and that third
+    /// one was Dan's. Two taps, and the score does not move.
+    func testAStrokeCanChangeHandsOnAFinishedHole() {
+        var c = card()
+        c.record(.shot(by: "c"), on: 1)
+        c.record(.shot(by: "d"), on: 1)
+        c.record(.shot(by: "p"), on: 1)
+        c.finish(hole: 1, tapIn: true)
+        let third = c.entry(1)!.strokes[2]
+
+        c.reassign(strokeId: third.id, on: 1, to: .shot, playerId: "d")
+
+        XCTAssertEqual(c.entry(1)?.score, 4, "the count is the score, and nothing about the count changed")
+        XCTAssertTrue(c.entry(1)?.finished ?? false)
+        XCTAssertEqual(c.entry(1)?.strokes[2].playerId, "d")
+        XCTAssertEqual(c.entry(1)?.strokes[2].id, third.id, "the same stroke, with a different name on it")
+        let rows = ScrambleTally.rows(c)
+        XCTAssertEqual(rows.first { $0.id == "d" }?.kept, 2)
+        XCTAssertEqual(rows.first { $0.id == "p" }?.kept, 0)
+    }
+
+    func testTheHoledShotChangesHandsWithTheStroke() {
+        var c = card()
+        c.record(.shot(by: "c"), on: 1)
+        c.record(.shot(by: "p"), on: 1)
+        c.finish(hole: 1, tapIn: false)
+        XCTAssertEqual(c.entry(1)?.holedBy, "p")
+
+        let last = c.entry(1)!.strokes[1]
+        c.reassign(strokeId: last.id, on: 1, to: .shot, playerId: "s")
+        XCTAssertEqual(c.entry(1)?.holedBy, "s")
+        XCTAssertEqual(ScrambleTally.rows(c).first { $0.id == "s" }?.holed, 1)
+        XCTAssertEqual(ScrambleTally.rows(c).first { $0.id == "p" }?.holed, 0)
+    }
+
+    /// A shot logged as somebody's that was really the water: it becomes a penalty, credits nobody,
+    /// and still counts — and the way back is the same tap with a name.
+    func testAStrokeCanBecomeNobodysAndBackAgain() {
+        var c = card()
+        c.record(.shot(by: "c"), on: 1)
+        c.record(.shot(by: "d"), on: 1)
+        let second = c.entry(1)!.strokes[1]
+
+        c.reassign(strokeId: second.id, on: 1, to: .penalty)
+        XCTAssertEqual(c.entry(1)?.strokes[1].kind, .penalty)
+        XCTAssertNil(c.entry(1)?.strokes[1].playerId)
+        XCTAssertEqual(c.entry(1)?.score, 2)
+        XCTAssertEqual(ScrambleTally.rows(c).first { $0.id == "d" }?.kept, 0)
+
+        c.reassign(strokeId: second.id, on: 1, to: .shot, playerId: "d")
+        XCTAssertEqual(c.entry(1)?.strokes[1].playerId, "d")
+    }
+
+    func testAStrokeCannotBeGivenToANameThatIsNotOnTheCard() {
+        var c = card()
+        c.record(.shot(by: "c"), on: 1)
+        let only = c.entry(1)!.strokes[0]
+        c.reassign(strokeId: only.id, on: 1, to: .shot, playerId: "nobody")
+        c.reassign(strokeId: only.id, on: 1, to: .shot, playerId: nil)
+        XCTAssertEqual(c.entry(1)?.strokes[0].playerId, "c")
+        c.reassign(strokeId: "not-a-stroke", on: 1, to: .shot, playerId: "d")
+        XCTAssertEqual(c.entry(1)?.score, 1)
+    }
+
+    /// The other correction: one too many, and not the last one. Off it comes from an open hole;
+    /// on a finished one the count is the score, so the hole has to be reopened first.
+    func testAStrokeInTheMiddleComesOffAnOpenHoleAndNotAFinishedOne() {
+        var c = card()
+        c.record(.shot(by: "c"), on: 1)
+        c.record(.shot(by: "d"), on: 1)
+        c.record(.shot(by: "p"), on: 1)
+        let middle = c.entry(1)!.strokes[1]
+
+        c.remove(strokeId: middle.id, on: 1)
+        XCTAssertEqual(c.entry(1)?.strokes.map(\.playerId), ["c", "p"])
+
+        c.finish(hole: 1, tapIn: false)
+        let first = c.entry(1)!.strokes[0]
+        c.remove(strokeId: first.id, on: 1)
+        XCTAssertEqual(c.entry(1)?.score, 2, "a finished hole keeps its count until it is reopened")
+
+        c.undo(hole: 1)
+        c.remove(strokeId: first.id, on: 1)
+        XCTAssertEqual(c.entry(1)?.strokes.map(\.playerId), ["p"])
+    }
+
+    // MARK: A card that has been shared
+
+    /**
+     Two copies of one afternoon, reconciled.
+
+     The Swift half of `mergeCards` in `shared/golf.ts`, and it has to agree with it exactly: the
+     server runs that one on every write, so a phone that merged differently would draw a round the
+     server does not have and then push it back. These are the three shapes that actually happen.
+     */
+    func testMergingKeepsBothHolesWhenTwoPeoplePlayedDifferentOnes() {
+        var mine = card()
+        var theirs = card()
+        mine.record(.shot(by: "c"), on: 1)
+        mine.finish(hole: 1, tapIn: false)
+        theirs.record(.shot(by: "d"), on: 2)
+        theirs.finish(hole: 2, tapIn: false)
+
+        let merged = mine.merging(theirs)
+        XCTAssertEqual(merged.holes.map(\.hole), [1, 2])
+        XCTAssertEqual(merged.entry(1)?.strokes.first?.playerId, "c")
+        XCTAssertEqual(merged.entry(2)?.strokes.first?.playerId, "d")
+    }
+
+    func testTheLaterWriteWinsTheHoleWhicheverWayRound() {
+        let early = HoleEntry(
+            hole: 1,
+            strokes: [Stroke(id: "a", kind: .shot, playerId: "c")],
+            finished: true,
+            updatedAt: Date(timeIntervalSince1970: 100)
+        )
+        let late = HoleEntry(
+            hole: 1,
+            strokes: [Stroke(id: "b", kind: .shot, playerId: "d")],
+            finished: true,
+            updatedAt: Date(timeIntervalSince1970: 900)
+        )
+        var a = card(); a.holes = [early]
+        var b = card(); b.holes = [late]
+
+        XCTAssertEqual(a.merging(b).entry(1)?.strokes.first?.playerId, "d")
+        XCTAssertEqual(b.merging(a).entry(1)?.strokes.first?.playerId, "d", "order must not decide it")
+    }
+
+    func testTheSettingsMoveAsOneUnitOnTheirOwnClock() {
+        var played = card()
+        played.record(.shot(by: "c"), on: 1)
+        played.finish(hole: 1, tapIn: false)
+
+        var renamed = card()
+        renamed.name = "Sunday"
+        renamed.contests.closestToPin = true
+        renamed.touchSettings(Date(timeIntervalSinceNow: 60))
+
+        let merged = played.merging(renamed)
+        XCTAssertEqual(merged.name, "Sunday")
+        XCTAssertTrue(merged.contests.closestToPin)
+        XCTAssertEqual(merged.holes.map(\.hole), [1], "renaming must not wipe the round")
+    }
+
+    /**
+     The two things that never cross.
+
+     Which tee this phone is standing on is nobody else's business — syncing it would have two
+     people dragging each other backwards all afternoon — and the token is something this device
+     already knows and the wire does not carry.
+     */
+    func testMergingKeepsThisDevicesOwnPlaceAndItsLink() {
+        var mine = card()
+        mine.go(to: 7)
+        mine.shareToken = "TOKEN"
+
+        var theirs = card()
+        theirs.go(to: 2)
+        theirs.shareToken = nil
+        theirs.touchSettings(Date(timeIntervalSinceNow: 60))
+
+        let merged = mine.merging(theirs)
+        XCTAssertEqual(merged.currentHole, 7)
+        XCTAssertEqual(merged.shareToken, "TOKEN")
+        XCTAssertEqual(merged.id, mine.id)
+    }
+
+    /// A card saved before sharing existed has no settings clock, and must not throw for it.
+    func testACardSavedBeforeSharingStillDecodesAndLosesEverySettingsRace() throws {
+        let old = """
+        {"cards":[{"id":"x","name":"Saturday","course":"","createdAt":"2026-09-01T12:00:00Z","players":[{"id":"c","name":"Corey"}],"pars":[4,4,4],"holes":[],"currentHole":1}]}
+        """
+        let catalog = try CardCatalog.decode(Data(old.utf8))
+        let card = try XCTUnwrap(catalog.cards.first)
+        XCTAssertEqual(card.settingsUpdatedAt, card.createdAt, "no clock means the oldest possible clock")
+        XCTAssertNil(card.shareToken)
+
+        var newer = card
+        newer.name = "Sunday"
+        newer.touchSettings()
+        XCTAssertEqual(card.merging(newer).name, "Sunday")
+    }
+
+    /// A card straight off the wire carries neither of the local-only fields, and defaults both.
+    func testACardFromTheServerDefaultsTheFieldsTheWireDoesNotCarry() throws {
+        let wire = """
+        {"cards":[{"id":"x","name":"Saturday","course":"","createdAt":"2026-09-01T12:00:00Z","settingsUpdatedAt":"2026-09-02T12:00:00Z","players":[{"id":"c","name":"Corey"}],"pars":[4,4,4],"holes":[]}]}
+        """
+        let catalog = try CardCatalog.decode(Data(wire.utf8))
+        let card = try XCTUnwrap(catalog.cards.first)
+        XCTAssertEqual(card.currentHole, 1)
+        XCTAssertNil(card.shareToken)
+        XCTAssertGreaterThan(card.settingsUpdatedAt, card.createdAt)
+    }
+
+    func testTheShareLinkAndItsInverseAgree() throws {
+        let url = try XCTUnwrap(GolfShare.url(token: "ABCDEFGHJKMNPQRSTUVWXYZ2"))
+        XCTAssertEqual(url.absoluteString, "https://playtally.app/g/ABCDEFGHJKMNPQRSTUVWXYZ2")
+        XCTAssertEqual(GolfShare.token(in: url), "ABCDEFGHJKMNPQRSTUVWXYZ2")
+        // A pool link is not a card link, and neither is the bare domain.
+        XCTAssertNil(GolfShare.token(in: URL(string: "https://playtally.app/p/high-five")!))
+        XCTAssertNil(GolfShare.token(in: URL(string: "https://playtally.app/")!))
+        XCTAssertNil(GolfShare.token(in: URL(string: "https://playtally.app/g/a/b")!))
+    }
+
+    /// Correcting a par is a settings change, so a shared card has to say so or keep losing it.
+    func testCorrectingAParMovesTheSettingsClock() {
+        var c = card()
+        // Backdated rather than read straight off `init`: two `Date()` calls a microsecond apart
+        // are not equal, but they are close enough that the assertion would be measuring the
+        // machine rather than the rule.
+        c.touchSettings(Date(timeIntervalSinceNow: -60))
+        let before = c.settingsUpdatedAt
+        c.setPar(3, on: 1)
+        XCTAssertGreaterThan(c.settingsUpdatedAt, before)
+    }
+
     // MARK: Moving round the course
 
     func testAdvanceSkipsFinishedHolesAndWrapsToOneThatWasMissed() {
@@ -496,6 +716,669 @@ final class HighlightTests: XCTestCase {
     }
 }
 
+/**
+ The two bets beside the round.
+
+ The whole feature turns on one fact that is easy to get wrong: *par decides where a contest
+ runs*, and par is editable from the tee. So every case here is a case where the par moved, the
+ contest was off, or the phone was carrying a card written before any of this existed.
+ */
+final class SideContestTests: XCTestCase {
+    private let corey = GolfPlayer(id: "c", name: "Corey")
+    private let dan = GolfPlayer(id: "d", name: "Dan")
+    private let pete = GolfPlayer(id: "p", name: "Pete")
+    private let sam = GolfPlayer(id: "s", name: "Sam")
+
+    /// Four playing, which is the number the pot maths is worth reading at: a win is worth three
+    /// stakes and there are three people paying for it.
+    private func four(
+        contests: ContestRules = ContestRules(longestDrive: true, closestToPin: true),
+        points: PointValues = .standard
+    ) -> ScrambleCard {
+        ScrambleCard(
+            name: "Saturday",
+            players: [corey, dan, pete, sam],
+            pars: [4, 3, 5, 4, 3, 5],
+            contests: contests,
+            points: points
+        )
+    }
+
+    /// Holes 1-6: par 4, 3, 5, 4, 3, 5. Both contests on unless told otherwise.
+    private func card(
+        contests: ContestRules = ContestRules(longestDrive: true, closestToPin: true),
+        points: PointValues = .standard
+    ) -> ScrambleCard {
+        ScrambleCard(
+            name: "Saturday",
+            players: [corey, dan, pete],
+            pars: [4, 3, 5, 4, 3, 5],
+            contests: contests,
+            points: points
+        )
+    }
+
+    // MARK: Where a contest runs
+
+    func testParDecidesWhichContestAHoleHosts() {
+        let c = card()
+        XCTAssertNil(c.contest(for: 1), "a par four hosts neither")
+        XCTAssertEqual(c.contest(for: 2), .closestToPin)
+        XCTAssertEqual(c.contest(for: 3), .longestDrive)
+        XCTAssertEqual(c.contestHoles, [2, 3, 5, 6])
+    }
+
+    func testACardWithTheContestsOffHostsNothingAnywhere() {
+        let c = card(contests: .off)
+        XCTAssertNil(c.contest(for: 2))
+        XCTAssertNil(c.contest(for: 3))
+        XCTAssertEqual(c.contestHoles, [])
+        XCTAssertTrue(ScrambleTally.contestResults(c).isEmpty)
+    }
+
+    func testOnlyTheContestThatIsSwitchedOnRuns() {
+        let c = card(contests: ContestRules(longestDrive: false, closestToPin: true))
+        XCTAssertNil(c.contest(for: 3), "the par fives are not in play")
+        XCTAssertEqual(c.contest(for: 2), .closestToPin)
+        XCTAssertEqual(c.contestHoles, [2, 5])
+    }
+
+    func testCorrectingAParFromTheTeeMovesTheContestWithIt() {
+        var c = card()
+        XCTAssertNil(c.contest(for: 4))
+        c.setPar(3, on: 4)
+        XCTAssertEqual(c.contest(for: 4), .closestToPin, "the fourth turned out to be a three")
+    }
+
+    // MARK: Claiming one
+
+    func testAnAwardNamesTheWinnerAndTappingTheSameNameTakesItBack() {
+        var c = card()
+        c.award(.closestToPin, on: 2, to: dan.id)
+        XCTAssertEqual(c.winner(of: .closestToPin, on: 2)?.id, dan.id)
+        c.award(.closestToPin, on: 2, to: nil)
+        XCTAssertNil(c.winner(of: .closestToPin, on: 2))
+    }
+
+    func testOneWinnerPerContestPerHole() {
+        var c = card()
+        c.award(.closestToPin, on: 2, to: dan.id)
+        c.award(.closestToPin, on: 2, to: pete.id)
+        XCTAssertEqual(c.entry(2)?.awards.count, 1)
+        XCTAssertEqual(c.winner(of: .closestToPin, on: 2)?.id, pete.id)
+    }
+
+    func testANameThatIsNotOnTheCardCannotBeGivenAnything() {
+        var c = card()
+        c.award(.longestDrive, on: 3, to: "stranger")
+        XCTAssertNil(c.winner(of: .longestDrive, on: 3))
+        XCTAssertEqual(c.entry(3)?.awards ?? [], [])
+    }
+
+    /// An award changes no score, so unlike a stroke it is allowed on a hole that is already in —
+    /// which is usually when the argument about who was closest gets settled.
+    func testAFinishedHoleCanStillBeAwarded() {
+        var c = card()
+        c.record(.shot(by: corey.id), on: 2)
+        c.record(.shot(by: dan.id), on: 2)
+        c.finish(hole: 2, tapIn: true)
+        c.award(.closestToPin, on: 2, to: corey.id)
+        XCTAssertEqual(c.winner(of: .closestToPin, on: 2)?.id, corey.id)
+        XCTAssertEqual(c.entry(2)?.score, 3, "awarding it changed nothing on the card")
+    }
+
+    /**
+     The case the contest is stored on the award for.
+
+     Hole 3 was a five and Dan took the long drive; somebody then notices the card says four. The
+     award stops counting, because hole 3 hosts nothing now — but it is still on disk as a
+     *longest drive*, so correcting the par back brings Dan's claim back rather than silently
+     reinterpreting it as a closest to the pin.
+     */
+    func testAParCorrectionOrphansAnAwardWithoutDestroyingIt() {
+        var c = card()
+        c.award(.longestDrive, on: 3, to: dan.id)
+        XCTAssertEqual(c.winner(of: .longestDrive, on: 3)?.id, dan.id)
+
+        c.setPar(4, on: 3)
+        XCTAssertNil(c.winner(of: .longestDrive, on: 3), "hole 3 hosts nothing now")
+        XCTAssertNil(c.winner(of: .closestToPin, on: 3), "and it is certainly not a closest to the pin")
+        XCTAssertEqual(c.entry(3)?.award(.longestDrive), dan.id, "the record survives the miscount")
+
+        c.setPar(5, on: 3)
+        XCTAssertEqual(c.winner(of: .longestDrive, on: 3)?.id, dan.id, "and comes back with the par")
+    }
+
+    func testSwitchingAContestOffKeepsWhatWasAlreadyClaimed() {
+        var c = card()
+        c.award(.longestDrive, on: 3, to: dan.id)
+        c.contests.longestDrive = false
+        XCTAssertNil(c.winner(of: .longestDrive, on: 3))
+        c.contests.longestDrive = true
+        XCTAssertEqual(c.winner(of: .longestDrive, on: 3)?.id, dan.id)
+    }
+
+    // MARK: What the screens read
+
+    func testEveryContestHoleIsListedWhetherOrNotAnybodyHasClaimedIt() {
+        var c = card()
+        c.award(.closestToPin, on: 2, to: corey.id)
+        let results = ScrambleTally.contestResults(c)
+        XCTAssertEqual(results.map(\.hole), [2, 3, 5, 6])
+        XCTAssertEqual(results.filter(\.claimed).count, 1)
+        XCTAssertEqual(results.first { $0.hole == 5 }?.contest, .closestToPin)
+        XCTAssertNil(results.first { $0.hole == 5 }?.winner)
+    }
+
+    // MARK: Points, which are a pot
+
+    /// Four playing, ten each on the closest to the pin: the winner is +30 and the other three are
+    /// −10. This is the case the whole model was rebuilt for, written the way it was asked for.
+    func testTenEachOnAClosestToThePinMakesTheWinnerThirtyAndEverybodyElseMinusTen() {
+        var c = four(points: PointValues(
+            enabled: true,
+            shotKept: Stake(on: false, each: 0),
+            longestDrive: Stake(on: false, each: 0),
+            closestToPin: Stake(on: true, each: 10)
+        ))
+        c.award(.closestToPin, on: 2, to: dan.id)
+
+        let rows = ScrambleTally.points(c)
+        XCTAssertEqual(rows.first { $0.id == dan.id }?.points, 30)
+        for loser in [corey.id, pete.id, sam.id] {
+            XCTAssertEqual(rows.first { $0.id == loser }?.points, -10, "everybody else put ten in")
+        }
+        XCTAssertEqual(rows.map(\.points).reduce(0, +), 0, "a pot cannot create points")
+    }
+
+    /// The winner's own stake is not part of what they collect, which is what makes it a *net*.
+    func testAWinCollectsFromTheOthersAndNotFromItself() {
+        let stake = Stake(on: true, each: 10)
+        XCTAssertEqual(stake.winnings(players: 4), 30)
+        XCTAssertEqual(stake.winnings(players: 2), 10)
+        XCTAssertEqual(stake.winnings(players: 1), 0, "nobody to take it off")
+    }
+
+    func testTwoHolesToTheSamePersonIsTwicePaid() {
+        var c = four(points: PointValues(
+            enabled: true,
+            shotKept: Stake(on: false, each: 0),
+            longestDrive: Stake(on: false, each: 0),
+            closestToPin: Stake(on: true, each: 10)
+        ))
+        c.award(.closestToPin, on: 2, to: dan.id)
+        c.award(.closestToPin, on: 5, to: dan.id)
+
+        let rows = ScrambleTally.points(c)
+        XCTAssertEqual(rows.first { $0.id == dan.id }?.points, 60)
+        XCTAssertEqual(rows.first { $0.id == corey.id }?.points, -20)
+        XCTAssertEqual(rows.map(\.points).reduce(0, +), 0)
+    }
+
+    /// Two people sharing the day between them: each pays into the other's hole and takes their own.
+    func testTwoWinnersPayIntoEachOther() {
+        var c = four(points: PointValues(
+            enabled: true,
+            shotKept: Stake(on: false, each: 0),
+            longestDrive: Stake(on: false, each: 0),
+            closestToPin: Stake(on: true, each: 10)
+        ))
+        c.award(.closestToPin, on: 2, to: dan.id)
+        c.award(.closestToPin, on: 5, to: corey.id)
+
+        let rows = ScrambleTally.points(c)
+        // Each won 30 off the others and put 10 into the hole the other took.
+        XCTAssertEqual(rows.first { $0.id == dan.id }?.points, 20)
+        XCTAssertEqual(rows.first { $0.id == corey.id }?.points, 20)
+        XCTAssertEqual(rows.first { $0.id == pete.id }?.points, -20)
+        XCTAssertEqual(rows.map(\.points).reduce(0, +), 0)
+    }
+
+    /// An unclaimed par three has no pot: nobody has put anything in on a bet nobody has won.
+    func testAnUnclaimedHoleCostsNobodyAnything() {
+        let c = four(points: PointValues(
+            enabled: true,
+            shotKept: Stake(on: false, each: 0),
+            longestDrive: Stake(on: false, each: 0),
+            closestToPin: Stake(on: true, each: 10)
+        ))
+        XCTAssertEqual(ScrambleTally.contestResults(c).filter { $0.contest == .closestToPin }.count, 2)
+        XCTAssertTrue(ScrambleTally.points(c).allSatisfy { $0.points == 0 })
+    }
+
+    /// The thing that was explicitly asked for: a group that does not want to play for the shots
+    /// the team keeps simply does not, and those shots move nothing.
+    func testShotsKeptSwitchedOffMoveNothing() {
+        var c = four(points: PointValues(
+            enabled: true,
+            shotKept: Stake(on: false, each: 5),
+            longestDrive: Stake(on: false, each: 0),
+            closestToPin: Stake(on: true, each: 10)
+        ))
+        c.record(.shot(by: corey.id), on: 1)
+        c.record(.shot(by: corey.id), on: 1)
+        c.finish(hole: 1, tapIn: true)
+        XCTAssertTrue(ScrambleTally.points(c).allSatisfy { $0.points == 0 }, "the stake is remembered but not in play")
+
+        // ...and switching it on puts the same shots straight into the game.
+        c.points.shotKept = Stake(on: true, each: 5)
+        XCTAssertEqual(ScrambleTally.points(c).first { $0.id == corey.id }?.points, 30, "two kept, 15 off each of three")
+        XCTAssertEqual(ScrambleTally.points(c).map(\.points).reduce(0, +), 0)
+    }
+
+    func testShotsKeptAreAPotToo() {
+        var c = four(points: PointValues(
+            enabled: true,
+            shotKept: Stake(on: true, each: 1),
+            longestDrive: Stake(on: false, each: 0),
+            closestToPin: Stake(on: false, each: 0)
+        ))
+        c.record(.shot(by: corey.id), on: 1)   // Corey 1
+        c.record(.shot(by: dan.id), on: 1)     // Dan 1
+        c.finish(hole: 1, tapIn: true)
+
+        let rows = ScrambleTally.points(c)
+        // Two shots kept in all. Corey takes 3 on his and pays 1 on Dan's; Dan the same.
+        XCTAssertEqual(rows.first { $0.id == corey.id }?.points, 2)
+        XCTAssertEqual(rows.first { $0.id == dan.id }?.points, 2)
+        XCTAssertEqual(rows.first { $0.id == pete.id }?.points, -2)
+        XCTAssertEqual(rows.map(\.points).reduce(0, +), 0)
+    }
+
+    /// What a row shows when it is negative, which is the number that looks like a bug without it.
+    func testARowSaysWhatItWonAndWhatItPutIn() {
+        var c = four(points: PointValues(
+            enabled: true,
+            shotKept: Stake(on: false, each: 0),
+            longestDrive: Stake(on: false, each: 0),
+            closestToPin: Stake(on: true, each: 10)
+        ))
+        c.award(.closestToPin, on: 2, to: dan.id)
+        let rows = ScrambleTally.points(c)
+        let winner = rows.first { $0.id == dan.id }
+        XCTAssertEqual(winner?.won, 30)
+        XCTAssertEqual(winner?.paid, 0)
+        let loser = rows.first { $0.id == pete.id }
+        XCTAssertEqual(loser?.won, 0)
+        XCTAssertEqual(loser?.paid, 10)
+    }
+
+    /// A contest switched off above is not a bet, whatever stake is still sitting against it.
+    func testAStakeOnAContestThatIsNotBeingPlayedIsNotInTheGame() {
+        var c = four(
+            contests: ContestRules(longestDrive: false, closestToPin: true),
+            points: PointValues(
+                enabled: true,
+                shotKept: Stake(on: false, each: 0),
+                longestDrive: Stake(on: true, each: 25),
+                closestToPin: Stake(on: true, each: 10)
+            )
+        )
+        c.award(.longestDrive, on: 3, to: dan.id)
+        XCTAssertTrue(ScrambleTally.points(c).allSatisfy { $0.points == 0 })
+        XCTAssertEqual(c.points.playing(c.contests), [.closestToPin])
+    }
+
+    func testTheBoardIsBuiltEvenWhenNobodyIsCountingPoints() {
+        var c = four(points: PointValues(
+            enabled: false,
+            shotKept: Stake(on: false, each: 0),
+            longestDrive: Stake(on: true, each: 10),
+            closestToPin: Stake(on: false, each: 0)
+        ))
+        c.award(.longestDrive, on: 3, to: dan.id)
+        XCTAssertEqual(ScrambleTally.points(c).first { $0.id == dan.id }?.points, 30)
+    }
+
+    func testATieOnTheNetSharesAPlace() {
+        var c = four(points: PointValues(
+            enabled: true,
+            shotKept: Stake(on: false, each: 0),
+            longestDrive: Stake(on: true, each: 10),
+            closestToPin: Stake(on: true, each: 10)
+        ))
+        c.award(.closestToPin, on: 2, to: dan.id)
+        c.award(.longestDrive, on: 3, to: corey.id)
+
+        let rows = ScrambleTally.points(c)
+        XCTAssertEqual(rows.filter { $0.points == 20 }.map(\.place), [1, 1])
+        XCTAssertEqual(rows.last?.place, 3, "the place skips past the tie")
+        XCTAssertEqual(rows.last?.points, -20)
+    }
+
+    func testAStakeOutsideTheRangeIsClampedRatherThanTrusted() {
+        XCTAssertEqual(Stake(on: true, each: -4).each, 0)
+        XCTAssertEqual(Stake(on: true, each: 900).each, 50)
+    }
+
+    func testTheStakesLineSaysEachAndOnlyWhatIsBeingPlayed() {
+        let c = four(
+            contests: ContestRules(longestDrive: false, closestToPin: true),
+            points: PointValues(
+                enabled: true,
+                shotKept: Stake(on: true, each: 1),
+                longestDrive: Stake(on: true, each: 10),
+                closestToPin: Stake(on: true, each: 7)
+            )
+        )
+        let line = ScrambleTally.pointsLine(c)
+        XCTAssertTrue(line.contains("1 each on a shot kept"))
+        XCTAssertTrue(line.contains("7 each on a closest to the pin"))
+        XCTAssertFalse(line.contains("longest drive"), "the par fives are not in play")
+    }
+
+    func testTheWinningsLineDoesTheArithmeticOutLoud() {
+        let line = ScrambleTally.winningsLine(stake: Stake(on: true, each: 10), players: 4)
+        XCTAssertTrue(line.contains("30"), "what a win is worth")
+        XCTAssertTrue(line.contains("other 3"), "and who it comes from")
+    }
+
+    func testTheNetReadsWithItsSign() {
+        XCTAssertEqual(ScrambleTally.netText(30), "+30")
+        XCTAssertEqual(ScrambleTally.netText(-10), "−10")
+        XCTAssertEqual(ScrambleTally.netText(0), "0")
+    }
+
+    // MARK: The brags
+
+    func testHighlightsNameTheContestWinnersAndStaySilentOtherwise() {
+        var c = card()
+        XCTAssertNil(ScrambleTally.highlights(c).closestToPin, "nobody has one yet")
+        c.award(.closestToPin, on: 2, to: dan.id)
+        c.award(.closestToPin, on: 5, to: dan.id)
+        let h = ScrambleTally.highlights(c)
+        XCTAssertEqual(h.closestToPin?.names, ["Dan"])
+        XCTAssertEqual(h.closestToPin?.count, 2)
+        XCTAssertNil(h.longestDrive, "on the card, but nobody has taken one")
+    }
+
+    func testAContestThatIsNotBeingPlayedIsNeverAHighlight() {
+        var c = card(contests: ContestRules(longestDrive: false, closestToPin: true))
+        c.award(.longestDrive, on: 3, to: dan.id)
+        XCTAssertNil(ScrambleTally.highlights(c).longestDrive)
+    }
+
+    // MARK: The cards already on people's phones
+
+    /**
+     The one that would have cost every round anybody had ever kept.
+
+     `contests`, `points` and `awards` all arrived after cards were on phones, and Swift's
+     synthesised decoder throws on a missing key rather than falling back to the property's
+     default. `CardCatalog.load` turns a throw into an empty catalogue — silently — so without the
+     hand-written decoders this JSON would decode to nothing at all.
+     */
+    func testACardSavedBeforeAnyOfThisExistedStillDecodes() throws {
+        let json = """
+        {"cards":[{        "createdAt":"2025-09-06T15:00:00Z",        "currentHole":2,        "course":"Blue Hill",        "holes":[{"finished":true,"hole":1,"strokes":[        {"id":"s1","kind":"shot","playerId":"c"},        {"id":"s2","kind":"tapIn"}],"updatedAt":"2025-09-06T15:20:00Z"}],        "id":"card-1",        "name":"Saturday scramble",        "pars":[4,3,5],        "players":[{"id":"c","name":"Corey"},{"id":"d","name":"Dan"}]}]}
+        """
+        let catalog = try CardCatalog.decode(Data(json.utf8))
+        let card = try XCTUnwrap(catalog.card("card-1"))
+
+        XCTAssertEqual(card.name, "Saturday scramble")
+        XCTAssertEqual(card.throughHole, 1, "the round that was kept is still there")
+        XCTAssertEqual(card.entry(1)?.score, 2)
+        XCTAssertEqual(card.entry(1)?.awards ?? [], [], "no awards, rather than no card")
+        XCTAssertEqual(card.contests, .off, "a card from before the contests is not playing them")
+        XCTAssertEqual(card.points, .standard)
+        XCTAssertFalse(card.points.enabled)
+        XCTAssertNil(card.contest(for: 2), "and its par threes host nothing")
+    }
+
+    /**
+     A card saved during the few hours the *prize* shape existed.
+
+     Points were one Int an item then, meaning "the winner scores this much", which is a different
+     game — nobody could lose. The numbers are migrated rather than dropped: what somebody typed
+     becomes the stake, and an item they had left at zero comes back switched off, which is the
+     same intent said in the new shape.
+     */
+    func testACardFromThePrizeShapeMigratesItsNumbersIntoStakes() throws {
+        let json = """
+        {"cards":[{\
+        "contests":{"closestToPin":true,"longestDrive":true},\
+        "createdAt":"2026-09-19T01:00:00Z",\
+        "currentHole":1,\
+        "course":"",\
+        "holes":[],\
+        "id":"card-prize",\
+        "name":"Saturday",\
+        "pars":[4,3,5],\
+        "players":[{"id":"c","name":"Corey"},{"id":"d","name":"Dan"}],\
+        "points":{"enabled":true,"perShotKept":0,"perLongestDrive":10,"perClosestToPin":25}}]}
+        """
+        let card = try XCTUnwrap(CardCatalog.decode(Data(json.utf8)).card("card-prize"))
+
+        XCTAssertTrue(card.points.enabled)
+        XCTAssertEqual(card.points.closestToPin, Stake(on: true, each: 25), "the number they typed is the stake now")
+        XCTAssertEqual(card.points.longestDrive, Stake(on: true, each: 10))
+        XCTAssertFalse(card.points.shotKept.on, "a zero meant they did not want it, and still does")
+        XCTAssertEqual(card.points.playing(card.contests), [.longestDrive, .closestToPin])
+
+        // And writing it back drops the dead keys, so the migration finishes itself the first
+        // time anybody touches the card.
+        var catalog = CardCatalog.empty
+        catalog.upsert(card)
+        let written = String(decoding: try catalog.encoded(), as: UTF8.self)
+        XCTAssertFalse(written.contains("perClosestToPin"), "the prize shape is not written back")
+        XCTAssertTrue(written.contains("closestToPin"))
+    }
+
+    /// A stake outside the range is clamped on the way *in* as well as on the way out, so a blob
+    /// written by a future build cannot hand the board a number it would refuse from a stepper.
+    func testAStakeIsClampedWhenItIsRead() throws {
+        let json = """
+        {"cards":[{\
+        "createdAt":"2026-09-19T01:00:00Z","currentHole":1,"course":"","holes":[],\
+        "id":"card-wild","name":"Saturday","pars":[3],\
+        "players":[{"id":"c","name":"Corey"},{"id":"d","name":"Dan"}],\
+        "points":{"enabled":true,"closestToPin":{"on":true,"each":900}}}]}
+        """
+        let card = try XCTUnwrap(CardCatalog.decode(Data(json.utf8)).card("card-wild"))
+        XCTAssertEqual(card.points.closestToPin.each, 50)
+    }
+
+    /// The round trip, so a card written by this build reads back the same on the next launch.
+    func testAwardsSurviveBeingWrittenAndReadBack() throws {
+        var c = card(points: PointValues(
+            enabled: true,
+            shotKept: Stake(on: true, each: 2),
+            longestDrive: Stake(on: true, each: 15),
+            closestToPin: Stake(on: true, each: 15)
+        ))
+        c.award(.longestDrive, on: 3, to: dan.id)
+        var catalog = CardCatalog.empty
+        catalog.upsert(c)
+
+        let back = try XCTUnwrap(CardCatalog.decode(catalog.encoded()).card(c.id))
+        XCTAssertEqual(back.winner(of: .longestDrive, on: 3)?.id, dan.id)
+        XCTAssertEqual(back.contests, c.contests)
+        XCTAssertEqual(back.points, c.points)
+    }
+
+    // MARK: A pot that carries
+
+    /// Ten a head on the closest to the pin, rolling. Par threes are holes 2 and 5 on this card.
+    private var carried: PointValues {
+        PointValues(
+            enabled: true,
+            shotKept: Stake(on: false, each: 0),
+            longestDrive: Stake(on: false, each: 0),
+            closestToPin: Stake(on: true, each: 10, carry: true)
+        )
+    }
+
+    private func played(_ c: inout ScrambleCard, _ hole: Int) {
+        c.record(.shot(by: corey.id), on: hole)
+        c.finish(hole: hole, tapIn: true)
+    }
+
+    func testAHoleNobodyTookIsOnTheNextOneInstead() {
+        var c = four(points: carried)
+        played(&c, 2)
+        c.award(.closestToPin, on: 5, to: dan.id)
+
+        let results = ScrambleTally.contestResults(c).filter { $0.contest == .closestToPin }
+        XCTAssertEqual(results.map(\.holes), [1, 2])
+        XCTAssertEqual(results.last?.carried, 1)
+
+        let rows = ScrambleTally.points(c)
+        XCTAssertEqual(rows.first { $0.id == dan.id }?.points, 60, "two holes at ten a head, four playing")
+        XCTAssertEqual(rows.first { $0.id == corey.id }?.points, -20)
+        XCTAssertEqual(rows.map(\.points).reduce(0, +), 0, "a carried pot cannot create points either")
+    }
+
+    /// The column still shows one win. What carried is money, not a trophy.
+    func testACarriedWinIsStillOneWin() {
+        var c = four(points: carried)
+        played(&c, 2)
+        c.award(.closestToPin, on: 5, to: dan.id)
+        XCTAssertEqual(ScrambleTally.points(c).first { $0.id == dan.id }?.closestToPins, 1)
+    }
+
+    func testSwitchedOffTheSameRoundSettlesTheOldWay() {
+        var values = carried
+        values.closestToPin = Stake(on: true, each: 10, carry: false)
+        var c = four(points: values)
+        played(&c, 2)
+        c.award(.closestToPin, on: 5, to: dan.id)
+        XCTAssertEqual(ScrambleTally.points(c).first { $0.id == dan.id }?.points, 30)
+    }
+
+    /// Every par three is a contest hole from the moment the card is dealt, so counting the ones
+    /// nobody has reached would have the second hole worth the whole round.
+    func testAHoleStillInFrontOfYouIsNotCarryingAnything() {
+        var c = four(points: carried)
+        c.award(.closestToPin, on: 2, to: dan.id)
+        XCTAssertEqual(ScrambleTally.contestResults(c).first { $0.hole == 2 }?.holes, 1)
+        XCTAssertEqual(ScrambleTally.points(c).first { $0.id == dan.id }?.points, 30)
+    }
+
+    func testAHolePlayedButNotFinishedDoesNotCarryEither() {
+        var c = four(points: carried)
+        c.record(.shot(by: corey.id), on: 2)
+        c.award(.closestToPin, on: 5, to: dan.id)
+        XCTAssertEqual(ScrambleTally.points(c).first { $0.id == dan.id }?.points, 30)
+    }
+
+    /// The honest end to it: money nobody won is money nobody pays.
+    func testACarryNobodyEverTakesCostsNobodyAnything() {
+        var c = four(points: carried)
+        played(&c, 2)
+        played(&c, 5)
+        XCTAssertTrue(ScrambleTally.points(c).allSatisfy { $0.points == 0 })
+        XCTAssertTrue(ScrambleTally.settleUp(c).isEmpty)
+    }
+
+    func testItSaysWhatIsRidingAndOnWhichHole() {
+        var c = four(points: carried)
+        played(&c, 2)
+        let pot = ScrambleTally.riding(c).first
+        XCTAssertEqual(pot?.contest, .closestToPin)
+        XCTAssertEqual(pot?.carried, 1)
+        XCTAssertEqual(pot?.nextHole, 5)
+        XCTAssertEqual(pot?.worth, 60, "two holes at ten a head from three other players")
+    }
+
+    func testNothingIsRidingOnceSomebodyTakesIt() {
+        var c = four(points: carried)
+        played(&c, 2)
+        c.award(.closestToPin, on: 5, to: dan.id)
+        XCTAssertTrue(ScrambleTally.riding(c).isEmpty)
+    }
+
+    func testABetWithNoHoleLeftToSettleItIsWorthNothing() {
+        var c = four(points: carried)
+        played(&c, 2)
+        played(&c, 5)
+        let pot = ScrambleTally.riding(c).first
+        XCTAssertEqual(pot?.carried, 2)
+        XCTAssertNil(pot?.nextHole)
+        XCTAssertEqual(pot?.worth, 0)
+    }
+
+    /// A card written before the carry existed decodes without one, whatever a new card defaults
+    /// to — otherwise an update silently restates what a group already settled up on.
+    func testACardThatAlreadyHadStakesIsNeverRetrofittedWithACarry() throws {
+        let json = #"{"on":true,"each":10}"#
+        let stake = try JSONDecoder().decode(Stake.self, from: Data(json.utf8))
+        XCTAssertEqual(stake, Stake(on: true, each: 10, carry: false))
+        XCTAssertTrue(PointValues().closestToPin.carry, "a new card is offered the carry")
+    }
+
+    // MARK: Settling up
+
+    func testTheBoardBecomesTheSmallestSetOfPayments() {
+        var c = four(points: carried)
+        c.award(.closestToPin, on: 2, to: dan.id)
+        let payments = ScrambleTally.settleUp(c)
+        XCTAssertEqual(payments.count, 3)
+        XCTAssertTrue(payments.allSatisfy { $0.to.id == dan.id && $0.amount == 10 })
+    }
+
+    /// Every payment clears somebody, and what leaves one person's column arrives in another's.
+    func testThePaymentsExactlyClearTheBoard() {
+        var c = four(points: carried)
+        played(&c, 2)
+        c.award(.closestToPin, on: 5, to: dan.id)
+
+        var balance: [String: Int] = [:]
+        for row in ScrambleTally.points(c) { balance[row.id] = row.points }
+        for payment in ScrambleTally.settleUp(c) {
+            XCTAssertGreaterThan(payment.amount, 0, "a payment of nothing is not an instruction")
+            balance[payment.from.id, default: 0] += payment.amount
+            balance[payment.to.id, default: 0] -= payment.amount
+        }
+        XCTAssertTrue(balance.values.allSatisfy { $0 == 0 }, "everybody should be square afterwards")
+    }
+
+    /**
+     The round this feature came from, kept whole because it is the only test here that was
+     settled by four people at a bar.
+
+     Four players, ten a head, both bets carrying. The first three par threes went unclaimed and
+     Lehman took the fourth — four holes' money. The first par five went unclaimed and Ryan took
+     the second — two holes'. Lehman took the last two outright.
+     */
+    func testItSettlesTheRoundItWasBuiltFor() {
+        let lehman = GolfPlayer(id: "l", name: "Lehman")
+        let ryan = GolfPlayer(id: "r", name: "Ryan")
+        let dillon = GolfPlayer(id: "d2", name: "Dillon")
+        let wall = GolfPlayer(id: "w", name: "Wall")
+        var c = ScrambleCard(
+            name: "Saturday",
+            players: [lehman, ryan, dillon, wall],
+            pars: [3, 5, 3, 5, 3, 5, 3, 5],
+            contests: ContestRules(longestDrive: true, closestToPin: true),
+            points: PointValues(
+                enabled: true,
+                shotKept: Stake(on: false, each: 0),
+                longestDrive: Stake(on: true, each: 10, carry: true),
+                closestToPin: Stake(on: true, each: 10, carry: true)
+            )
+        )
+        for hole in 1...8 {
+            c.record(.shot(by: lehman.id), on: hole)
+            c.finish(hole: hole, tapIn: true)
+        }
+        c.award(.closestToPin, on: 7, to: lehman.id)  // par 3s: 1, 3 and 5 went begging
+        c.award(.longestDrive, on: 4, to: ryan.id)    // par 5s: 2 went begging
+        c.award(.longestDrive, on: 6, to: lehman.id)
+        c.award(.longestDrive, on: 8, to: lehman.id)
+
+        let net = Dictionary(uniqueKeysWithValues: ScrambleTally.points(c).map { ($0.id, $0.points) })
+        XCTAssertEqual(net[lehman.id], 160)
+        XCTAssertEqual(net[ryan.id], 0, "he won a double pot and paid it all back out")
+        XCTAssertEqual(net[dillon.id], -80)
+        XCTAssertEqual(net[wall.id], -80)
+        XCTAssertEqual(net.values.reduce(0, +), 0)
+
+        // And the instruction the group actually wanted: two payments, nobody chasing Ryan.
+        let payments = ScrambleTally.settleUp(c).map { [$0.from.name, $0.to.name, "\($0.amount)"] }
+        XCTAssertEqual(payments, [["Dillon", "Lehman", "80"], ["Wall", "Lehman", "80"]])
+    }
+}
+
 /// The lock screen's tap target, and that tapping it lands back on the round it came from.
 final class RoundDeepLinkTests: XCTestCase {
     func testTheLinkCarriesTheCardIdAndNothingElse() {
@@ -517,5 +1400,59 @@ final class RoundDeepLinkTests: XCTestCase {
     func testTheBareDomainIsNotACardLink() {
         let bare = URL(string: "https://playtally.app/golf")!
         XCTAssertNil(RoundActivityAttributes.cardId(in: bare))
+    }
+
+    // MARK: Calling the score
+
+    /**
+     The name of the recording is the whole wiring, so these are the filenames on disk.
+
+     A rename here is somebody's voice going silent in an app that still looks like it is working,
+     which is the kind of break nobody reports and nobody finds — so the mapping is pinned score by
+     score rather than left to read correctly.
+     */
+    func testEveryScoreIsCalledByAName() {
+        XCTAssertEqual(ScrambleTally.callName(score: 1, par: 4), "ace")
+        XCTAssertEqual(ScrambleTally.callName(score: 1, par: 3), "ace")
+        XCTAssertEqual(ScrambleTally.callName(score: 2, par: 5), "albatross")
+        XCTAssertEqual(ScrambleTally.callName(score: 3, par: 5), "eagle")
+        XCTAssertEqual(ScrambleTally.callName(score: 3, par: 4), "birdie")
+        XCTAssertEqual(ScrambleTally.callName(score: 4, par: 4), "par")
+        XCTAssertEqual(ScrambleTally.callName(score: 5, par: 4), "bogey")
+        XCTAssertEqual(ScrambleTally.callName(score: 6, par: 4), "double")
+    }
+
+    /// `label` runs off into "+3", "+4", "+9"; there is no recording of any of those. The tail is
+    /// one word so a hole always has exactly one sound to reach for.
+    func testTheWholeBadTailIsOneWord() {
+        for over in 3...12 {
+            XCTAssertEqual(ScrambleTally.callName(score: 4 + over, par: 4), "worse", "\(over) over")
+        }
+    }
+
+    /// Nothing may be called a name the folder does not document. Every score on every par a
+    /// course can hold, against the one list.
+    func testACallIsAlwaysOneOfTheNamesOnTheList() {
+        for par in 3...6 {
+            for score in 1...15 {
+                let name = ScrambleTally.callName(score: score, par: par)
+                XCTAssertTrue(
+                    ScrambleTally.callNames.contains(name),
+                    "\(score) on a par \(par) is called \(name), which is not a file anybody has been asked for"
+                )
+            }
+        }
+    }
+
+    /// The two vocabularies agree wherever both have a word: what is stamped on the screen is what
+    /// the voice says, or the app is saying one thing and showing another.
+    func testTheCallMatchesTheWordOnScreen() {
+        for par in 3...5 {
+            for score in 1...15 {
+                let word = ScrambleTally.label(score: score, par: par)
+                guard ScrambleTally.callNames.contains(word) else { continue }
+                XCTAssertEqual(ScrambleTally.callName(score: score, par: par), word)
+            }
+        }
     }
 }

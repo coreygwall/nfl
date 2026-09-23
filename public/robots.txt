@@ -1,0 +1,14 @@
+# Tally — playtally.app
+#
+# A pool is a public address: its page is meant to be found, and a link to it is meant to be
+# followed. A golf card is the opposite. It exists only because somebody sent the link to three
+# people, it is reachable by a 120-bit token and nothing else, and there is no page anywhere on
+# this site that links to one. Indexing it would turn a private round into a search result.
+#
+# The pages themselves also answer with `X-Robots-Tag: noindex` (worker/index.ts), because these
+# two rules cover different failures: this file stops a well-behaved crawler fetching the page,
+# and the header stops one that ignored this file from keeping what it found.
+User-agent: *
+Disallow: /g/
+
+Sitemap: https://playtally.app/sitemap.xml

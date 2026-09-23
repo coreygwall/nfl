@@ -9,6 +9,7 @@ import { isPoolCodeShaped, normalizePoolCode } from "../../shared/pool-codes.ts"
 import { clearedSessionCookie, hashToken, isLockedOut, lockUntil, MAX_CLAIM_ATTEMPTS, newToken, sessionCookie } from "../auth.ts";
 import { validatePicks } from "../../shared/picks.ts";
 import { buildSeasonBoard, buildWeekBoard } from "../../shared/scoring.ts";
+import { buildWinnings } from "../../shared/winnings.ts";
 import { boardWeek, gameStatus, isLocked, pickWeek, SEASON_START_WEEK, weekSummaries, WEEKS } from "../../shared/week.ts";
 import type { Game, Player } from "../../shared/types.ts";
 import type { PlayerPick } from "../../shared/scoring.ts";
@@ -23,6 +24,7 @@ import type {
   SeasonBoardResponse,
   WeekBoardResponse,
   WeekResponse,
+  WinningsResponse,
 } from "../../shared/api.ts";
 import {
   addDevice,
@@ -45,9 +47,11 @@ import {
   listPlayers,
   listWeekGames,
   listWeekPicks,
+  ownedEntryIds,
   noteRateLimit,
   publicPlayer,
   rateLimit,
+  renamePlayer,
   replacePicks,
   touchPlayer,
 } from "../db.ts";
@@ -171,6 +175,49 @@ publicRoutes.get("/join/:code", async (c) => {
     pool: { id: pool.id, slug: pool.slug, name: pool.name, type: pool.type, joinCode: pool.joinCode },
   };
   return c.json(body);
+});
+
+/**
+ * Renaming a name you are responsible for: your own, or one of the entries you manage.
+ *
+ * The account page could show you your name and never let you change it — a typo in your own name
+ * was a message to whoever runs the pool, which is an absurd errand for the one field that is
+ * unambiguously yours. The commissioner's `PATCH /commissioner/players/:id` has always done this;
+ * this is the same act without the office, narrowed to the two names the account page already
+ * lists.
+ *
+ * Every check the commissioner's route runs, this runs too, plus the profanity screen `POST
+ * /entries` applies — a commissioner typing a real person's unusual name is not the same risk as
+ * anyone at all choosing any string, so the stricter of the two paths is the right one here.
+ *
+ * Authorization is deliberately *not* "any signed-in account": it is the calling account itself,
+ * or a player in that account's `entry_owners`. A rename is the one edit that changes what
+ * everybody else sees on the board, so it stays scoped to names the caller already manages.
+ */
+publicRoutes.patch("/players/:id/name", async (c) => {
+  const account = c.get("account");
+  if (!account) throw new ApiError(401, "NO_PLAYER", "Sign in to change a name.");
+  const player = await getPlayer(c.env.DB, c.req.param("id"));
+  if (!player) throw notFound("NO_PLAYER", "No such player");
+
+  if (player.id !== account.id) {
+    const owner = await ownerOfEntry(c.env.DB, player.id);
+    if (owner?.id !== account.id) {
+      throw new ApiError(403, "NOT_YOURS", "That name isn't one of yours to change.");
+    }
+  }
+
+  const body = (await c.req.json().catch(() => ({}))) as { name?: unknown };
+  const check = validateName(body.name);
+  if (!check.ok) throw badRequest("INVALID_NAME", check.message);
+  if (isVulgar(check.name)) throw badRequest("INVALID_NAME", VULGAR_MESSAGE);
+  const key = nameKey(check.name);
+  const clash = await findPlayerByKey(c.env.DB, key);
+  if (clash && clash.id !== player.id) {
+    throw new ApiError(409, "NAME_TAKEN", "Somebody in the pool already has that name.");
+  }
+  await renamePlayer(c.env.DB, player.id, check.name, key);
+  return c.json({ player: { id: player.id, name: check.name } });
 });
 
 publicRoutes.post("/entries", async (c) => {
@@ -415,23 +462,49 @@ publicRoutes.put("/weeks/:week/picks", async (c) => {
   return c.json(res);
 });
 
+/** The names this request may see whole: the account's, and everything it picks for. */
+async function revealFor(c: { env: { DB: D1Database }; get: (k: "account") => Player | null }): Promise<Set<string>> {
+  const account = c.get("account");
+  return account ? ownedEntryIds(c.env.DB, account.id) : new Set();
+}
+
 publicRoutes.get("/board/week/:week", async (c) => {
   const week = parseWeek(c.req.param("week"));
   const now = c.get("now");
-  const [games, players, picks] = await Promise.all([
+  const [games, players, picks, revealIds] = await Promise.all([
     listWeekGames(c.env.DB, SEASON, week),
     listPlayers(c.env.DB),
     listWeekPicks(c.env.DB, week),
+    revealFor(c),
   ]);
-  const board = buildWeekBoard({ week, players: players.map(publicPlayer), picks, games, now, requesterId: c.get("player")?.id });
+  const board = buildWeekBoard({ week, players: players.map(publicPlayer), picks, games, now, requesterId: c.get("player")?.id, revealIds });
   const res: WeekBoardResponse = { now, ...board };
   return c.json(res);
 });
 
 publicRoutes.get("/board/season", async (c) => {
   const now = c.get("now");
-  const [games, players, picks] = await Promise.all([listGames(c.env.DB, SEASON), listPlayers(c.env.DB), listAllPicks(c.env.DB)]);
-  const board = buildSeasonBoard({ season: SEASON, players: players.map(publicPlayer), picks, games, now, requesterId: c.get("player")?.id });
+  const [games, players, picks, revealIds] = await Promise.all([
+    listGames(c.env.DB, SEASON),
+    listPlayers(c.env.DB),
+    listAllPicks(c.env.DB),
+    revealFor(c),
+  ]);
+  const board = buildSeasonBoard({ season: SEASON, players: players.map(publicPlayer), picks, games, now, requesterId: c.get("player")?.id, revealIds });
   const res: SeasonBoardResponse = { now, ...board };
+  return c.json(res);
+});
+
+/** The real-money board: every week's pot and the season's, settled and split. */
+publicRoutes.get("/board/winnings", async (c) => {
+  const now = c.get("now");
+  const [games, players, picks, revealIds] = await Promise.all([
+    listGames(c.env.DB, SEASON),
+    listPlayers(c.env.DB),
+    listAllPicks(c.env.DB),
+    revealFor(c),
+  ]);
+  const board = buildWinnings({ season: SEASON, players: players.map(publicPlayer), picks, games, now, requesterId: c.get("player")?.id, revealIds });
+  const res: WinningsResponse = { now, ...board };
   return c.json(res);
 });

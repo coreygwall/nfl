@@ -1,9 +1,17 @@
 import SwiftUI
 
 /// Slide the lock across to save. One gesture, no accidental taps, and it feels like locking.
+///
+/// The words and the knob's symbol are parameters because the golf card borrows the gesture to
+/// finish a hole: the same deliberate act, said as "Swipe to finish the hole" under a flag rather
+/// than a lock. The pick flow's defaults are unchanged.
 struct SlideToLock: View {
     let pending: Bool
     let disabled: Bool
+    var title = "Slide to lock in"
+    var busy = "Saving…"
+    /// The knob before and after the bolt goes home.
+    var symbols: (open: String, closed: String) = ("lock.open.fill", "lock.fill")
     let onSubmit: () -> Void
 
     @State private var offset: CGFloat = 0
@@ -21,7 +29,7 @@ struct SlideToLock: View {
             ZStack(alignment: .leading) {
                 Capsule().fill(Color.turf)
                 Capsule().strokeBorder(Color.ink, lineWidth: 2)
-                Text(pending ? "Saving…" : "Slide to lock in")
+                Text(pending ? busy : title)
                     .font(TallyFont.display(17, weight: .bold))
                     .foregroundStyle(Color.onFill)
                     .frame(maxWidth: .infinity)
@@ -29,7 +37,7 @@ struct SlideToLock: View {
                 Circle()
                     .fill(Color.onFill)
                     .overlay(Circle().strokeBorder(Color.ink, lineWidth: 2))
-                    .overlay(Image(systemName: progress > 0.95 ? "lock.fill" : "lock.open.fill").font(.system(size: 18, weight: .bold)).foregroundStyle(Color.ink))
+                    .overlay(Image(systemName: progress > 0.95 ? symbols.closed : symbols.open).font(.system(size: 18, weight: .bold)).foregroundStyle(Color.ink))
                     .frame(width: knob, height: knob)
                     .offset(x: 4 + offset)
                     .gesture(
@@ -73,7 +81,7 @@ struct SlideToLock: View {
         .frame(height: height)
         .opacity(disabled ? 0.45 : 1)
         .accessibilityRepresentation {
-            Button(pending ? "Saving…" : "Lock it in", action: onSubmit).disabled(disabled || pending)
+            Button(pending ? busy : title, action: onSubmit).disabled(disabled || pending)
         }
     }
 }

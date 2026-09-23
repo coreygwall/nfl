@@ -27,6 +27,8 @@ struct CardSetupSheet: View {
     @State private var pars: [Int] = CardSetupSheet.standardPars
     @State private var holeCount = 18
     @State private var showPars = false
+    @State private var contests = ContestRules.off
+    @State private var points = PointValues.standard
     @State private var loaded = false
     @State private var confirmDelete = false
 
@@ -59,6 +61,7 @@ struct CardSetupSheet: View {
                         players
                         round
                         if showPars { parGrid }
+                        sideGames
                         details
                         if !canSave {
                             Text(trimmed.count < 2
@@ -189,6 +192,90 @@ struct CardSetupSheet: View {
         }
     }
 
+    /**
+     The two bets beside the round, and what everything is worth.
+
+     Each switch says how many holes *today's pars* give it, which is the one number that makes
+     this decidable on a first tee: "on every par 5" is abstract, "4 holes today" is not, and it
+     moves as the pars are corrected. Turning a contest off is not a reset — the holes already
+     claimed keep their winners, exactly the way shortening a round to nine keeps the back — so a
+     switch flicked by accident costs nothing.
+
+     Points are their own switch because a second leaderboard is a second answer to "who won", and
+     a group that has not asked for one should not be handed it. The values survive the switch, so
+     turning it off to settle an argument and back on again does not lose what somebody typed.
+     */
+    private var sideGames: some View {
+        VStack(alignment: .leading, spacing: 12) {
+            SectionLabel(text: "Side games")
+            ForEach(SideContest.allCases, id: \.self) { contest in
+                SideGameSwitch(
+                    title: contest.title,
+                    symbol: contest.symbol,
+                    detail: "\(contest.runsOn) \(Format.plural(holesAtPar(contest.par), "hole")) today.",
+                    isOn: contests.runs(contest),
+                    onChange: { contests.set(contest, $0) }
+                )
+            }
+            DashedDivider()
+            SideGameSwitch(
+                title: "Play for points",
+                symbol: "number",
+                detail: "Everybody puts the same in each time, and whoever wins it takes the lot. The shots-kept board stays either way.",
+                isOn: points.enabled,
+                onChange: { points.enabled = $0 }
+            )
+            if points.enabled { stakes }
+        }
+    }
+
+    /**
+     What everybody is in for, one row per thing.
+
+     **Each row is a stake, not a prize**, and the row says so twice: the stepper reads "10 each",
+     and the line under it works out what that actually means for the number of people currently
+     on the card — "worth 30 to whoever takes it, 10 from each of the other 3". That second line
+     is the one that settles the argument on the first tee, and it moves as names are added above,
+     because the value of a win is a fact about how many are playing rather than about the bet.
+
+     Every item has its own switch. A group that wants the two contests and nothing on the shots
+     the team keeps simply leaves that one off; it is not a stake of zero, it is not in the game.
+     */
+    private var stakes: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            ForEach(WagerItem.allCases, id: \.self) { item in
+                // A contest that is switched off above has nothing to stake — the bet does not
+                // exist on this card, so offering a number for it would be offering a number for
+                // nothing.
+                if item.contest.map({ contests.runs($0) }) ?? true {
+                    StakeRow(
+                        item: item,
+                        stake: Binding(get: { points[item] }, set: { points[item] = $0 }),
+                        players: trimmed.count
+                    )
+                }
+            }
+            if !contests.any {
+                Text("Only shots kept is in the game — switch a contest on above and it gets a stake here too.")
+                    .sans(12).foregroundStyle(Color.ink3)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            if points.playing(contests).isEmpty {
+                Text("Nothing is switched on, so the points board will be empty. Put a stake on something above.")
+                    .sans(12, weight: .semibold).foregroundStyle(Color.danger)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(12)
+        .cardFlat(fill: .paper2)
+    }
+
+    /// How many holes today's pars give a contest. Recomputed as the par grid is edited, which is
+    /// the point: the answer changes under you and the switch should say so.
+    private func holesAtPar(_ par: Int) -> Int {
+        pars.prefix(holeCount).filter { $0 == par }.count
+    }
+
     private var details: some View {
         VStack(alignment: .leading, spacing: 10) {
             SectionLabel(text: "Details")
@@ -241,6 +328,8 @@ struct CardSetupSheet: View {
         course = editing.course
         rows = editing.players.map { PlayerDraft(player: $0.id, name: $0.name) }
         holeCount = editing.holeCount
+        contests = editing.contests
+        points = editing.points
         // The pars of a round that was shortened are kept, so lengthening it again finds them.
         pars = editing.pars.count >= 18 ? editing.pars : editing.pars + Array(CardSetupSheet.standardPars.dropFirst(editing.pars.count))
     }
@@ -270,6 +359,11 @@ struct CardSetupSheet: View {
             card.name = finalName
             card.course = course.trimmingCharacters(in: .whitespaces)
             card.pars = finalPars
+            card.contests = contests
+            card.points = points
+            // Names, pars, contests and stakes all move on one clock. Without this a shared card
+            // would keep losing them to whichever other phone last touched its settings.
+            card.touchSettings()
             if !card.holeNumbers.contains(card.currentHole) { card.go(to: 1) }
             golf.save(card)
         } else {
@@ -277,7 +371,9 @@ struct CardSetupSheet: View {
                 name: finalName,
                 course: course.trimmingCharacters(in: .whitespaces),
                 players: trimmed.map { GolfPlayer(name: $0) },
-                pars: finalPars
+                pars: finalPars,
+                contests: contests,
+                points: points
             )
             golf.save(card)
             golf.tab = .round
@@ -285,5 +381,117 @@ struct CardSetupSheet: View {
             Haptics.lockedIn()
         }
         dismiss()
+    }
+}
+
+/// A labelled switch with the sentence that says what it actually does — the same shape the
+/// notification settings use, because a switch without its consequence beside it is a guess.
+private struct SideGameSwitch: View {
+    let title: String
+    let symbol: String
+    let detail: String
+    let isOn: Bool
+    let onChange: (Bool) -> Void
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 12) {
+            Image(systemName: symbol)
+                .font(.system(size: 15, weight: .bold))
+                .foregroundStyle(isOn ? Color.turf : Color.ink3)
+                .frame(width: 24)
+            VStack(alignment: .leading, spacing: 2) {
+                Text(title).font(TallyFont.display(16))
+                Text(detail)
+                    .sans(12).foregroundStyle(Color.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+            Spacer(minLength: 8)
+            Toggle("", isOn: Binding(get: { isOn }, set: { value in
+                Haptics.tap()
+                onChange(value)
+            }))
+            .labelsHidden()
+            .tint(Color.turf)
+            .accessibilityLabel(title)
+            .accessibilityHint(detail)
+        }
+    }
+}
+
+/**
+ One thing to play for: whether it is in, and what everybody puts in each time.
+
+ A stepper rather than a text field — these are small whole numbers and the keyboard on a first tee
+ is the enemy — and `Stake` clamps the range anyway, so the control may as well be the one that
+ cannot produce a number the model would refuse.
+
+ The word is **each**, everywhere, because the difference between "10 to the winner" and "10 from
+ everybody" is the whole feature and a bare "10" reads as the first one. The line underneath does
+ the arithmetic out loud for the number of people currently on the card, which is the number
+ nobody wants to do in their head standing on a tee.
+ */
+private struct StakeRow: View {
+    let item: WagerItem
+    @Binding var stake: Stake
+    let players: Int
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack(spacing: 10) {
+                Image(systemName: item.symbol)
+                    .font(.system(size: 14, weight: .bold))
+                    .foregroundStyle(stake.on ? Color.turf : Color.ink3)
+                    .frame(width: 22)
+                Text(item.title).font(TallyFont.display(15)).lineLimit(1)
+                Spacer(minLength: 6)
+                Toggle(item.title, isOn: Binding(get: { stake.on }, set: { value in
+                    Haptics.tap()
+                    stake = Stake(on: value, each: stake.each, carry: stake.carry)
+                }))
+                .labelsHidden()
+                .tint(Color.turf)
+            }
+            if stake.on {
+                Stepper(
+                    value: Binding(
+                        get: { stake.each },
+                        set: { stake = Stake(on: stake.on, each: $0, carry: stake.carry) }
+                    ),
+                    in: Stake.range
+                ) {
+                    HStack(spacing: 6) {
+                        Text("\(stake.each)")
+                            .font(TallyFont.display(20))
+                            .monospacedDigit()
+                            .contentTransition(.numericText())
+                        Text("each")
+                            .sans(12, weight: .bold).foregroundStyle(Color.ink2)
+                        Spacer(minLength: 4)
+                    }
+                }
+                .accessibilityLabel("\(item.title), \(stake.each) each")
+                Text(ScrambleTally.winningsLine(stake: stake, players: players))
+                    .sans(12).foregroundStyle(Color.ink2)
+                    .fixedSize(horizontal: false, vertical: true)
+                // Only the two contests: a shot the team keeps has no hole to roll into, so a
+                // switch here would be a control with nothing behind it.
+                if item.contest != nil {
+                    Divider().overlay(Color.line)
+                    Toggle(isOn: Binding(get: { stake.carry }, set: { value in
+                        Haptics.tap()
+                        stake = Stake(on: stake.on, each: stake.each, carry: value)
+                    })) {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text("Carry it over").sans(13, weight: .bold)
+                            Text(ScrambleTally.carryLine(stake: stake, players: players))
+                                .sans(12).foregroundStyle(Color.ink2)
+                                .fixedSize(horizontal: false, vertical: true)
+                        }
+                    }
+                    .tint(Color.turf)
+                }
+            }
+        }
+        .padding(.vertical, 2)
     }
 }

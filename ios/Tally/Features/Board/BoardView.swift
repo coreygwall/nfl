@@ -7,16 +7,18 @@ import TallyKit
  */
 struct BoardView: View {
     @Environment(AppModel.self) private var model
+    /// List or grid. A preference rather than screen state, so the person who reads the board as
+    /// a table on Sunday finds it that way again on Monday. It lives up here with the other two
+    /// controls: all three are ways of looking at the same standings.
+    @AppStorage("tally.boardGrid") private var grid = false
 
     var body: some View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: 16) {
-            HStack(spacing: 10) {
-                TallySegmented(value: $model.boardScope, options: [(.week, "Week"), (.season, "Season")])
-                TallySegmented(value: $model.boardSort, options: [(.points, "Points"), (.possible, "Potential")])
-            }
+            BoardControls(scope: $model.boardScope, sort: $model.boardSort, grid: $grid,
+                          showLayout: model.boardScope == .week)
             if model.boardScope == .week {
-                WeekBoardView(week: model.activeBoardWeek, sort: model.boardSort)
+                WeekBoardView(week: model.activeBoardWeek, sort: model.boardSort, grid: grid)
                     .id("\(model.player?.id ?? "-"):\(model.activeBoardWeek)")
             } else {
                 SeasonBoardView(sort: model.boardSort)
@@ -29,6 +31,51 @@ struct BoardView: View {
     }
 }
 
+/**
+ The three ways of reading the board: which board, how it is sorted, and — on the week — list or
+ grid. One line when one line holds them, two when it does not.
+
+ `ViewThatFits` rather than a width someone measured once. Three controls across a phone leaves
+ about forty points a label, which is where "Season" and "Potential" start shrinking, and a person
+ who has turned their type size up has less room again. So the one-line arrangement is offered
+ first and the stacked one takes over whenever it would not fit — the toggle drops to its own
+ right-aligned row and the two segmented controls keep their full width. The web draws the same
+ two shapes off a width floor, because CSS has no `ViewThatFits`.
+
+ The layout toggle is drawn for the whole of the week tab rather than only once rows land, so the
+ row does not reflow under your thumb as the board loads. The season board has no grid, so it has
+ no toggle and never needs the second row.
+ */
+private struct BoardControls: View {
+    @Binding var scope: BoardScope
+    @Binding var sort: BoardSort
+    @Binding var grid: Bool
+    let showLayout: Bool
+
+    var body: some View {
+        if showLayout {
+            ViewThatFits(in: .horizontal) {
+                HStack(spacing: 8) {
+                    pair
+                    BoardLayoutToggle(grid: $grid)
+                }
+                VStack(alignment: .trailing, spacing: 8) {
+                    HStack(spacing: 8) { pair }
+                    BoardLayoutToggle(grid: $grid)
+                }
+            }
+        } else {
+            HStack(spacing: 8) { pair }
+        }
+    }
+
+    /// Which board, and how it is sorted. Always together, always this order.
+    @ViewBuilder private var pair: some View {
+        TallySegmented(value: $scope, options: [(.week, "Week"), (.season, "Season")])
+        TallySegmented(value: $sort, options: [(.points, "Points"), (.possible, "Potential")])
+    }
+}
+
 /// Sorting by potential reorders the list but keeps each player's real standing on their badge.
 private func rowsSorted<T: BoardRow>(_ rows: [T], by sort: BoardSort) -> [T] {
     sort == .points ? rows : rows.sorted { a, b in a.possible != b.possible ? a.possible > b.possible : a.place < b.place }
@@ -38,6 +85,8 @@ struct WeekBoardView: View {
     @Environment(AppModel.self) private var model
     let week: Int
     let sort: BoardSort
+    /// List or grid, decided by the toggle on the row above (`BoardView`).
+    let grid: Bool
     @State private var board: Loadable<WeekBoardResponse> = .idle
     @State private var open: String?
     @State private var celebrating = false
@@ -158,25 +207,17 @@ struct WeekBoardView: View {
             if !top.isEmpty {
                 WeekWinnerBanner(week: week, winners: top.map(\.name), points: top[0].points, isMe: iWon)
             }
-            VStack(alignment: .leading, spacing: 2) {
-                Text(data.lockedCount == 0
-                     ? "Nothing has kicked off yet · \(data.rows.filter { $0.picksMade > 0 }.count) of \(data.rows.count) have picked"
-                     : "\(data.finalCount) of \(data.gameCount) games final")
-                    .sans(14).foregroundStyle(Color.ink2)
-                if week < model.seasonStartsAt {
-                    Text("Week \(week) has its own winner. The season race starts in Week \(model.seasonStartsAt).")
-                        .sans(12).foregroundStyle(Color.ink3)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
             if data.rows.isEmpty {
                 EmptyState(title: "Nobody's on the board yet.", body: "Be the first to lock in five picks.") {
                     Button("Make your picks") { model.pickWeek = week; model.tab = .picks }.buttonStyle(.tally(.primary, size: .small))
                 }
+            } else if grid {
+                BoardGrid(rows: rowsSorted(data.rows, by: sort), started: started)
+                    .animation(Motion.settle, value: sort)
             } else {
                 ForEach(Array(rowsSorted(data.rows, by: sort).enumerated()), id: \.element.id) { index, row in
                     let won = !top.isEmpty && row.place == 1 && row.picksMade > 0
-                    BoardRowCard(place: row.place, name: row.name, isMe: row.playerId == model.player?.id, points: row.points, muted: !started,
+                    BoardRowCard(place: row.place, name: row.name, isMe: row.playerId == model.player?.id, mine: row.isMine, points: row.points, muted: !started,
                                  crowned: won,
                                  subtitle: row.picksMade == 0 ? "No picks"
                                     : !started ? "\(Format.plural(row.picksMade, "pick")) in · up to \(row.possible)"
@@ -206,6 +247,21 @@ struct WeekBoardView: View {
                 }
                 .animation(Motion.settle, value: sort)
             }
+            // How far through the week this is, and which prize it settles — underneath, because
+            // it is a footnote about the standings rather than a heading over them, and the top
+            // of this screen is for the standings and the three ways of reading them.
+            VStack(alignment: .leading, spacing: 2) {
+                Text(data.lockedCount == 0
+                     ? "Nothing has kicked off yet · \(data.rows.filter { $0.picksMade > 0 }.count) of \(data.rows.count) have picked"
+                     : "\(data.finalCount) of \(data.gameCount) games final")
+                    .sans(13).foregroundStyle(Color.ink2)
+                if week < model.seasonStartsAt {
+                    Text("Week \(week) has its own winner. The season race starts in Week \(model.seasonStartsAt).")
+                        .sans(12).foregroundStyle(Color.ink3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+            }
+            .padding(.top, 2)
         }
     }
 }
@@ -280,10 +336,10 @@ struct SeasonBoardView: View {
                         if let best = row.bestWeek, best.points > 0 { s += " · best \(best.points) (W\(best.week))" }
                         return s
                     }()
-                    BoardRowCard(place: row.place, name: row.name, isMe: row.playerId == model.player?.id, points: row.points, muted: data.throughWeek == 0,
+                    BoardRowCard(place: row.place, name: row.name, isMe: row.playerId == model.player?.id, mine: row.isMine, points: row.points, muted: data.throughWeek == 0,
                                  subtitle: subtitle, open: open == row.playerId,
                                  onToggle: { withAnimation(Motion.fade) { open = open == row.playerId ? nil : row.playerId } }) {
-                        WeekBars(row: row, throughWeek: data.throughWeek) { w in
+                        WeekBars(row: row, fromWeek: data.seasonStartsAt, throughWeek: data.throughWeek) { w in
                             model.boardScope = .week
                             model.boardWeek = w
                         }
@@ -293,7 +349,107 @@ struct SeasonBoardView: View {
                 }
                 .animation(Motion.settle, value: sort)
             }
+            WinningsCard()
         }
+    }
+}
+
+/**
+ The real-money board: what every entry has actually won, running. It sits under the season
+ standings rather than inside them — the points column already means something on every other
+ screen, and this is a different number entirely, so it gets its own card and its own `$` rather
+ than borrowing the points row's big digit. Mirrors `WinningsCard` on the web.
+ */
+struct WinningsCard: View {
+    @Environment(AppModel.self) private var model
+    @State private var board: Loadable<WinningsResponse> = .idle
+
+    var body: some View {
+        Group {
+            switch board {
+            // Real money is worth showing only once it is right — say nothing rather than guess,
+            // and the season standings above already carry the loading state for this screen.
+            case .idle, .loading, .failed: EmptyView()
+            case .loaded(let data): content(data)
+            }
+        }
+        .task { await load() }
+        .task {
+            while !Task.isCancelled {
+                try? await Task.sleep(for: .seconds(300))
+                await load()
+            }
+        }
+    }
+
+    private func load() async {
+        if let fresh = try? await model.service.winnings() { board = .loaded(fresh) }
+    }
+
+    @ViewBuilder
+    private func content(_ data: WinningsResponse) -> some View {
+        // Nothing has settled yet — nothing to show.
+        if data.rows.contains(where: { $0.total > 0 }) {
+            VStack(alignment: .leading, spacing: 10) {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text("WINNINGS")
+                        .sans(10, weight: .bold).tracking(1)
+                        .foregroundStyle(Color.ink3)
+                    Text("\(Winnings.label(data.weeklyPot)) to each week's winner, \(Winnings.label(data.seasonPot)) to the season's\(data.seasonSettled ? "" : " once it's decided") — a tie splits the pot evenly.")
+                        .sans(12).foregroundStyle(Color.ink3)
+                        .fixedSize(horizontal: false, vertical: true)
+                }
+                ForEach(data.rows.filter { $0.total > 0 }) { row in
+                    WinningsRowView(row: row, isMe: row.playerId == model.player?.id)
+                }
+                if !data.weeks.isEmpty {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Rectangle().fill(Color.line).frame(height: 1)
+                        VStack(alignment: .leading, spacing: 4) {
+                            ForEach(data.weeks) { week in
+                                Text(weekLine(week)).sans(12).foregroundStyle(Color.ink2)
+                            }
+                        }
+                    }
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .cardFlat()
+        }
+    }
+
+    /// "Week 1 — Joseph Philbin — $18" alone, "Week 2 — Athens G & Parker split $9 each" tied.
+    private func weekLine(_ week: WeekWinnings) -> String {
+        let names = week.winnerNames.joined(separator: " & ")
+        let tail = week.winnerNames.count > 1 ? "split \(Winnings.label(week.share)) each" : "— \(Winnings.label(week.share))"
+        return "Week \(week.week) — \(names) \(tail)"
+    }
+}
+
+private struct WinningsRowView: View {
+    let row: WinningsRow
+    let isMe: Bool
+
+    var body: some View {
+        HStack(spacing: 10) {
+            PlaceBadge(place: row.place, small: true)
+            VStack(alignment: .leading, spacing: 1) {
+                HStack(spacing: 6) {
+                    Text(row.name).font(TallyFont.display(15, weight: .bold)).lineLimit(1)
+                    if isMe { Chip(text: "you", size: 10) }
+                    if row.mine && !isMe { Chip(text: "yours", size: 10) }
+                }
+                Text("\(row.weeksWon) week\(row.weeksWon == 1 ? "" : "s") won\(row.season > 0 ? " · season" : "")")
+                    .sans(11).foregroundStyle(Color.ink2)
+            }
+            Spacer(minLength: 8)
+            Text(Winnings.label(row.total))
+                .font(TallyFont.display(18, weight: .bold)).monospacedDigit()
+        }
+        .padding(8)
+        .background(isMe ? Color.flagSoft : Color.clear)
+        .clipShape(RoundedRectangle(cornerRadius: 14, style: .continuous))
     }
 }
 
@@ -302,6 +458,10 @@ struct BoardRowCard<Detail: View>: View {
     let place: Int
     let name: String
     let isMe: Bool
+    /// One of the account's other entries: not who you are picking as, but yours all the same.
+    /// Told apart from the field with a chip rather than the flag fill, because two highlighted
+    /// rows would leave nobody sure which one the picks tab is actually on.
+    var mine = false
     let points: Int
     let muted: Bool
     /// Took the week. Only ever true once the week is over, so it reads as a result rather than a
@@ -321,6 +481,7 @@ struct BoardRowCard<Detail: View>: View {
                         HStack(spacing: 6) {
                             Text(name).font(TallyFont.display(17)).lineLimit(1)
                             if isMe { Chip(text: "you", size: 10) }
+                            if mine && !isMe { Chip(text: "yours", size: 10) }
                             if crowned { Chip(text: "winner", fill: .flag, size: 10, label: .onAccent) }
                         }
                         Text(subtitle).sans(12).foregroundStyle(Color.ink2).lineLimit(1)
@@ -474,32 +635,92 @@ struct PickChip: View {
     }
 }
 
-/// Points per week as a row of bars; tap one to open that week's board.
+/**
+ One player's season as a chart: a column per week from the first week that counts to the last of
+ the season, so the weeks still to come are *on screen* as placeholders rather than implied.
+
+ It used to draw only the weeks that had been played, which in Week 2 meant a single column filling
+ the whole width — and because a nothing week was drawn as a two-point sliver, that column read as
+ a horizontal rule with a stray "2" under it. Nobody could tell it was a chart.
+
+ Three states, and the dashes mean here what they mean on the grid: nothing here.
+
+ | Column | Week | Drawn as |
+ | --- | --- | --- |
+ | scored | played, points on the board | turf fill, its number above |
+ | blank | played, nothing scored | an empty track |
+ | ahead | not played yet | a dashed outline |
+
+ The scale is a *perfect week* rather than this row's own best, so a five-point column is the same
+ height on everybody's chart — which is the whole point of putting them one above another. The web
+ draws the same three states from the same rule (`SeasonWeekChart`).
+ */
 struct WeekBars: View {
     let row: SeasonRow
+    /// The first week that counts towards the season — the server's, not a client constant.
+    let fromWeek: Int
     let throughWeek: Int
     let onWeek: (Int) -> Void
 
+    /// How tall a column's track is. A perfect week fills it exactly.
+    private let track: CGFloat = 52
+
     var body: some View {
-        let weeks = Array(1...max(throughWeek, 1))
-        let top = max(15, weeks.map { row.points(inWeek: $0) }.max() ?? 0)
-        HStack(alignment: .bottom, spacing: 4) {
-            ForEach(weeks, id: \.self) { w in
-                let pts = row.points(inWeek: w)
-                Button { onWeek(w) } label: {
-                    VStack(spacing: 4) {
-                        UnevenRoundedRectangle(topLeadingRadius: 5, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 5)
-                            .fill(pts > 0 ? Color.turf : Color.paper3)
-                            .overlay(UnevenRoundedRectangle(topLeadingRadius: 5, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 5).strokeBorder(Color.ink, lineWidth: 2))
-                            .frame(height: max(CGFloat(pts) / CGFloat(top) * 48, pts > 0 ? 6 : 2))
-                        Text("\(w)").sans(9, weight: .bold).foregroundStyle(Color.ink3)
-                    }
-                    .frame(maxWidth: .infinity)
-                }
-                .buttonStyle(.plain)
-                .accessibilityLabel("Week \(w): \(pts) points")
+        let last = max(WeekLogic.weeks, fromWeek)
+        VStack(alignment: .leading, spacing: 6) {
+            Text("POINTS BY WEEK")
+                .sans(10, weight: .bold).tracking(1)
+                .foregroundStyle(Color.ink3)
+            HStack(alignment: .bottom, spacing: 2) {
+                ForEach(fromWeek...last, id: \.self) { w in column(w) }
             }
         }
-        .frame(height: 64, alignment: .bottom)
+        .accessibilityElement(children: .contain)
+        .accessibilityLabel("Points by week")
+    }
+
+    private func column(_ w: Int) -> some View {
+        let pts = row.points(inWeek: w)
+        let played = w <= throughWeek
+        return VStack(spacing: 3) {
+            // The score is the thing to read, so it is the only full-ink text here.
+            Text(played && pts > 0 ? "\(pts)" : " ")
+                .sans(10, weight: .bold).monospacedDigit()
+                .foregroundStyle(Color.ink)
+            ZStack(alignment: .bottom) {
+                // Every track is the same. A dashed outline on the weeks still to come was doing
+                // the job a green bar already does — saying which weeks have happened — and
+                // seventeen dashed boxes at this size is a texture, not information.
+                RoundedRectangle(cornerRadius: 4, style: .continuous)
+                    .fill(Color.paper2)
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 4, style: .continuous)
+                            .strokeBorder(Color.line, lineWidth: 1)
+                    )
+                if pts > 0 {
+                    UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 4)
+                        .fill(Color.turf)
+                        .overlay(
+                            UnevenRoundedRectangle(topLeadingRadius: 4, bottomLeadingRadius: 0, bottomTrailingRadius: 0, topTrailingRadius: 4)
+                                .strokeBorder(Color.ink, lineWidth: 2)
+                        )
+                        .frame(height: max(CGFloat(pts) / CGFloat(Scoring.maxWeekPoints) * track, 6))
+                }
+            }
+            .frame(height: track)
+            // Every week is numbered, but quietly: the axis is for orienting yourself once, and it
+            // should never compete with the scores above it.
+            Text("\(w)")
+                .sans(8, weight: .bold).monospacedDigit()
+                .foregroundStyle(Color.ink3.opacity(0.7))
+        }
+        .frame(maxWidth: .infinity)
+        .contentShape(Rectangle())
+        // Every column opens its week now that they all look alike; a week still to come opens a
+        // board of fixtures, which is a fair answer to tapping it.
+        .onTapGesture { Haptics.tap(); onWeek(w) }
+        .accessibilityElement(children: .ignore)
+        .accessibilityLabel(played ? "Week \(w): \(pts) point\(pts == 1 ? "" : "s")" : "Week \(w): not played yet")
+        .accessibilityAddTraits(.isButton)
     }
 }

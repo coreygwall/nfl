@@ -46,6 +46,10 @@ public struct PoolService: Sendable {
         try await client.get("/board/season")
     }
 
+    public func winnings() async throws -> WinningsResponse {
+        try await client.get("/board/winnings")
+    }
+
     // MARK: Identity
 
     private struct NameBody: Encodable { let name: String }
@@ -62,6 +66,12 @@ public struct PoolService: Sendable {
 
     public func addEntry(name: String) async throws -> EntryResponse {
         try await client.post("/entries", body: NameBody(name: name))
+    }
+
+    /// Rename a name this account is responsible for: its own, or one of the entries it manages.
+    /// The server decides which of those the id is; anything else comes back 403.
+    public func renameMine(playerId: String, name: String) async throws -> RenameResponse {
+        try await client.patch("/players/\(playerId)/name", body: NameBody(name: name))
     }
 
     private struct AttachEntryBody: Encodable { let name: String; let code: String }

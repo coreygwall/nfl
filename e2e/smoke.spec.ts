@@ -61,7 +61,10 @@ test.describe.serial("pool flow", () => {
     await welcome.getByRole("button", { name: "Not now — start picking →" }).click();
     await expect(page).toHaveURL(/\/week\/1$/);
     await expect(page.locator('header img[src="/icon.svg"]')).toBeVisible();
-    await expect(page.getByRole("button", { name: "High Five. Switch pool" })).toBeVisible();
+    await expect(page.locator("header").getByText("High Five", { exact: true })).toBeVisible();
+    // The lockup is a label, not a control: on the web a pool *is* an address, so the sheet it
+    // used to open could only ever name the one pool this origin serves.
+    await expect(page.getByRole("button", { name: /switch pool/i })).toHaveCount(0);
     await expect(page.getByText("No weekly deadline")).toBeVisible();
     await expect(page.getByRole("heading", { name: "Pick 5 winners" })).toBeVisible();
 
@@ -72,14 +75,12 @@ test.describe.serial("pool flow", () => {
     await expect(page.getByRole("heading", { name: "Explore the pool" })).toBeVisible();
     await expect(page.getByRole("link", { name: /Season standings/ })).toBeVisible();
     await expect(page.getByRole("link", { name: "Week 1", exact: true })).toBeVisible();
-    await page.getByRole("button", { name: "High Five. Switch pool" }).click();
-    const pools = page.getByRole("dialog", { name: "Pools" });
-    // The lockup is not a switcher here and has stopped pretending to be one: on the web a pool is
-    // an address, so this names the one you are standing in and says how to get into another.
-    await expect(pools.getByText("High Five").first()).toBeVisible();
-    await expect(pools.getByRole("heading", { name: "Join a pool" })).toBeVisible();
-    await pools.getByRole("button", { name: "Close" }).click();
-    await expect(pools).toBeHidden();
+    // The lockup opens nothing at all now. Joining lives in the fold at the bottom of Home, which
+    // is the only place on this surface where "another pool" means anything: a pool is an address
+    // here, so the sheet the lockup used to open could only ever name the one you are already in.
+    await expect(page.getByRole("button", { name: /switch pool/i })).toHaveCount(0);
+    await page.getByRole("button", { name: "Join or start a pool" }).click();
+    await expect(page.getByRole("heading", { name: "Join a pool" })).toBeVisible();
 
     // Account is a tab now, not a chip in the header. The offices behind it — a commissioner's and
     // the league's — were routes with nothing in the app linking to them.
@@ -307,6 +308,15 @@ test.describe.serial("pool flow", () => {
     await expect(page.getByText("Season standings start in Week 2")).toBeVisible();
     await expect(page.getByText(/Most points from Week 2 on wins the season/)).toBeVisible();
     await expect(page.getByRole("button", { name: /Corey/ })).toContainText("No picks yet");
+
+    // The drawer is a chart of the whole season rather than of the weeks played so far, so before
+    // any of it has happened it is an axis running to the end and nothing but placeholders.
+    await page.getByRole("button", { name: /Corey/ }).click();
+    await expect(page.getByText("Points by week")).toBeVisible();
+    // Every week is numbered, all the way to the end of the season.
+    await expect(page.getByLabel("Week 10: not played yet")).toContainText("10");
+    await expect(page.getByLabel("Week 2: not played yet")).toBeVisible();
+    await expect(page.getByLabel("Week 18: not played yet")).toBeVisible();
   });
 });
 
@@ -439,6 +449,37 @@ test("one phone can pick for the whole family, and the code stays out of the way
   await page.getByRole("button", { name: `Pick as Parent ${stamp}` }).click();
   await expectPickingAs(page, `Parent ${stamp}`);
 
+  // One phone, one reader. Picking as the parent, the kid's row on the board is marked as yours
+  // and opens whole — nothing has kicked off, and to anybody else that Seahawks pick is a lock.
+  await page.goto(`/board/week/1?now=${BEFORE}`);
+  // Rows live in list items; the picker's chips above them carry the same names and do not.
+  const boardRows = page.locator("li");
+  const kid = boardRows.getByRole("button", { name: new RegExp(`Kid ${stamp}`) });
+  await expect(kid).toContainText("yours");
+  await expect(boardRows.getByRole("button", { name: new RegExp(`Parent ${stamp}`) })).toContainText("you");
+  await kid.click();
+  // The team being named at all is the reveal; a stranger would get a lock here. The outcome is
+  // deliberately not asserted: an earlier test settles Week 1 as home wins, so by this point in
+  // the suite the pick has already "won", and on its own it is "still playing".
+  await expect(page.getByTitle(/^Seattle Seahawks — /)).toBeVisible();
+  await expect(page.getByText(/still hidden/)).toBeHidden();
+
+  // The same week as a grid: entries down the side, the five places across, points at the end.
+  await page.getByRole("button", { name: "Grid" }).click();
+  await expect(page).toHaveURL(/view=grid/);
+  const grid = page.getByRole("region", { name: "Who picked whom, by place" });
+  await expect(grid).toBeVisible();
+  const kidRow = grid.getByRole("row", { name: new RegExp(`Kid ${stamp}`) });
+  await expect(kidRow).toContainText("yours");
+  await expect(kidRow.getByTitle(/^Seattle Seahawks — /)).toBeVisible();
+  // And it is a preference of the page, not of the week: it survives the sort.
+  await page.getByRole("tab", { name: "Potential" }).click();
+  await expect(page).toHaveURL(/sort=possible/);
+  await expect(page).toHaveURL(/view=grid/);
+  await page.getByRole("button", { name: "List" }).click();
+  await expect(page).not.toHaveURL(/view=/);
+
+  await page.goto(`/week/1?now=${BEFORE}`);
   await expect(page.getByRole("heading", { name: "Pick 5 winners" })).toBeVisible();
 
   await expect(page.getByRole("button", { name: "Pick Buffalo Bills" })).toHaveAttribute("aria-pressed", "true");
@@ -675,4 +716,135 @@ test("Face ID: turn it on, lose the device's memory, and sign back in with no ty
   await page.getByRole("button", { name: "Rank 1" }).click();
   await page.getByRole("button", { name: "Lock it in" }).click();
   await expect(page.getByText("Locked in")).toBeVisible();
+});
+
+/**
+ * The account page listed your name and let you change nothing about it.
+ *
+ * A typo in your own name was a message to whoever runs the pool — an errand nobody runs, which is
+ * how pools fill up with names nobody meant. The interesting part is not the form; it is that the
+ * name is the one on the *board*, so the edit has to reach it.
+ */
+test("you can fix your own name, and the board follows", async ({ page }) => {
+  const original = `Typo ${Date.now().toString(36)}`;
+  const fixed = `${original} Fixed`;
+  await enablePlatformBiometrics(page);
+  await page.goto(`/welcome?now=${BEFORE}`);
+  await page.getByPlaceholder("Your name").fill(original);
+  await page.getByRole("button", { name: "Let's go" }).click();
+  await page.getByRole("dialog", { name: "You’re all set" }).getByRole("button", { name: "Not now — start picking →" }).click();
+
+  await openAccount(page);
+  await expect(page.getByRole("heading", { name: original, level: 1 })).toBeVisible();
+  await page.getByRole("button", { name: "Edit" }).first().click();
+  const field = page.getByRole("textbox").first();
+  await field.fill(fixed);
+  await page.getByRole("button", { name: "Save", exact: true }).click();
+  await expect(page.getByRole("heading", { name: fixed, level: 1 })).toBeVisible();
+
+  // The name everyone else reads is the same name.
+  await page.goto(`/p/high-five/board/season?now=${BEFORE}`);
+  await expect(page.getByText(fixed, { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(original, { exact: true })).toHaveCount(0);
+});
+
+/** Apple asks for a privacy policy at a public address, and a pool that keeps picks forever should
+ *  say so somewhere. It is reachable from the account page rather than only by URL. */
+test("the privacy page is reachable from the account page and says what is kept", async ({ page }) => {
+  await enablePlatformBiometrics(page);
+  await page.goto(`/welcome?now=${BEFORE}`);
+  await page.getByPlaceholder("Your name").fill(`Reader ${Date.now().toString(36)}`);
+  await page.getByRole("button", { name: "Let's go" }).click();
+  await page.getByRole("dialog", { name: "You’re all set" }).getByRole("button", { name: "Not now — start picking →" }).click();
+
+  await openAccount(page);
+  await page.getByRole("link", { name: /Privacy/ }).click();
+  await expect(page).toHaveURL(/\/privacy$/);
+  await expect(page.getByRole("heading", { name: "Privacy", level: 1 })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What Tally stores" })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "What Tally does not do" })).toBeVisible();
+  // A policy with no way to reach anybody is the failure the page exists to avoid, and App Review
+  // asks for a support contact besides.
+  await expect(page.getByRole("heading", { name: "Getting in touch" })).toBeVisible();
+  await expect(page.getByRole("link", { name: /@/ })).toHaveAttribute("href", /^mailto:.+@.+\..+\?subject=/);
+});
+
+test("a settled season week is a labelled column, and the rest of the season is still drawn", async ({ page, request }) => {
+  const stamp = Date.now().toString(36);
+  const me = await (await request.post("/api/players", { data: { name: `Charter ${stamp}` } })).json();
+
+  // Five picks in Week 2, then results for exactly those five: three right, two wrong.
+  const week = await (await request.get(`/api/league/weeks/2?now=${BEFORE}`, { headers: { "x-admin-pin": "1234" } })).json();
+  const games = (week.games as { id: string; home: string; away: string }[]).slice(0, 5);
+  await request.put(`/api/weeks/2/picks?now=${BEFORE}`, {
+    headers: { "x-player-token": me.token },
+    data: { picks: games.map((g, i) => ({ gameId: g.id, team: g.home, rank: i + 1 })) },
+  });
+  for (const [i, g] of games.entries()) {
+    await request.put(`/api/league/games/${g.id}/result?now=${BEFORE}`, {
+      headers: { "x-admin-pin": "1234" },
+      data: { winner: i < 3 ? g.home : g.away },
+    });
+  }
+
+  // Ranks 1, 2 and 3 came in: 5 + 4 + 3.
+  const after = "2026-09-22T12:00:00Z";
+  await page.goto(`/welcome?claim=${me.player.id}&code=${me.code}&now=${after}`);
+  await page.waitForURL(/\/week\/\d+$/);
+  await page.goto(`/board/season?now=${after}`);
+  const row = page.getByRole("button", { name: new RegExp(`Charter ${stamp}`) });
+  await expect(row).toContainText("12");
+  await row.click();
+
+  // The week that happened is a column carrying its own number; the rest of the season is there
+  // too, which is the whole point — a chart of one column reads as a rule, not a chart.
+  await expect(page.getByLabel("Week 2: 12 points")).toBeVisible();
+  await expect(page.getByLabel("Week 3: not played yet")).toBeVisible();
+  await expect(page.getByLabel("Week 18: not played yet")).toBeVisible();
+});
+
+test("a lone winner takes the week's pot, and a tie splits it", async ({ page, request }) => {
+  const stamp = Date.now().toString(36);
+  const philbin = await (await request.post("/api/players", { data: { name: `Philbin ${stamp}` } })).json();
+  const parker = await (await request.post("/api/players", { data: { name: `Parker ${stamp}` } })).json();
+  const athens = await (await request.post("/api/players", { data: { name: `Athens G ${stamp}` } })).json();
+
+  // Weeks 9 and 10 — untouched by the rest of this suite, so nothing else's results or picks
+  // can turn Philbin's lone week or the tie into a bigger crowd than the test expects.
+  //
+  // Week 9: only Philbin picks, and picks right. Nobody to split the pot with.
+  const week9 = await (await request.get(`/api/league/weeks/9?now=${BEFORE}`, { headers: { "x-admin-pin": "1234" } })).json();
+  const games9 = week9.games as { id: string; home: string }[];
+  await request.put(`/api/weeks/9/picks?now=${BEFORE}`, {
+    headers: { "x-player-token": philbin.token },
+    data: { picks: [{ gameId: games9[0]!.id, team: games9[0]!.home, rank: 1 }] },
+  });
+  for (const g of games9) {
+    await request.put(`/api/league/games/${g.id}/result?now=${BEFORE}`, { headers: { "x-admin-pin": "1234" }, data: { winner: g.home } });
+  }
+
+  // Week 10: Parker and Athens G both pick the same winner. A tie for the top of the week.
+  const week10 = await (await request.get(`/api/league/weeks/10?now=${BEFORE}`, { headers: { "x-admin-pin": "1234" } })).json();
+  const games10 = week10.games as { id: string; home: string }[];
+  for (const p of [parker, athens]) {
+    await request.put(`/api/weeks/10/picks?now=${BEFORE}`, {
+      headers: { "x-player-token": p.token },
+      data: { picks: [{ gameId: games10[0]!.id, team: games10[0]!.home, rank: 1 }] },
+    });
+  }
+  for (const g of games10) {
+    await request.put(`/api/league/games/${g.id}/result?now=${BEFORE}`, { headers: { "x-admin-pin": "1234" }, data: { winner: g.home } });
+  }
+
+  const after = "2026-09-22T12:00:00Z";
+  await page.goto(`/welcome?claim=${philbin.player.id}&code=${philbin.code}&now=${after}`);
+  await page.waitForURL(/\/week\/\d+$/);
+  await page.goto(`/board/season?now=${after}`);
+
+  const winnings = page.getByRole("region", { name: "Winnings" });
+  await expect(winnings).toBeVisible();
+  // Alone in Week 1: the whole pot. Tied in Week 2: split down the middle.
+  await expect(winnings.getByText(`Philbin ${stamp}`).first()).toBeVisible();
+  await expect(winnings.getByText(/Week 9 —/)).toContainText("$18");
+  await expect(winnings.getByText(/Week 10 —/)).toContainText("split $9 each");
 });

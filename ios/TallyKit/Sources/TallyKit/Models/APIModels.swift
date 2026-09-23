@@ -121,6 +121,18 @@ public struct EntryResponse: Codable, Sendable {
     public let player: Player
 }
 
+/// What a rename answers with: the id that was changed and the name it now has. Deliberately not
+/// a whole `Player` — the route returns exactly these two fields, and decoding into a type with
+/// more of them would break the moment `Player` gained a required one.
+public struct RenameResponse: Codable, Sendable {
+    public struct Renamed: Codable, Sendable {
+        public let id: String
+        public let name: String
+    }
+
+    public let player: Renamed
+}
+
 public struct PickCount: Codable, Hashable, Sendable {
     public let away: Int
     public let home: Int
@@ -211,7 +223,11 @@ public protocol BoardRow: Identifiable {
 public struct WeekRow: Codable, Hashable, Sendable, BoardRow {
     public let playerId: String
     public let name: String
+    /// The entry the request was made as. One row at most.
     public let isMe: Bool
+    /// An entry the asking *account* owns — the active one and every other name it picks for.
+    /// Optional so a board served by an older Worker still decodes; read `isMine`.
+    public let mine: Bool?
     public let place: Int
     public let points: Int
     public let correct: Int
@@ -225,6 +241,10 @@ public struct WeekRow: Codable, Hashable, Sendable, BoardRow {
     /// Worker still decodes; `pickSlots` is what screens should read.
     public let hiddenRanks: [Int]?
     public var id: String { playerId }
+
+    /// Yours to see whole: the account's own entries. A Worker that has not heard of `mine`
+    /// only ever revealed the requester, so that is the honest fallback.
+    public var isMine: Bool { mine ?? isMe }
 
     /// One entry per rank, in rank order, so a row draws five places that fill in rather than a
     /// list that grows sideways as games kick off.
@@ -281,6 +301,8 @@ public struct SeasonRow: Codable, Hashable, Sendable, BoardRow {
     public let playerId: String
     public let name: String
     public let isMe: Bool
+    /// Owned by the asking account — see `WeekRow.mine`.
+    public let mine: Bool?
     public let place: Int
     public let points: Int
     public let correct: Int
@@ -292,6 +314,7 @@ public struct SeasonRow: Codable, Hashable, Sendable, BoardRow {
     /// Keyed by week as a string, because that is what JSON objects have for keys.
     public let byWeek: [String: Int]
     public var id: String { playerId }
+    public var isMine: Bool { mine ?? isMe }
 
     public func points(inWeek week: Int) -> Int { byWeek[String(week)] ?? 0 }
 }
@@ -309,6 +332,45 @@ public struct SeasonBoardResponse: Codable, Sendable {
     public var seasonStartsAt: Int { fromWeek ?? 1 }
     /// True while the season race has not begun, which is worth saying out loud on a board of zeroes.
     public var notStarted: Bool { throughWeek == 0 }
+}
+
+/// One settled week: who was alone (or tied) in first once every one of its games had a result,
+/// and what the pot came to for each of them. Mirrors `WeekWinnings` in `shared/winnings.ts`.
+public struct WeekWinnings: Codable, Hashable, Sendable, Identifiable {
+    public let week: Int
+    public let winnerIds: [String]
+    public let winnerNames: [String]
+    /// What each winner gets. Rounded to the cent — see `Winnings.label(_:)`.
+    public let share: Double
+    public var id: Int { week }
+}
+
+/// Mirrors `WinningsRow` in `shared/winnings.ts` — see there for what each field means.
+public struct WinningsRow: Codable, Hashable, Sendable, Identifiable {
+    public let playerId: String
+    public let name: String
+    public let isMe: Bool
+    public let mine: Bool
+    public let place: Int
+    public let weeksWon: Int
+    public let weekly: Double
+    public let season: Double
+    public let total: Double
+    public var id: String { playerId }
+}
+
+/// The real-money board: every week's pot and the season's, settled and split. Mirrors
+/// `WinningsBoard` in `shared/winnings.ts`.
+public struct WinningsResponse: Codable, Sendable {
+    public let now: Date
+    public let weeklyPot: Double
+    public let seasonPot: Double
+    /// Whether the season pot has a winner yet.
+    public let seasonSettled: Bool
+    /// Sorted by `total`, richest first.
+    public let rows: [WinningsRow]
+    /// One entry per week that has fully settled, in week order.
+    public let weeks: [WeekWinnings]
 }
 
 public struct SessionResponse: Codable, Sendable {

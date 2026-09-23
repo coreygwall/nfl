@@ -5,7 +5,8 @@ import { isDev } from "./env.ts";
 import { ApiError } from "./errors.ts";
 import { getPlayer, getPoolBySlug, playerForToken, publicPlayer } from "./db.ts";
 import { hashToken, tokenFromCookie } from "./auth.ts";
-import { withAbsoluteUrls, withAppBanner, withUnfurlTags } from "./unfurl.ts";
+import { withAbsoluteUrls, withAppBanner, withNoIndex, withUnfurlTags } from "./unfurl.ts";
+import { isSharedCardPath } from "../shared/golf.ts";
 import { appleAppSiteAssociation } from "./apple.ts";
 import { ensureReady, SCHEDULE_VERSION, SEASON, syncResultsFromSource, syncScheduleFromSource } from "./ready.ts";
 import { publicRoutes } from "./routes/public.ts";
@@ -15,6 +16,7 @@ import { roleRoutes } from "./routes/roles.ts";
 import { passkeyRoutes } from "./routes/passkeys.ts";
 import { pushRoutes } from "./routes/push.ts";
 import { messageRoutes } from "./routes/messages.ts";
+import { golfRoutes } from "./routes/golf.ts";
 import { configFrom } from "./apns.ts";
 import { dispatchNotifications } from "./notify.ts";
 import { dispatchActivities } from "./activities.ts";
@@ -72,6 +74,7 @@ app.route("/api/commissioner", commissionerRoutes);
 app.route("/api/league", leagueRoutes);
 app.route("/api/push", pushRoutes);
 app.route("/api/messages", messageRoutes);
+app.route("/api/golf", golfRoutes);
 
 /**
  * A pool installs to a home screen as itself — its name, scoped to its own path — while the bare
@@ -141,6 +144,27 @@ app.notFound(async (c) => {
   if (MOVED.some((p) => path === p || path.startsWith(`${p}/`))) {
     url.pathname = `/p/${slug}${path}`;
     return c.redirect(url.toString(), 301);
+  }
+
+  /**
+   * A shared golf card. The page is the same document every other route serves — the router reads
+   * the token out of the path — but the headers are not: a card is reachable by its link and by
+   * nothing else, so it must never end up in a search result.
+   *
+   * Both halves are here on purpose. `X-Robots-Tag` is what a crawler that has *already* fetched
+   * the page obeys; `public/robots.txt` is what stops one fetching it at all. Neither alone is
+   * enough, because the failure modes differ — a link pasted somewhere public gets crawled, and a
+   * crawler that ignores robots.txt still reads the header — and a round somebody shared with
+   * three friends turning up on Google is not a bug you get to fix afterwards.
+   *
+   * Above the assets guard so it covers every answer this prefix can give, including the ones
+   * that are not a page at all.
+   */
+  if (isSharedCardPath(path)) {
+    if (!c.env.ASSETS) return withNoIndex(c.text("Not found", 404));
+    const doc = await c.env.ASSETS.fetch(new Request(new URL("/index.html", url.origin), { headers: c.req.raw.headers }));
+    if (!doc.ok) return withNoIndex(doc);
+    return withNoIndex(withAbsoluteUrls(new Response(doc.body, doc), url.origin));
   }
 
   if (!c.env.ASSETS) return c.text("Not found", 404);

@@ -54,6 +54,7 @@ struct ShareCardView: View {
             score
             Spacer(minLength: 10)
             tally
+            pot
             Spacer(minLength: 10)
             brags
             footer
@@ -130,6 +131,47 @@ struct ShareCardView: View {
         }
     }
 
+    /**
+     Who is up and who is buying, when the group priced something.
+
+     One line rather than a second board: the poster is about the round, and the pot is the
+     argument the round settled. It is drawn only when the numbers have moved — a card that says
+     everybody is level is a card that should not have mentioned it — and the net wears the same
+     two colours the Tally tab uses, so a −10 here is the −10 somebody has already seen.
+     */
+    @ViewBuilder
+    private var pot: some View {
+        let rows = ScrambleTally.points(card)
+        if card.points.enabled, rows.contains(where: { $0.points != 0 }) {
+            VStack(alignment: .leading, spacing: 3) {
+                Text("POT · \(ScrambleTally.pointsLine(card).uppercased())")
+                    .font(TallyFont.display(9))
+                    .tracking(1.2)
+                    .foregroundStyle(Color.ink3)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.7)
+                potLine(rows)
+                    .font(TallyFont.display(12))
+                    .lineLimit(2)
+                    .minimumScaleFactor(0.7)
+            }
+            .padding(.top, 10)
+        }
+    }
+
+    /// "Corey +30  ·  Dan −10  ·  Pete −10  ·  Sam −10", each net in the colour the Tally tab
+    /// gives it, as one wrapping run of text rather than a row that would not fit four names.
+    private func potLine(_ rows: [PointsRow]) -> Text {
+        var line = Text("")
+        for (index, row) in rows.enumerated() {
+            if index > 0 { line = line + Text("  ·  ").foregroundStyle(Color.ink3) }
+            let tone: Color = row.points > 0 ? .turf : row.points < 0 ? .danger : .ink3
+            line = line + Text(row.player.name + " ").foregroundStyle(Color.ink)
+            line = line + Text(ScrambleTally.netText(row.points)).foregroundStyle(tone)
+        }
+        return line
+    }
+
     private var brags: some View {
         VStack(alignment: .leading, spacing: 6) {
             if let tee = highlights.offTheTee {
@@ -137,6 +179,15 @@ struct ShareCardView: View {
             }
             if let holed = highlights.holed {
                 BragLine(symbol: "flag.fill", label: "Holed", best: holed, unit: "shot")
+            }
+            // The side games go above nothing and below everything: they are the loudest brag in
+            // the group chat and the least related to the score, so they sit with the other
+            // things that are true about a person rather than about the round.
+            if let long = highlights.longestDrive {
+                BragLine(symbol: SideContest.longestDrive.symbol, label: "Longest drive", best: long, unit: "hole")
+            }
+            if let close = highlights.closestToPin {
+                BragLine(symbol: SideContest.closestToPin.symbol, label: "Closest to pin", best: close, unit: "hole")
             }
         }
     }
@@ -250,13 +301,19 @@ extension ShareCardView {
             name: "Saturday scramble",
             course: "Blue Hill",
             players: ["Corey", "Dan", "Pete", "Sam"].map { GolfPlayer(name: $0) },
-            pars: CardSetupSheet.standardPars
+            pars: CardSetupSheet.standardPars,
+            contests: ContestRules(longestDrive: true, closestToPin: true)
         )
         let ids = card.players.map(\.id)
         for hole in 1...18 {
             card.record(.shot(by: ids[hole % ids.count]), on: hole)
             card.record(.shot(by: ids[(hole + 1) % ids.count]), on: hole)
             card.finish(hole: hole, tapIn: hole % 3 != 0)
+            // The side games too, so the preview draws the card at its busiest rather than
+            // leaving the two lines that only appear on a card that played them untested by eye.
+            if let contest = card.contest(for: hole) {
+                card.award(contest, on: hole, to: ids[hole % ids.count])
+            }
         }
         return card
     }

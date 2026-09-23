@@ -85,3 +85,20 @@ export function withAppBanner(res: Response, appStoreId: string | undefined, pag
     })
     .transform(res);
 }
+
+/**
+ * A URL that must never be indexed, whatever it ends up answering.
+ *
+ * Applied to the whole `/g/*` prefix rather than to the page that succeeds, because the two are
+ * not the same set: a card that has been taken down, a mistyped token and a cold asset handler all
+ * answer from here too, and "noindex on the good ones" is how a 404 page ends up being the thing
+ * a search engine keeps. The `cache-control` is the other half — this document is the same bytes
+ * for everybody, but an intermediary holding it under a *card's* URL is one hop from holding the
+ * card.
+ */
+export function withNoIndex(res: Response): Response {
+  const out = new Response(res.body, res);
+  out.headers.set("x-robots-tag", "noindex, nofollow, noarchive");
+  out.headers.set("cache-control", "private, no-store");
+  return out;
+}

@@ -131,6 +131,19 @@ export const X = ({ size = 18, ...p }: P) => (
     <path d="M6 6l12 12M18 6L6 18" />
   </svg>
 );
+/// An envelope, for the row that writes to Tally.
+export const Mail = ({ size = 18, ...p }: P) => (
+  <svg {...base(size, p)}>
+    <rect x="3" y="5" width="18" height="14" rx="2.5" />
+    <path d="M3.5 7l8.5 6 8.5-6" />
+  </svg>
+);
+/// A shield, for the privacy row. Drawn rather than pulled in, the same as everything else here.
+export const Shield = ({ size = 18, ...p }: P) => (
+  <svg {...base(size, p)}>
+    <path d="M12 3l7 3v5.5c0 4.2-2.9 7.9-7 9.5-4.1-1.6-7-5.3-7-9.5V6l7-3z" />
+  </svg>
+);
 export const Pencil = ({ size = 16, ...p }: P) => (
   <svg {...base(size, p)}>
     <path d="M4 20l4.5-1L19 8.5a2.1 2.1 0 00-3-3L5.5 16 4 20z" />
@@ -182,5 +195,31 @@ export const Megaphone = ({ size = 18, ...p }: P) => (
   <svg {...base(size, p)}>
     <path d="M4 13V9l12-5v14L4 13z" />
     <path d="M16 8a4 4 0 010 6M7 14l1 6h4l-2-5" />
+  </svg>
+);
+
+/** A flag on a stick: the hole you are standing on, and the Round tab of a golf card. */
+export const Flag = ({ size = 20, ...p }: P) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...p}>
+    <path d="M6 21V3" />
+    <path d="M6 4h11l-2.2 3.5L17 11H6" />
+  </svg>
+);
+
+/** A square grid: the scorecard, hole by hole. */
+export const Grid = ({ size = 20, ...p }: P) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...p}>
+    <rect x="3" y="4" width="18" height="16" rx="2" />
+    <path d="M3 10h18M3 15h18M9 4v16" />
+  </svg>
+);
+
+/** A QR code, as a sign rather than a scannable thing: three finders and some noise. */
+export const QrIcon = ({ size = 18, ...p }: P) => (
+  <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true" {...p}>
+    <rect x="3" y="3" width="7" height="7" rx="1" />
+    <rect x="14" y="3" width="7" height="7" rx="1" />
+    <rect x="3" y="14" width="7" height="7" rx="1" />
+    <path d="M14 14h3v3h-3zM19 19h2M14 21h2M21 14v3" />
   </svg>
 );
