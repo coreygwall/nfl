@@ -31,6 +31,7 @@ interface PlayerRow {
   ready: number | null;
   ready_at: string | null;
   claim_requires_code: number | null;
+  deleted_at?: string | null;
 }
 
 interface PickRow {
@@ -55,6 +56,8 @@ export interface PlayerRecord extends Player {
   readyAt: string | null;
   /** True once this name has been claimed and reset: zero devices no longer means "open". */
   claimRequiresCode: boolean;
+  /** Set when the account was deleted (`anonymiseAccount`). Nobody can get back into it. */
+  deletedAt: string | null;
 }
 
 export interface ScheduleGame {
@@ -93,6 +96,7 @@ const toPlayer = (r: PlayerRow): PlayerRecord => ({
   ready: r.ready === 1,
   readyAt: r.ready_at ?? null,
   claimRequiresCode: r.claim_requires_code === 1,
+  deletedAt: r.deleted_at ?? null,
 });
 
 const toPick = (r: PickRow): PlayerPick => ({ playerId: r.player_id, gameId: r.game_id, team: r.team as Abbr, rank: r.rank });
@@ -360,6 +364,50 @@ export async function deletePlayer(db: D1Database, id: string): Promise<void> {
     db.prepare(`DELETE FROM devices WHERE player_id IN (${marks})`).bind(...ids),
     db.prepare("DELETE FROM entry_owners WHERE owner_id = ?").bind(id),
     db.prepare(`DELETE FROM players WHERE id IN (${marks})`).bind(...ids),
+  ]);
+}
+
+/** What a deleted account is called on the board, forever after. */
+export const FORMER_PLAYER = "Former player";
+
+/**
+ * Deletes an account the way Tally deletes one: everything that identifies the person or lets
+ * anybody back in goes, and the picks stay. The account and every entry it manages are handled
+ * alike, because a parent deleting the account that picks for their children is deleting the
+ * children's entries too.
+ *
+ * Picks stay because they belong to other people's results as much as to this one: removing them
+ * would rewrite past weekly winners and the winnings log for everybody who played that week.
+ * `/privacy` says exactly this, and the Account page says it again before anybody confirms.
+ *
+ * `name_key` becomes unique per row (`deleted:<id>`), so any number of former players can sit on
+ * one board and none of them blocks a new person from choosing a name. One batch, so a failure
+ * halfway leaves nothing half-deleted.
+ */
+export async function anonymiseAccount(db: D1Database, accountId: string, now: string): Promise<void> {
+  const owned = await db.prepare("SELECT player_id FROM entry_owners WHERE owner_id = ?").bind(accountId).all<{ player_id: string }>();
+  const ids = [accountId, ...owned.results.map((row) => row.player_id)];
+  const marks = ids.map(() => "?").join(", ");
+  await db.batch([
+    ...ids.map((id) =>
+      db.prepare(
+        `UPDATE players SET name = ?, name_key = ?, claim_code = NULL, claim_attempts = 0, claim_locked_until = NULL,
+           claim_requires_code = 1, ready = 0, ready_at = NULL, deleted_at = ? WHERE id = ?`,
+      ).bind(FORMER_PLAYER, `deleted:${id}`, now, id),
+    ),
+    db.prepare(`DELETE FROM devices WHERE player_id IN (${marks})`).bind(...ids),
+    db.prepare(`DELETE FROM passkeys WHERE player_id IN (${marks})`).bind(...ids),
+    db.prepare(`DELETE FROM passkey_challenges WHERE player_id IN (${marks})`).bind(...ids),
+    db.prepare(`DELETE FROM push_tokens WHERE account_id IN (${marks}) OR player_id IN (${marks})`).bind(...ids, ...ids),
+    db.prepare(`DELETE FROM live_activities WHERE player_id IN (${marks})`).bind(...ids),
+    db.prepare(`DELETE FROM notifications_sent WHERE player_id IN (${marks})`).bind(...ids),
+    db.prepare("DELETE FROM entry_owners WHERE owner_id = ?").bind(accountId),
+    db.prepare("DELETE FROM pool_commissioners WHERE player_id = ?").bind(accountId),
+    db.prepare("DELETE FROM platform_admins WHERE player_id = ?").bind(accountId),
+    db.prepare("DELETE FROM pool_message_reactions WHERE account_id = ?").bind(accountId),
+    db.prepare("UPDATE pool_messages SET author_account_id = NULL, author_name = ? WHERE author_account_id = ?").bind(FORMER_PLAYER, accountId),
+    db.prepare("UPDATE pools SET created_by = NULL WHERE created_by = ?").bind(accountId),
+    db.prepare(`UPDATE pick_history SET player_name = ? WHERE player_id IN (${marks})`).bind(FORMER_PLAYER, ...ids),
   ]);
 }
 

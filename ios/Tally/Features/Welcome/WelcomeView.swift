@@ -41,7 +41,7 @@ struct WelcomeView: View {
             PaperBackground()
             ScrollView {
                 VStack(alignment: .leading, spacing: 22) {
-                    Hero()
+                    TallyHero()
                     panel
                     Footnote(onRules: { showRules = true })
                 }
@@ -353,7 +353,7 @@ struct WelcomeView: View {
 // MARK: - Brand
 
 /// Tally first, because most people arriving here have never heard of it.
-private struct Hero: View {
+struct TallyHero: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
@@ -377,7 +377,7 @@ private struct Hero: View {
     }
 }
 
-/// A few logos for warmth. Deliberately a fixed, short row: it has to fit the narrowest phone
+/// A few teams for warmth. Deliberately a fixed, short row: it has to fit the narrowest phone
 /// without pushing the layout wider than the screen.
 private struct TeamStrip: View {
     @Environment(AppModel.self) private var model

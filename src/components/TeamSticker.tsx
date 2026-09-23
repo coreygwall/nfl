@@ -1,6 +1,5 @@
-import { useState } from "react";
 import { motion } from "motion/react";
-import { TEAMS, type Abbr } from "../../shared/teams.ts";
+import { labelIsDark, TEAMS, type Abbr } from "../../shared/teams.ts";
 import { Check } from "./Icons.tsx";
 
 export function tiltFor(abbr: string): number {
@@ -29,9 +28,7 @@ interface Props {
 
 export function TeamSticker({ abbr, size = 72, selected = false, dimmed = false, lost = false, flat = false, badge, className = "" }: Props) {
   const team = TEAMS[abbr];
-  const raster = team.logo.endsWith(".png");
   const tilt = flat ? 0 : tiltFor(abbr);
-  const [failed, setFailed] = useState(false);
   return (
     <motion.div
       className={`relative shrink-0 ${className}`}
@@ -45,26 +42,21 @@ export function TeamSticker({ abbr, size = 72, selected = false, dimmed = false,
       }}
       transition={{ type: "spring", stiffness: 520, damping: 24 }}
     >
-      {failed ? (
-        <div
-          role="img"
-          aria-label={`${team.city} ${team.nickname}`}
-          className="flex h-full w-full items-center justify-center rounded-2xl border-2 border-white font-display font-extrabold text-white shadow-hard-sm"
-          style={{ background: team.primary, fontSize: size * 0.34 }}
-        >
-          {team.display}
-        </div>
-      ) : (
-        <img
-          src={team.logo}
-          alt={`${team.city} ${team.nickname}`}
-          draggable={false}
-          loading="lazy"
-          decoding="async"
-          onError={() => setFailed(true)}
-          className={`sticker-img ${raster ? "sticker-raster" : ""} ${selected ? "sticker-shadow" : ""}`}
+      <div
+        role="img"
+        aria-label={`${team.city} ${team.nickname}`}
+        className={`relative flex h-full w-full items-center justify-center font-display font-extrabold ${selected ? "sticker-shadow" : ""}`}
+        style={{ background: team.primary, borderRadius: size * 0.26, color: labelIsDark(team.primary) ? "#000" : "#fff" }}
+      >
+        <span
+          aria-hidden
+          className="absolute"
+          style={{ inset: size * 0.07, border: `${Math.max(1.5, size * 0.045)}px solid ${team.secondary}`, borderRadius: size * 0.26 * 0.8 }}
         />
-      )}
+        <span className="relative leading-none" style={{ fontSize: size * (team.display.length > 2 ? 0.3 : 0.36) }}>
+          {team.display}
+        </span>
+      </div>
       {selected && (
         <motion.span
           initial={{ scale: 0, rotate: -30 }}

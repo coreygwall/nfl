@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
-import { moneyLabel, SEASON_POT, WEEKLY_POT } from "../../shared/winnings.ts";
+import { moneyLabel, NO_MONEY_NOTE, SEASON_POT, WEEKLY_POT } from "../../shared/winnings.ts";
 
 /**
  * `shared/winnings.ts` computes the whole winnings board server-side, so the app never
@@ -28,6 +28,14 @@ describe("the two implementations agree about the pots", () => {
     expect(season, "Winnings should declare seasonPot").not.toBeNull();
     expect(Number(weekly![1])).toBe(WEEKLY_POT);
     expect(Number(season![1])).toBe(SEASON_POT);
+  });
+
+  it("says the same sentence about who holds the money", () => {
+    // The one line that stands between a dollar sign and a reviewer reading gambling into it; a
+    // reworded half on one surface would leave the other saying something the app no longer means.
+    const note = swift.match(/static let noMoneyNote = "([^"]+)"/);
+    expect(note, "Winnings should declare noMoneyNote").not.toBeNull();
+    expect(note![1]).toBe(NO_MONEY_NOTE);
   });
 
   it("labels a dollar amount the same way", () => {

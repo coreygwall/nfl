@@ -61,3 +61,20 @@ export const TEAM_LIST: Team[] = Object.values(TEAMS);
 export const ABBRS = Object.keys(TEAMS) as Abbr[];
 export const isAbbr = (s: unknown): s is Abbr => typeof s === "string" && s in TEAMS;
 export const team = (abbr: Abbr): Team => TEAMS[abbr];
+
+/**
+ * Whether a label on a team's primary colour should be dark rather than white: whichever of the
+ * two contrasts more, by WCAG relative luminance. A team is drawn as its colours and abbreviation
+ * rather than its logo — the logos are trademarks Tally has no licence for — so the abbreviation
+ * has to read on all 32. Same rule as `Team.labelIsDark` in TallyKit.
+ */
+export function labelIsDark(hex: string): boolean {
+  const digits = hex.replace(/^#/, "");
+  if (!/^[0-9a-f]{6}$/i.test(digits)) return false;
+  const channel = (i: number) => {
+    const c = parseInt(digits.slice(i, i + 2), 16) / 255;
+    return c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4;
+  };
+  const l = 0.2126 * channel(0) + 0.7152 * channel(2) + 0.0722 * channel(4);
+  return (l + 0.05) / 0.05 > 1.05 / (l + 0.05);
+}

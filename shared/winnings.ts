@@ -17,6 +17,15 @@ export const WEEKLY_POT = 18;
 export const SEASON_POT = 51;
 
 /**
+ * Said under the winnings card on both surfaces, every time it is drawn. Tally never holds, moves
+ * or pays out money — the pot is something a group agrees among itself, the way an office pool
+ * does, and this board is only the record of it. App Review reads a dollar sign as gambling unless
+ * the screen says otherwise, and so, fairly, might anybody new to the pool. Mirrored as
+ * `Winnings.noMoneyNote` and pinned by `winningsParity.test.ts`.
+ */
+export const NO_MONEY_NOTE = "Tally doesn't collect, hold or pay out money. This is a record of what your group agreed; settle up among yourselves.";
+
+/**
  * One settled week: who was alone (or tied) in first once every one of its games had a result,
  * and what the pot came to for each of them. A tie splits the pot evenly rather than duplicating
  * it — three people tied for the win share one $18 pot three ways, they do not each get $18.

@@ -15,8 +15,24 @@ public struct Team: Hashable, Sendable, Identifiable {
 
     public var id: String { abbr }
     public var fullName: String { "\(city) \(nickname)" }
-    /// The image set in the asset catalogue (`scripts/build-ios-assets.ts`).
-    public var imageName: String { "team-\(abbr)" }
+
+    /// Whether a label on the team's primary colour should be dark rather than white: whichever of
+    /// the two contrasts more, by WCAG relative luminance. A team is drawn as its colours and its
+    /// abbreviation rather than its logo (the logos are trademarks we have no licence for), so
+    /// the abbreviation has to read on every one of the 32. Same rule as `labelIsDark` in
+    /// `shared/teams.ts`.
+    public var labelIsDark: Bool { Team.labelIsDark(onHex: primary) }
+
+    public static func labelIsDark(onHex hex: String) -> Bool {
+        let digits = hex.trimmingCharacters(in: CharacterSet(charactersIn: "#"))
+        guard digits.count == 6, let value = UInt32(digits, radix: 16) else { return false }
+        func channel(_ shift: UInt32) -> Double {
+            let c = Double((value >> shift) & 0xFF) / 255
+            return c <= 0.03928 ? c / 12.92 : pow((c + 0.055) / 1.055, 2.4)
+        }
+        let l = 0.2126 * channel(16) + 0.7152 * channel(8) + 0.0722 * channel(0)
+        return (l + 0.05) / 0.05 > 1.05 / (l + 0.05)
+    }
 
     public init(abbr: String, display: String? = nil, city: String, nickname: String, primary: String, secondary: String, conference: String, division: String) {
         self.abbr = abbr

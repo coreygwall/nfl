@@ -2,7 +2,8 @@ import SwiftUI
 import TallyKit
 
 /**
- Welcome until this device has a name; after that, the shell of whatever the app is standing in.
+ The front door until this phone has been in a pool, then welcome until it has a name there;
+ after that, the shell of whatever the app is standing in.
 
  Two shells, chosen here and nowhere else: the pool's tabs, or a golf card's. The home tab that
  both put first is the one control that moves between them (`docs/navigation.md`), and
@@ -27,7 +28,11 @@ struct RootView: View {
         @Bindable var golf = golf
         ZStack(alignment: .top) {
             Color.paper.ignoresSafeArea()
-            if model.player == nil || model.showWelcome {
+            if model.needsPool {
+                // Never been in a pool: which one first, before any pool's welcome.
+                FrontDoorView()
+                    .transition(.opacity)
+            } else if model.player == nil || model.showWelcome {
                 WelcomeView()
                     .transition(.opacity)
             } else if let card = activeCard {
@@ -41,6 +46,7 @@ struct RootView: View {
         }
         .noZoom()
         .animation(.easeInOut(duration: 0.2), value: model.player == nil || model.showWelcome)
+        .animation(.easeInOut(duration: 0.2), value: model.needsPool)
         .animation(.easeInOut(duration: 0.2), value: model.context)
         .onChange(of: scenePhase) { _, phase in
             // Back from the background: the week may have moved on, a game may have kicked off.

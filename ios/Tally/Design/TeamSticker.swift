@@ -1,8 +1,14 @@
 import SwiftUI
 import TallyKit
 
-/// A team's logo drawn as a sticker: a little tilt that is fixed per team, a lift when selected,
-/// a check badge in the team's colour, greyed when the other side was picked.
+/// A team drawn as a sticker: a little tilt that is fixed per team, a lift when selected, a check
+/// badge in the team's colour, greyed when the other side was picked.
+///
+/// The sticker is the team's colours and its abbreviation, never its logo. The logos are NFL
+/// trademarks nobody has licensed to Tally, and App Review rejects pick'em apps for exactly that
+/// (Guideline 5.2.1) — so the primary is the fill, the secondary is a ring just inside the edge,
+/// and the abbreviation sits on top in whichever of white or ink reads better (`labelIsDark`).
+/// The board's grid already said "who took whom" in three letters, and it read fine.
 struct TeamSticker: View {
     let team: Team
     var size: CGFloat = 72
@@ -24,23 +30,9 @@ struct TeamSticker: View {
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
-            Group {
-                if UIImage(named: team.imageName) != nil {
-                    Image(team.imageName)
-                        .resizable()
-                        .scaledToFit()
-                        .shadow(color: selected ? Color.ink.opacity(0.22) : .clear, radius: 3, y: 4)
-                } else {
-                    Text(team.display)
-                        .font(TallyFont.display(size * 0.34))
-                        .foregroundStyle(.white)
-                        .frame(width: size, height: size)
-                        .background(RoundedRectangle(cornerRadius: 16).fill(Color(hex: team.primary)))
-                        .overlay(RoundedRectangle(cornerRadius: 16).strokeBorder(Color.white, lineWidth: 2))
-                        .accessibilityLabel(team.fullName)
-                }
-            }
-            .frame(width: size, height: size)
+            badge
+                .shadow(color: selected ? Color.ink.opacity(0.22) : .clear, radius: 3, y: 4)
+                .frame(width: size, height: size)
             .grayscale(dimmed ? 0.7 : lost ? 0.55 : 0)
             .opacity(dimmed ? 0.4 : lost ? 0.65 : 1)
             .scaleEffect(selected ? 1.1 : dimmed ? 0.9 : 1)
@@ -64,5 +56,27 @@ struct TeamSticker: View {
         .frame(width: size, height: size)
         .animation(Motion.snap, value: dimmed)
         .accessibilityLabel(team.fullName)
+    }
+
+    /// The colours and the letters. The corner, the ring and the type all scale with the sticker,
+    /// so it reads the same at 28pt in a bar chart as at 72pt in the pick flow.
+    private var badge: some View {
+        let corner = size * 0.26
+        let shape = RoundedRectangle(cornerRadius: corner, style: .continuous)
+        return shape
+            .fill(Color(hex: team.primary))
+            .overlay(
+                RoundedRectangle(cornerRadius: corner * 0.8, style: .continuous)
+                    .strokeBorder(Color(hex: team.secondary), lineWidth: max(1.5, size * 0.045))
+                    .padding(size * 0.07)
+            )
+            .overlay(
+                Text(team.display)
+                    .font(TallyFont.display(size * (team.display.count > 2 ? 0.3 : 0.36)))
+                    .foregroundStyle(team.labelIsDark ? Color.black : Color.white)
+                    .lineLimit(1)
+                    .minimumScaleFactor(0.5)
+                    .padding(.horizontal, size * 0.14)
+            )
     }
 }

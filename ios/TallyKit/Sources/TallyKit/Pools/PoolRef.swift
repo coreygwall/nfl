@@ -20,6 +20,9 @@ public struct PoolRef: Codable, Hashable, Sendable {
 
     /// The pool everyone is in this season. A link to any other pool adds it to the catalogue.
     public static let `default` = PoolRef(origin: URL(string: "https://playtally.app")!, slug: "high-five")
+    /// The demo pool: its own Worker and database on its own host (`wrangler.jsonc` → `env.demo`),
+    /// full of made-up players, so looking around never puts a stranger on a real group's board.
+    public static let demo = PoolRef(origin: URL(string: "https://demo.playtally.app")!, slug: "demo")
 
     public var host: String { origin.host ?? "" }
 

@@ -92,6 +92,13 @@ public struct PoolService: Sendable {
         try await client.delete("/session")
     }
 
+    /// Deletes the signed-in account (App Store Guideline 5.1.1(v)). The Worker anonymises rather
+    /// than erases: the name, devices, passkeys and managed entries go, and the picks stay under
+    /// "Former player" so nobody else's results move. `confirm` is required by the route.
+    public func deleteAccount() async throws -> OkResponse {
+        try await client.delete("/me", body: DeleteAccountRequest(confirm: true))
+    }
+
     // MARK: Passkeys
 
     public func passkeyRegistrationOptions() async throws -> PasskeyRegistrationOptionsResponse {
@@ -334,4 +341,8 @@ public struct PoolService: Sendable {
     public func leagueStatus() async throws -> LeagueStatus {
         try await client.get("/league/status")
     }
+}
+
+private struct DeleteAccountRequest: Encodable {
+    let confirm: Bool
 }

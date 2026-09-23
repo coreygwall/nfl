@@ -44,6 +44,21 @@ export function Account() {
   const [plays, setPlays] = useState(false);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [confirmSignOut, setConfirmSignOut] = useState(false);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
+  // Anonymised on the server (`DELETE /api/me`), then signed out here like any other sign-out.
+  const deleteAccount = async () => {
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await api("/me", { method: "DELETE", body: { confirm: true } });
+      signOut();
+    } catch (err) {
+      setDeleteError(err instanceof Error ? err.message : "That didn't work. Try again.");
+      setDeleting(false);
+    }
+  };
 
   const accountName = boot.data?.account?.name ?? player?.name ?? "";
   const poolName = boot.data?.poolName ?? "this pool";
@@ -251,6 +266,41 @@ export function Account() {
         ) : (
           <button className="btn mt-3 w-full text-danger sm:w-auto" onClick={() => setConfirmSignOut(true)}>
             Sign out
+          </button>
+        )}
+      </section>
+
+      {/* Deleting is the one irreversible thing on this page, so it is the one that gets the solid
+          danger fill — and it asks first, saying exactly what goes and what stays, because "your
+          picks stay on the board as Former player" is the part nobody would guess. */}
+      <section className="mt-7" aria-labelledby="account-delete">
+        <SectionLabel id="account-delete">Delete account</SectionLabel>
+        {confirmDelete ? (
+          <div className="card-flat mt-2 border-danger bg-danger-soft p-4">
+            <p className="font-display text-sm font-extrabold">Delete {accountName}?</p>
+            <ul className="mt-1 list-disc space-y-1 pl-5 text-sm text-ink-2">
+              <li>Your name comes off the pool, and every device signed in as you is signed out.</li>
+              {people.length > 1 && <li>The other entries you pick for are deleted with it.</li>}
+              <li>Your past picks stay on the board as “Former player”, so other people's results don't change.</li>
+              <li>This can't be undone.</li>
+            </ul>
+            {deleteError && (
+              <p role="alert" className="mt-2 text-sm font-semibold text-danger">
+                {deleteError}
+              </p>
+            )}
+            <div className="mt-3 flex flex-wrap gap-3">
+              <button className="btn btn-sm btn-danger" disabled={deleting} onClick={deleteAccount}>
+                {deleting ? "Deleting…" : "Delete my account"}
+              </button>
+              <button className="btn btn-sm" disabled={deleting} onClick={() => setConfirmDelete(false)}>
+                Keep it
+              </button>
+            </div>
+          </div>
+        ) : (
+          <button className="btn mt-2 w-full text-danger sm:w-auto" onClick={() => setConfirmDelete(true)}>
+            Delete account
           </button>
         )}
       </section>

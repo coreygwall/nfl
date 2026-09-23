@@ -99,6 +99,12 @@ public final class APIClient: @unchecked Sendable {
         try await request("DELETE", path, body: Optional<Empty>.none, options: options)
     }
 
+    /// A delete that has to say something beyond its path — deleting an account carries an
+    /// explicit confirmation, so a stray request can never do it by accident.
+    public func delete<T: Decodable, B: Encodable>(_ path: String, body: B, options: Options = Options()) async throws -> T {
+        try await request("DELETE", path, body: body, options: options)
+    }
+
     /// Raw bytes, for the CSV export.
     public func download(_ path: String, options: Options = Options()) async throws -> Data {
         let (data, response) = try await perform(makeRequest("GET", path, body: Optional<Empty>.none, options: options))

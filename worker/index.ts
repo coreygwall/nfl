@@ -20,6 +20,7 @@ import { golfRoutes } from "./routes/golf.ts";
 import { configFrom } from "./apns.ts";
 import { dispatchNotifications } from "./notify.ts";
 import { dispatchActivities } from "./activities.ts";
+import { isDemo, runDemo } from "./demo.ts";
 
 /** Injected by Vite at build time (git sha); "dev" when running under the test runner. */
 export const BUILD_ID: string = typeof __BUILD_ID__ === "string" ? __BUILD_ID__ : "dev";
@@ -214,8 +215,12 @@ const handler: ExportedHandler<Env> = {
     ctx.waitUntil(
       (async () => {
         await ensureReady(env);
-        // Once a day: flexed kickoff times, so the locks stay honest all season.
-        if (event.cron === SCHEDULE_CRON) {
+        // Once a day: flexed kickoff times, so the locks stay honest all season. The demo pool runs
+        // on the half-hourly trigger alone (the free plan's cron allowance is per account, and
+        // every Worker on it spends from the same five), so it takes the 10:00 UTC firing instead.
+        const firing = new Date(event.scheduledTime).toISOString();
+        const demoDaily = isDemo(env) && firing.slice(11, 13) === "10" && firing.slice(14, 16) < "30";
+        if (event.cron === SCHEDULE_CRON || demoDaily) {
           const schedule = await syncScheduleFromSource(env.DB);
           console.log("schedule sync", JSON.stringify(schedule));
         }
@@ -226,6 +231,8 @@ const handler: ExportedHandler<Env> = {
           minElapsedHours: UNATTENDED_MIN_ELAPSED_HOURS,
         });
         console.log("results sync", JSON.stringify(results));
+        // The demo pool's made-up players, topped up for any week that has come round.
+        if (isDemo(env)) console.log("demo", JSON.stringify(await runDemo(env.DB, SEASON, now)));
         // Straight after, so a result that has just landed is already in the database when we work
         // out whether a slate is over. Every message is claimed before it is sent, so a firing that
         // finds nothing new says nothing.

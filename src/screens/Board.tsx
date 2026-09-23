@@ -7,7 +7,7 @@ import { useHeaderWeek } from "../components/Chrome.tsx";
 import { EntryPicker } from "../components/EntryPicker.tsx";
 import { TEAMS } from "../../shared/teams.ts";
 import { MAX_WEEK_POINTS, ordinal, type ScoredPick, type SeasonRow, type WeekRow } from "../../shared/scoring.ts";
-import { moneyLabel, SEASON_POT, WEEKLY_POT, type WinningsRow } from "../../shared/winnings.ts";
+import { moneyLabel, NO_MONEY_NOTE, SEASON_POT, WEEKLY_POT, type WinningsRow } from "../../shared/winnings.ts";
 import { SEASON_START_WEEK, WEEKS } from "../../shared/week.ts";
 import { CountUp, EmptyState, ErrorState, RankBadge, Segmented } from "../components/Common.tsx";
 import { BoardSkeleton } from "../components/TallyLoader.tsx";
@@ -528,6 +528,7 @@ function WinningsCard() {
           ))}
         </ul>
       )}
+      <p className="mt-3 text-xs text-ink-3">{NO_MONEY_NOTE}</p>
     </section>
   );
 }

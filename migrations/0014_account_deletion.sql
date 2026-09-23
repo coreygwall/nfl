@@ -1,0 +1,12 @@
+-- Deleting your account, from inside the app (App Store Guideline 5.1.1(v)).
+--
+-- A deleted account is anonymised rather than erased. Its name becomes "Former player", and every
+-- way back into it goes: devices, passkeys, push tokens, roles, the entries it managed. Its picks
+-- stay, because they are part of other people's results: removing the row would change past
+-- weekly winners and the winnings log under everybody who played against it.
+--
+-- `deleted_at` is what keeps it deleted. Without it the row would look like a name nobody has
+-- claimed yet, and the pool's oldest rule — the first device to ask for an unheld name gets it —
+-- would hand the empty shell to a stranger. Every route that could put somebody back into a
+-- player refuses one with this set.
+ALTER TABLE players ADD COLUMN deleted_at TEXT;

@@ -20,7 +20,7 @@ import { SUPPORT_EMAIL, supportMailto } from "../../shared/contact.ts";
  * published on purpose anyway. Apple asks for one at submission.
  */
 export function Privacy() {
-  const updated = "19 September 2026";
+  const updated = "23 September 2026";
 
   return (
     <div className="mx-auto w-full max-w-[720px]">
@@ -102,10 +102,15 @@ export function Privacy() {
           <Item term="Signing out">
             Signing out clears this device only. Your picks stay on the board.
           </Item>
+          <Item term="Deleting your account">
+            Account ▸ Delete account, in the app or on the web. Your name is removed, every device, passkey and push
+            token signed in as you is deleted, and so are the entries you pick for. Your past picks stay on the board
+            under “Former player”, because they are part of other people's results — taking them out would change who
+            won weeks that are already over. It cannot be undone.
+          </Item>
           <Item term="Deleting everything">
-            Ask your commissioner to remove you. Removing a player deletes that player, their picks, their devices and
-            any entries they manage. It cannot be undone. If the pool is gone or your commissioner is not reachable,
-            write to the address below and it will be done for you.
+            If you want your picks gone as well, ask your commissioner to remove you, or write to the address below and it
+            will be done for you.
           </Item>
         </Section>
 

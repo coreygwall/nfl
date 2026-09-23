@@ -748,6 +748,30 @@ test("you can fix your own name, and the board follows", async ({ page }) => {
   await expect(page.getByText(original, { exact: true })).toHaveCount(0);
 });
 
+/** App Store Guideline 5.1.1(v): an account made in the app can be deleted from it. It asks first,
+ *  says the picks stay, and afterwards the device is back at the front door with the name free. */
+test("you can delete your account, and the name is free again", async ({ page }) => {
+  const leaving = `Leaving ${Date.now().toString(36)}`;
+  await enablePlatformBiometrics(page);
+  await page.goto(`/welcome?now=${BEFORE}`);
+  await page.getByPlaceholder("Your name").fill(leaving);
+  await page.getByRole("button", { name: "Let's go" }).click();
+  await page.getByRole("dialog", { name: "You’re all set" }).getByRole("button", { name: "Not now — start picking →" }).click();
+
+  await openAccount(page);
+  await page.getByRole("button", { name: "Delete account" }).click();
+  await expect(page.getByText("Former player", { exact: false })).toBeVisible();
+  await page.getByRole("button", { name: "Keep it" }).click();
+  await expect(page.getByRole("heading", { name: leaving, level: 1 })).toBeVisible();
+
+  await page.getByRole("button", { name: "Delete account" }).click();
+  await page.getByRole("button", { name: "Delete my account" }).click();
+  await expect(page.getByPlaceholder("Your name")).toBeVisible();
+  await page.getByPlaceholder("Your name").fill(leaving);
+  // Nobody is "already picking as" the name: the deleted account no longer holds it.
+  await expect(page.getByText(/already picking as/i)).toHaveCount(0);
+});
+
 /** Apple asks for a privacy policy at a public address, and a pool that keeps picks forever should
  *  say so somewhere. It is reachable from the account page rather than only by URL. */
 test("the privacy page is reachable from the account page and says what is kept", async ({ page }) => {

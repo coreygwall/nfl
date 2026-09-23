@@ -93,6 +93,15 @@ final class AppModel {
 
     private(set) var catalog: PoolCatalog
     private(set) var pool: PoolRef
+    /**
+     True on a phone that has never been in a pool: a fresh install from the App Store, with no link
+     tapped yet. It used to be answered by dropping everybody into High Five — a private group's
+     pool, roster and all — which is fine while the only people installing are its players and
+     wrong the day a stranger downloads the app. `RootView` shows `FrontDoorView` instead: a code,
+     a link, or the demo pool. Anything that lands the phone in a pool clears it (`switchPool`).
+     `pool` still holds the default meanwhile, only so the model never has to be optional.
+     */
+    private(set) var needsPool = false
     private(set) var service: PoolService
     let passkeys: PasskeyService
     let push = PushService()
@@ -308,7 +317,6 @@ final class AppModel {
 
     init() {
         var catalog = PoolCatalog.load()
-        if catalog.pools.isEmpty { catalog.open(PoolRef.default, name: PoolTypes.highFive.name) }
         // Development: `-tally.devPoolURL http://localhost:5173/p/high-five` as a launch argument
         // points the app at a local Worker (see ios/README.md).
         if let raw = UserDefaults.standard.string(forKey: "tally.devPoolURL"), let url = URL(string: raw), let link = PoolRef.parse(url) {
@@ -330,6 +338,7 @@ final class AppModel {
         golfCards = UserDefaults.standard.bool(forKey: AppModel.golfKey)
         poolPager = UserDefaults.standard.bool(forKey: AppModel.pagerKey)
         context = golfCards ? AppModel.loadContext() : .pool
+        needsPool = catalog.pools.isEmpty
         loadLegacyPin()
         announcementsSeenId = AnnouncementSeen.load(pool: pool)
         connectPush()
@@ -645,6 +654,23 @@ final class AppModel {
         Task { await self.refreshBootstrap() }
     }
 
+    /// Deletes the account on the server, then forgets it here exactly as signing out does. Unlike
+    /// signing out it waits for the server, because a deletion that silently failed would leave
+    /// somebody believing they were gone. Returns the error to show, or nil once it is done.
+    func deleteAccount() async -> String? {
+        do {
+            _ = try await service.deleteAccount()
+        } catch {
+            return error.asAPIError.message
+        }
+        commit(.empty)
+        clearWidgetSnapshot()
+        Task { await live.endAll() }
+        Task { await self.refreshBootstrap() }
+        toast("Your account is deleted.", kind: .success)
+        return nil
+    }
+
     /// Best effort, like the web: the header still rules, this just keeps the server's cookie in step.
     private func touchSession() {
         guard let token = player?.token else { return }
@@ -656,6 +682,17 @@ final class AppModel {
     func switchPool(_ ref: PoolRef) {
         // Choosing a pool from inside a card is a switch even when it is the pool already held.
         setContext(.pool)
+        // Leaving the front door. The pool held until now was only a placeholder, so choosing that
+        // same pool is still a real arrival: it goes into the catalogue and gets a bootstrap.
+        if needsPool {
+            needsPool = false
+            catalog.open(ref)
+            catalog.save()
+            if ref == pool {
+                Task { await self.refreshBootstrap() }
+                return
+            }
+        }
         guard ref != pool else { return }
         catalog.open(ref)
         catalog.save()
@@ -734,9 +771,22 @@ final class AppModel {
 
     func removePool(_ id: String) {
         catalog.remove(id)
-        if catalog.pools.isEmpty { catalog.open(PoolRef.default, name: PoolTypes.highFive.name) }
         catalog.save()
+        // The last pool gone: back to the front door, not into somebody else's pool.
+        if catalog.pools.isEmpty {
+            needsPool = true
+            return
+        }
         if let current = catalog.current?.ref, current != pool { switchPool(current) }
+    }
+
+    /// The demo pool (`demo.playtally.app`): made-up players and a season in progress, for anyone
+    /// who wants to see Tally before they have been invited to anything — and for App Review.
+    func openDemo() {
+        catalog.open(PoolRef.demo, name: "Tally Demo", poolType: PoolTypes.highFive.name)
+        catalog.save()
+        switchPool(PoolRef.demo)
+        tab = .pool
     }
 
     // MARK: Links
@@ -746,7 +796,7 @@ final class AppModel {
         guard let link = PoolRef.parse(url) else { return }
         let query = link.query
         setContext(.pool)
-        if link.pool != pool { switchPool(link.pool) }
+        if needsPool || link.pool != pool { switchPool(link.pool) }
         let parts = link.path.split(separator: "/").map(String.init)
         switch parts.first ?? "" {
         case "welcome":
