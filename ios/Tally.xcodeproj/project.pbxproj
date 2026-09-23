@@ -351,7 +351,7 @@
 				CODE_SIGN_ENTITLEMENTS = Tally/Tally.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 8445LWRG3B;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Tally;
@@ -384,7 +384,7 @@
 				CODE_SIGN_ENTITLEMENTS = Tally/Tally.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 8445LWRG3B;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_CFBundleDisplayName = Tally;
@@ -416,7 +416,7 @@
 				CODE_SIGN_ENTITLEMENTS = TallyWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 8445LWRG3B;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TallyWidgetsInfo.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Tally;
@@ -443,7 +443,7 @@
 				CODE_SIGN_ENTITLEMENTS = TallyWidgets.entitlements;
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
-				DEVELOPMENT_TEAM = "";
+				DEVELOPMENT_TEAM = 8445LWRG3B;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_FILE = TallyWidgetsInfo.plist;
 				INFOPLIST_KEY_CFBundleDisplayName = Tally;

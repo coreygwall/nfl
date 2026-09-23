@@ -722,6 +722,14 @@ This matters for Apple: the app's entitlements name `playtally.app`, so the asso
 reach production — a merged pull request — before the app will honour it. A preview URL is never
 enough. `README.md` has the cutover steps, kept for the next time a branch has to change.
 
+## Launching on the App Store
+
+`docs/launch/app-store.md` is the launch tracker, and **Codex works from it too** (`AGENTS.md` is its
+way in). Claim an item — your name and branch in its *Owner* cell — before starting it, and close it
+in the pull request that does the work. `docs/launch/listing.md` is the listing, the privacy label
+and the review notes as drafts; the privacy manifests (`ios/Tally/PrivacyInfo.xcprivacy`,
+`ios/TallyWidgets/PrivacyInfo.xcprivacy`) have to keep saying the same thing as it and `/privacy`.
+
 ## Before opening a pull request
 
 The `CI` check runs these, and a pull request cannot merge until it passes — but running them first

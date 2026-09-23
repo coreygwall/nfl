@@ -1,0 +1,33 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<!--
+  The widget extension's own privacy manifest: an extension is a separate bundle and Apple reads
+  each one. The only required-reason API it touches is UserDefaults, and only the App Group the app
+  leaves its snapshot in (WidgetSnapshot). What Tally collects is declared once, in the app's
+  manifest (Tally/PrivacyInfo.xcprivacy).
+
+  Unlike the extension's Info.plist and entitlements, this one belongs *inside* TallyWidgets/: it is
+  meant to be copied in as a resource and nothing else processes it, so the synchronised folder's
+  "Multiple commands produce" trap does not apply.
+-->
+<plist version="1.0">
+<dict>
+	<key>NSPrivacyTracking</key>
+	<false/>
+	<key>NSPrivacyTrackingDomains</key>
+	<array/>
+	<key>NSPrivacyCollectedDataTypes</key>
+	<array/>
+	<key>NSPrivacyAccessedAPITypes</key>
+	<array>
+		<dict>
+			<key>NSPrivacyAccessedAPIType</key>
+			<string>NSPrivacyAccessedAPICategoryUserDefaults</string>
+			<key>NSPrivacyAccessedAPITypeReasons</key>
+			<array>
+				<string>1C8F.1</string>
+			</array>
+		</dict>
+	</array>
+</dict>
+</plist>
