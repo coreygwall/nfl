@@ -398,6 +398,31 @@ test("a sign-in link claims the name in one tap, with no code to type", async ({
   await expect(page.getByRole("heading", { name, level: 1 })).toBeVisible();
 });
 
+/** What a sign-in link used to end on for people on iPhones: a blank page. With Face ID available
+ *  the link stops on the passkey offer, and the address it left behind was a bare "/welcome",
+ *  outside the pool's router. The next popstate — Safari fires one coming back from the Face ID
+ *  sheet or another app — made the router read that address and draw nothing at all. */
+test("a sign-in link never leaves the page blank, whatever Safari does next", async ({ page, request }) => {
+  const name = `Gammy ${Date.now().toString(36)}`;
+  const { player, code } = (await (await request.post("/api/players", { data: { name } })).json()) as { player: { id: string }; code: string };
+  await enablePlatformBiometrics(page);
+  await page.goto(`/p/high-five/welcome?claim=${player.id}&code=${code}&now=${BEFORE}`);
+  await expect(page.getByRole("dialog", { name: "You’re all set" })).toBeVisible();
+  // The code is out of the address bar, and the address is still inside the pool.
+  await expect(page).toHaveURL(/\/p\/high-five\/welcome$/);
+
+  await page.evaluate(() => window.dispatchEvent(new PopStateEvent("popstate")));
+  await expect(page.getByRole("dialog", { name: "You’re all set" })).toBeVisible();
+
+  // And the safety net: an address that has wandered out of the pool is put back, not drawn blank.
+  await page.evaluate(() => {
+    history.replaceState(null, "", "/welcome");
+    window.dispatchEvent(new PopStateEvent("popstate"));
+  });
+  await expect(page).toHaveURL(/\/p\/high-five\/welcome$/);
+  await expect(page.getByRole("dialog", { name: "You’re all set" })).toBeVisible();
+});
+
 test("a sign-in link with the wrong code falls back to typing it", async ({ page, request }) => {
   const name = `Mislinked ${Date.now().toString(36)}`;
   const created = await request.post("/api/players", { data: { name } });
