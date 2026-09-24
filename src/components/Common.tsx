@@ -77,16 +77,20 @@ export function Segmented<T extends string>({
   onChange,
   label,
   pillId = "segmented-pill",
+  fill = true,
 }: {
   value: T;
-  options: { value: T; label: string }[];
+  /** `icon` draws a glyph in place of the words; `label` is still what a screen reader says. */
+  options: { value: T; label: string; icon?: ReactNode }[];
   onChange: (v: T) => void;
   label?: string;
   /** Distinct per control, so two on one screen don't animate into each other. */
   pillId?: string;
+  /** Stretch to the row (the default) or sit at its own width, as an icon toggle beside one does. */
+  fill?: boolean;
 }) {
   return (
-    <div className="card-flat relative flex w-full p-1" role="tablist" aria-label={label}>
+    <div className={`card-flat relative flex p-1 ${fill ? "w-full" : "w-auto shrink-0"}`} role="tablist" aria-label={label}>
       {options.map((o) => {
         const active = o.value === value;
         return (
@@ -94,10 +98,12 @@ export function Segmented<T extends string>({
             key={o.value}
             role="tab"
             aria-selected={active}
+            aria-label={o.icon ? o.label : undefined}
+            title={o.icon ? o.label : undefined}
             // Two of these sit side by side on a phone, so the text tightens rather than wraps.
-            className={`relative z-10 min-w-0 flex-1 truncate rounded-2xl px-2 py-2 font-display text-[13px] font-bold transition-colors sm:px-3 sm:text-sm ${
-              active ? "text-paper" : "text-ink-2"
-            }`}
+            className={`relative z-10 min-w-0 truncate rounded-2xl py-2 font-display text-[13px] font-bold transition-colors sm:text-sm ${
+              fill ? "flex-1 px-2 sm:px-3" : "px-3"
+            } ${active ? "text-paper" : "text-ink-2"}`}
             whileTap={{ scale: 0.96 }}
             transition={{ type: "spring", stiffness: 600, damping: 30 }}
             onClick={() => {
@@ -118,7 +124,18 @@ export function Segmented<T extends string>({
               animate={{ scale: active ? 1 : 0.97, opacity: active ? 1 : 0.82 }}
               transition={{ type: "spring", stiffness: 500, damping: 32 }}
             >
-              {o.label}
+              {o.icon ? (
+                // An invisible line of text sizes the glyph's slot, so an icon option is exactly
+                // as tall as a worded one in the same row, at every breakpoint and type size.
+                <span className="relative block">
+                  <span className="invisible" aria-hidden="true">
+                    Ag
+                  </span>
+                  <span className="absolute inset-0 flex items-center justify-center">{o.icon}</span>
+                </span>
+              ) : (
+                o.label
+              )}
             </motion.span>
           </motion.button>
         );

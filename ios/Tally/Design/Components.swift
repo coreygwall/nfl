@@ -480,25 +480,40 @@ extension View {
 // MARK: Controls
 
 /// Two or three options in a bordered track, with an ink pill sliding under the active one.
+///
+/// An option can be a glyph instead of words (`symbols:`), which is how the board's list/grid
+/// toggle wears the same track, pill and height as Week/Season beside it. `fill: false` lets a
+/// control like that sit at its own width rather than stretching across the row.
 struct TallySegmented<T: Hashable>: View {
     @Binding var value: T
-    let options: [(T, String)]
+    private let options: [(value: T, label: String, symbol: String?)]
+    private let fill: Bool
     @Namespace private var pill
+
+    init(value: Binding<T>, options: [(T, String)], fill: Bool = true) {
+        _value = value
+        self.options = options.map { (value: $0.0, label: $0.1, symbol: nil) }
+        self.fill = fill
+    }
+
+    /// Glyph options: `(value, SF Symbol, what VoiceOver says)`.
+    init(value: Binding<T>, symbols: [(T, String, String)], fill: Bool = false) {
+        _value = value
+        self.options = symbols.map { (value: $0.0, label: $0.2, symbol: $0.1) }
+        self.fill = fill
+    }
 
     var body: some View {
         HStack(spacing: 0) {
             ForEach(Array(options.enumerated()), id: \.offset) { _, option in
-                let active = option.0 == value
+                let active = option.value == value
                 Button {
                     if !active { Haptics.tap() }
-                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { value = option.0 }
+                    withAnimation(.spring(response: 0.3, dampingFraction: 0.8)) { value = option.value }
                 } label: {
-                    Text(option.1)
-                        .font(TallyFont.display(13, weight: .bold))
-                        .foregroundStyle(active ? Color.paper : Color.ink2)
-                        .lineLimit(1)
-                        .minimumScaleFactor(0.85)
-                        .frame(maxWidth: .infinity)
+                    label(for: option, active: active)
+                        .frame(maxWidth: fill ? .infinity : nil)
+                        .padding(.horizontal, fill ? 0 : 14)
                         .padding(.vertical, 9)
                         .background {
                             if active {
@@ -509,11 +524,33 @@ struct TallySegmented<T: Hashable>: View {
                         }
                 }
                 .buttonStyle(.plain)
+                .accessibilityLabel(option.label)
                 .accessibilityAddTraits(active ? .isSelected : [])
             }
         }
         .padding(4)
         .cardFlat()
+    }
+
+    @ViewBuilder
+    private func label(for option: (value: T, label: String, symbol: String?), active: Bool) -> some View {
+        let font = TallyFont.display(13, weight: .bold)
+        if let symbol = option.symbol {
+            // A hidden line of text in the same font sizes the glyph's slot, so a glyph option is
+            // exactly as tall as a worded one, at every Dynamic Type size.
+            Text("Ag").font(font).hidden()
+                .overlay {
+                    Image(systemName: symbol)
+                        .font(.system(size: 14, weight: .bold))
+                        .foregroundStyle(active ? Color.paper : Color.ink2)
+                }
+        } else {
+            Text(option.label)
+                .font(font)
+                .foregroundStyle(active ? Color.paper : Color.ink2)
+                .lineLimit(1)
+                .minimumScaleFactor(0.85)
+        }
     }
 }
 

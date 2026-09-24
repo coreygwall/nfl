@@ -55,7 +55,7 @@ export function Board({ tab }: { tab: "week" | "season" }) {
               />
             </div>
             {tab === "week" && (
-              <div className="ml-auto flex items-center">
+              <div className="ml-auto flex">
                 <LayoutToggle view={view} onChange={setView} />
               </div>
             )}
@@ -159,28 +159,25 @@ function SideRail({ tab, week }: { tab: "week" | "season"; week: number }) {
  * already holds two, and this is a way of looking rather than a different board.
  */
 function LayoutToggle({ view, onChange }: { view: BoardView; onChange: (v: BoardView) => void }) {
-  const glyph = (value: BoardView, label: string, path: string) => {
-    const active = view === value;
-    return (
-      <button
-        type="button"
-        aria-pressed={active}
-        aria-label={label}
-        title={label}
-        onClick={() => !active && onChange(value)}
-        className={`flex h-7 w-9 items-center justify-center rounded-lg transition-colors ${active ? "bg-ink text-paper" : "text-ink-2 hover:bg-paper-3"}`}
-      >
-        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-          <path d={path} />
-        </svg>
-      </button>
-    );
-  };
+  // The same segmented control as Week/Season beside it — same card, same pill, same height — at
+  // its own width, with a glyph where the words would be.
+  const glyph = (path: string) => (
+    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <path d={path} />
+    </svg>
+  );
   return (
-    <div className="flex shrink-0 gap-0.5 rounded-[10px] bg-paper-2 p-0.5" role="group" aria-label="Board layout">
-      {glyph("list", "List", "M2 4h12M2 8h12M2 12h12")}
-      {glyph("grid", "Grid", "M2 2h12v12H2zM2 6.7h12M2 11.3h12M6.7 2v12M11.3 2v12")}
-    </div>
+    <Segmented
+      value={view}
+      label="Board layout"
+      pillId="board-layout"
+      fill={false}
+      options={[
+        { value: "list", label: "List", icon: glyph("M2 4h12M2 8h12M2 12h12") },
+        { value: "grid", label: "Grid", icon: glyph("M2 2h12v12H2zM2 6.7h12M2 11.3h12M6.7 2v12M11.3 2v12") },
+      ]}
+      onChange={onChange}
+    />
   );
 }
 

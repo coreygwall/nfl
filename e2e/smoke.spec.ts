@@ -461,7 +461,7 @@ test("one phone can pick for the whole family, and the code stays out of the way
   await expect(page.getByText(/still hidden/)).toBeHidden();
 
   // The same week as a grid: entries down the side, the five places across, points at the end.
-  await page.getByRole("button", { name: "Grid" }).click();
+  await page.getByRole("tab", { name: "Grid" }).click();
   await expect(page).toHaveURL(/view=grid/);
   const grid = page.getByRole("region", { name: "Who picked whom, by place" });
   await expect(grid).toBeVisible();
@@ -473,7 +473,7 @@ test("one phone can pick for the whole family, and the code stays out of the way
   await expect(page).toHaveURL(/view=grid/);
   await page.getByRole("tab", { name: "Week" }).click();
   await expect(page).toHaveURL(/view=grid/);
-  await page.getByRole("button", { name: "List" }).click();
+  await page.getByRole("tab", { name: "List" }).click();
   await expect(page).not.toHaveURL(/view=/);
 
   await page.goto(`/week/1?now=${BEFORE}`);
