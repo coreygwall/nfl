@@ -45,7 +45,7 @@ public struct PoolRef: Codable, Hashable, Sendable {
         return components.url!
     }
 
-    /// Parses a pool link — `https://playtally.app/p/high-five/board/week/3?sort=possible` — into
+    /// Parses a pool link — `https://playtally.app/p/high-five/board/week/3?view=grid` — into
     /// the pool and the path inside it. Anything else (the landing page, another site) is nil.
     public static func parse(_ url: URL) -> (pool: PoolRef, path: String, query: [String: String])? {
         guard let scheme = url.scheme, scheme == "https" || scheme == "http", let host = url.host else { return nil }

@@ -295,13 +295,9 @@ test.describe.serial("pool flow", () => {
     // The chip says what the pick was worth, and says it in words for anyone who cannot see colour.
     await expect(page.getByTitle(/Seattle Seahawks — won 4 points/)).toBeVisible();
 
-    // Sorting by potential reorders without renaming anyone's standing.
-    await page.getByRole("tab", { name: "Potential" }).click();
-    await expect(page).toHaveURL(/sort=possible/);
-    await expect(page.getByRole("tab", { name: "Potential" })).toHaveAttribute("aria-selected", "true");
+    // No sort by potential any more: what is still to play for is on every row instead.
+    await expect(page.getByRole("tab", { name: "Potential" })).toHaveCount(0);
     await expect(page.getByText(/up to/).first()).toBeVisible();
-    await page.getByRole("tab", { name: "Points" }).click();
-    await expect(page).not.toHaveURL(/sort=/);
 
     // Week 1 points are the week's own prize, so the season race has not opened yet.
     await page.getByRole("tab", { name: "Season" }).click();
@@ -472,9 +468,10 @@ test("one phone can pick for the whole family, and the code stays out of the way
   const kidRow = grid.getByRole("row", { name: new RegExp(`Kid ${stamp}`) });
   await expect(kidRow).toContainText("yours");
   await expect(kidRow.getByTitle(/^Seattle Seahawks — /)).toBeVisible();
-  // And it is a preference of the page, not of the week: it survives the sort.
-  await page.getByRole("tab", { name: "Potential" }).click();
-  await expect(page).toHaveURL(/sort=possible/);
+  // And it is a preference of the page, not of the week: it survives moving to another week.
+  await page.getByRole("tab", { name: "Season" }).click();
+  await expect(page).toHaveURL(/view=grid/);
+  await page.getByRole("tab", { name: "Week" }).click();
   await expect(page).toHaveURL(/view=grid/);
   await page.getByRole("button", { name: "List" }).click();
   await expect(page).not.toHaveURL(/view=/);
