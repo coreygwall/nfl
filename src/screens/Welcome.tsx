@@ -17,6 +17,7 @@ import { TeamSticker } from "../components/TeamSticker.tsx";
 import { useToast } from "../components/Toast.tsx";
 import { addPasskey, autofillSupported, cancelAutofill, dismissOffer, offerDismissed, passkeysSupported, platformBiometricsSupported, signInWithAutofill, signInWithPasskey, wasCancelled } from "../lib/passkey.ts";
 import { fallbackPoolWeeks } from "../lib/poolFallback.ts";
+import { poolUrl } from "../lib/basename.ts";
 
 /** Every team, in a fixed shuffle so the strip reads as a jumble rather than a division list. */
 const MARQUEE_TEAMS: Abbr[] = [
@@ -68,12 +69,16 @@ export function Welcome() {
     claim
       .mutateAsync({ id: found.id, code: normalizeCode(linkCode) })
       .then((r) => {
-        // Don't leave the code sitting in the address bar or the back stack.
-        window.history.replaceState(null, "", "/welcome");
+        // Don't leave the code sitting in the address bar or the back stack. The address stays
+        // under the pool's own path (`poolUrl`): a bare "/welcome" is outside the router's
+        // basename, and the next time anything made the router read the address — Safari fires
+        // popstate coming back from the Face ID sheet or another app — it drew nothing at all.
+        // That blank page is what a sign-in link used to end on for people on iPhones.
+        window.history.replaceState(null, "", poolUrl("/welcome"));
         void go({ ...r.player, token: r.token }, { returning: true });
       })
       .catch(() => {
-        window.history.replaceState(null, "", `/welcome?claim=${found.id}`);
+        window.history.replaceState(null, "", poolUrl(`/welcome?claim=${found.id}`));
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [claimId, linkCode, linkTried, boot.data]);

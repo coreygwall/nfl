@@ -26,6 +26,20 @@ window.addEventListener("vite:preloadError", (event) => {
   window.location.reload();
 });
 
+// A pool's router only draws addresses under /p/<slug>. If the address ever ends up outside it
+// — a stray replaceState, a link written without the prefix — React Router renders nothing, and
+// the person sees an empty page with no way back. So an address that has wandered out of the pool
+// is put back inside it before the router reads it, on load and on every back/forward. It is a
+// safety net, not the fix: the rewrites that caused it keep the prefix themselves now.
+function keepInsidePool() {
+  if (BASENAME === "/") return;
+  const { pathname, search, hash } = window.location;
+  if (pathname === BASENAME || pathname.startsWith(`${BASENAME}/`)) return;
+  window.history.replaceState(window.history.state, "", `${BASENAME}${pathname === "/" ? "" : pathname}${search}${hash}`);
+}
+keepInsidePool();
+window.addEventListener("popstate", keepInsidePool, true);
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { staleTime: 20_000, refetchOnWindowFocus: true, retry: 1 },

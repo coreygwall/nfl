@@ -16,7 +16,6 @@ import { Lock } from "../components/Icons.tsx";
 import { BoardGrid } from "../components/BoardGrid.tsx";
 import { fallbackPoolWeeks } from "../lib/poolFallback.ts";
 
-export type BoardSort = "points" | "possible";
 export type BoardView = "list" | "grid";
 
 export function Board({ tab }: { tab: "week" | "season" }) {
@@ -27,34 +26,21 @@ export function Board({ tab }: { tab: "week" | "season" }) {
   const week = tab === "week" ? Number(weekParam) : null;
   if (tab === "week" && (!Number.isInteger(week) || week! < 1 || week! > WEEKS)) return <Navigate to="/board" replace />;
   const boardWeek = boot.data?.boardWeek ?? fallbackPoolWeeks().boardWeek;
-  const sort: BoardSort = params.get("sort") === "possible" ? "possible" : "points";
-  // The grid is a way of looking at the week, not a different board, so it rides in the query
-  // beside the sort — and like the sort, only when it is not the default.
+  // The grid is a way of looking at the week, not a different board, so it rides in the query —
+  // and only when it is not the default. There used to be a "Potential" sort beside it; it was
+  // taken out because it confused more than it told, and "up to N" on every row already says
+  // what is still to play for. An old `?sort=possible` link just lands on the ordinary board.
   const view: BoardView = params.get("view") === "grid" ? "grid" : "list";
-  const query = (next: { sort: BoardSort; view: BoardView }) => {
-    const q: Record<string, string> = {};
-    if (next.sort === "possible") q.sort = "possible";
-    if (next.view === "grid") q.view = "grid";
-    return q;
-  };
-  const setSort = (v: BoardSort) => setParams(query({ sort: v, view }), { replace: true });
-  const setView = (v: BoardView) => setParams(query({ sort, view: v }), { replace: true });
-  const kept = new URLSearchParams(query({ sort, view })).toString();
-  const keepSort = kept ? `?${kept}` : "";
+  const setView = (v: BoardView) => setParams(v === "grid" ? { view: "grid" } : {}, { replace: true });
+  const keepView = view === "grid" ? "?view=grid" : "";
   return (
     <div className="mx-auto w-full max-w-[760px] lg:max-w-[1060px]">
       <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_300px] lg:items-start lg:gap-8">
         <div>
           <EntryPicker />
-          {/* Every way of reading the board together: which board, how it is sorted, and — on the
-              week — list or grid. The toggle is drawn for the whole of the week tab rather than
-              only once rows land, so the row does not reflow as the board loads.
-
-              The floor on the two segmented controls is what decides the shape. Three of these
-              across a phone leaves about forty pixels a label, and "Season" and "Potential" both
-              truncate at that width; the floor makes the toggle wrap to its own line instead, and
-              `ml-auto` keeps it against the right edge wherever it lands. A desktop fits all
-              three. Legible labels are worth more than the one short row this costs. */}
+          {/* Every way of reading the board together: which board and — on the week — list or
+              grid. The toggle is drawn for the whole of the week tab rather than only once rows
+              land, so the row does not reflow as the board loads. */}
           <div className="flex flex-wrap items-stretch gap-2 sm:gap-3">
             <div className="min-w-[9.5rem] flex-1">
               <Segmented
@@ -65,32 +51,20 @@ export function Board({ tab }: { tab: "week" | "season" }) {
                   { value: "week", label: "Week" },
                   { value: "season", label: "Season" },
                 ]}
-                onChange={(v) => nav(v === "week" ? `/board/week/${boardWeek}${keepSort}` : `/board/season${keepSort}`)}
-              />
-            </div>
-            <div className="min-w-[9.5rem] flex-1">
-              <Segmented
-                value={sort}
-                label="Sort the board"
-                pillId="board-sort"
-                options={[
-                  { value: "points", label: "Points" },
-                  { value: "possible", label: "Potential" },
-                ]}
-                onChange={setSort}
+                onChange={(v) => nav(v === "week" ? `/board/week/${boardWeek}${keepView}` : `/board/season${keepView}`)}
               />
             </div>
             {tab === "week" && (
-              <div className="ml-auto flex items-center">
+              <div className="ml-auto flex">
                 <LayoutToggle view={view} onChange={setView} />
               </div>
             )}
           </div>
           <div className="mt-4">
             {tab === "week" ? (
-              <WeekBoardView week={week!} sort={sort} view={view} onWeek={(w) => nav(`/board/week/${w}${keepSort}`)} />
+              <WeekBoardView week={week!} view={view} onWeek={(w) => nav(`/board/week/${w}${keepView}`)} />
             ) : (
-              <SeasonBoardView sort={sort} />
+              <SeasonBoardView />
             )}
           </div>
         </div>
@@ -175,15 +149,6 @@ function SideRail({ tab, week }: { tab: "week" | "season"; week: number }) {
   );
 }
 
-/**
- * Sorting by potential reorders the list but keeps each player's real standing on their badge —
- * "third, but still the most to play for" is the interesting thing to see.
- */
-function sortRows<T extends { place: number; possible: number }>(rows: T[], sort: BoardSort): T[] {
-  if (sort === "points") return rows;
-  return [...rows].sort((a, b) => b.possible - a.possible || a.place - b.place);
-}
-
 
 /**
  * Before anything has been scored everyone shares first place, which is true but reads as a wall
@@ -194,28 +159,25 @@ function sortRows<T extends { place: number; possible: number }>(rows: T[], sort
  * already holds two, and this is a way of looking rather than a different board.
  */
 function LayoutToggle({ view, onChange }: { view: BoardView; onChange: (v: BoardView) => void }) {
-  const glyph = (value: BoardView, label: string, path: string) => {
-    const active = view === value;
-    return (
-      <button
-        type="button"
-        aria-pressed={active}
-        aria-label={label}
-        title={label}
-        onClick={() => !active && onChange(value)}
-        className={`flex h-7 w-9 items-center justify-center rounded-lg transition-colors ${active ? "bg-ink text-paper" : "text-ink-2 hover:bg-paper-3"}`}
-      >
-        <svg viewBox="0 0 16 16" className="h-3.5 w-3.5" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-          <path d={path} />
-        </svg>
-      </button>
-    );
-  };
+  // The same segmented control as Week/Season beside it — same card, same pill, same height — at
+  // its own width, with a glyph where the words would be.
+  const glyph = (path: string) => (
+    <svg viewBox="0 0 16 16" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+      <path d={path} />
+    </svg>
+  );
   return (
-    <div className="flex shrink-0 gap-0.5 rounded-[10px] bg-paper-2 p-0.5" role="group" aria-label="Board layout">
-      {glyph("list", "List", "M2 4h12M2 8h12M2 12h12")}
-      {glyph("grid", "Grid", "M2 2h12v12H2zM2 6.7h12M2 11.3h12M6.7 2v12M11.3 2v12")}
-    </div>
+    <Segmented
+      value={view}
+      label="Board layout"
+      pillId="board-layout"
+      fill={false}
+      options={[
+        { value: "list", label: "List", icon: glyph("M2 4h12M2 8h12M2 12h12") },
+        { value: "grid", label: "Grid", icon: glyph("M2 2h12v12H2zM2 6.7h12M2 11.3h12M6.7 2v12M11.3 2v12") },
+      ]}
+      onChange={onChange}
+    />
   );
 }
 
@@ -231,7 +193,7 @@ function PlaceBadge({ place, size = "md", muted = false }: { place: number; size
   );
 }
 
-function WeekBoardView({ week, sort, view, onWeek }: { week: number; sort: BoardSort; view: BoardView; onWeek: (w: number) => void }) {
+function WeekBoardView({ week, view, onWeek }: { week: number; view: BoardView; onWeek: (w: number) => void }) {
   const board = useWeekBoard(week);
   const { player } = usePlayer();
   const [open, setOpen] = useState<string | null>(null);
@@ -255,10 +217,10 @@ function WeekBoardView({ week, sort, view, onWeek }: { week: number; sort: Board
               }
             />
           ) : view === "grid" ? (
-            <BoardGrid rows={sortRows(board.data.rows, sort)} started={board.data.lockedCount > 0} activeId={player?.id ?? null} />
+            <BoardGrid rows={board.data.rows} started={board.data.lockedCount > 0} activeId={player?.id ?? null} />
           ) : (
             <motion.ul layout className="space-y-2">
-              {sortRows(board.data.rows, sort).map((row, i) => (
+              {board.data.rows.map((row, i) => (
                 <WeekRowItem
                   key={row.playerId}
                   row={row}
@@ -455,13 +417,13 @@ function PickChip({ pick }: { pick: ScoredPick }) {
   );
 }
 
-function SeasonBoardView({ sort }: { sort: BoardSort }) {
+function SeasonBoardView() {
   const board = useSeasonBoard();
   const { player } = usePlayer();
   const [open, setOpen] = useState<string | null>(null);
   if (board.isPending) return <BoardSkeleton />;
   if (board.error) return <ErrorState message={board.error.message} onRetry={() => board.refetch()} />;
-  const rows = sortRows(board.data.rows, sort);
+  const rows = board.data.rows;
   return (
     <div>
       <p className="text-sm text-ink-2">

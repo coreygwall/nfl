@@ -2,26 +2,27 @@ import SwiftUI
 import TallyKit
 
 /**
- The board, ported from `Board.tsx`: week or season, sorted by points or by what is still on the
- table, one row per player that opens to show their picks. Both toggles share one line.
+ The board, ported from `Board.tsx`: week or season, one row per player that opens to show their
+ picks. What each player still has to play for is on their row ("up to 14"); there used to be a
+ "Potential" sort as well, taken out because it confused more than it told.
  */
 struct BoardView: View {
     @Environment(AppModel.self) private var model
     /// List or grid. A preference rather than screen state, so the person who reads the board as
-    /// a table on Sunday finds it that way again on Monday. It lives up here with the other two
-    /// controls: all three are ways of looking at the same standings.
+    /// a table on Sunday finds it that way again on Monday. It lives up here with the week/season
+    /// switch: both are ways of looking at the same standings.
     @AppStorage("tally.boardGrid") private var grid = false
 
     var body: some View {
         @Bindable var model = model
         VStack(alignment: .leading, spacing: 16) {
-            BoardControls(scope: $model.boardScope, sort: $model.boardSort, grid: $grid,
+            BoardControls(scope: $model.boardScope, grid: $grid,
                           showLayout: model.boardScope == .week)
             if model.boardScope == .week {
-                WeekBoardView(week: model.activeBoardWeek, sort: model.boardSort, grid: grid)
+                WeekBoardView(week: model.activeBoardWeek, grid: grid)
                     .id("\(model.player?.id ?? "-"):\(model.activeBoardWeek)")
             } else {
-                SeasonBoardView(sort: model.boardSort)
+                SeasonBoardView()
                     .id(model.player?.id ?? "-")
             }
             LinkButton(title: "How scoring works", color: .ink3) { model.showRules = true }
@@ -32,15 +33,12 @@ struct BoardView: View {
 }
 
 /**
- The three ways of reading the board: which board, how it is sorted, and — on the week — list or
- grid. One line when one line holds them, two when it does not.
+ The ways of reading the board: which board, and — on the week — list or grid. One line when one
+ line holds them, two when it does not.
 
- `ViewThatFits` rather than a width someone measured once. Three controls across a phone leaves
- about forty points a label, which is where "Season" and "Potential" start shrinking, and a person
- who has turned their type size up has less room again. So the one-line arrangement is offered
- first and the stacked one takes over whenever it would not fit — the toggle drops to its own
- right-aligned row and the two segmented controls keep their full width. The web draws the same
- two shapes off a width floor, because CSS has no `ViewThatFits`.
+ `ViewThatFits` rather than a width someone measured once: a person who has turned their type size
+ right up can run out of room even for two controls, and then the toggle drops to its own
+ right-aligned row and the segmented control keeps its full width.
 
  The layout toggle is drawn for the whole of the week tab rather than only once rows land, so the
  row does not reflow under your thumb as the board loads. The season board has no grid, so it has
@@ -48,7 +46,6 @@ struct BoardView: View {
  */
 private struct BoardControls: View {
     @Binding var scope: BoardScope
-    @Binding var sort: BoardSort
     @Binding var grid: Bool
     let showLayout: Bool
 
@@ -69,22 +66,15 @@ private struct BoardControls: View {
         }
     }
 
-    /// Which board, and how it is sorted. Always together, always this order.
+    /// Which board.
     @ViewBuilder private var pair: some View {
         TallySegmented(value: $scope, options: [(.week, "Week"), (.season, "Season")])
-        TallySegmented(value: $sort, options: [(.points, "Points"), (.possible, "Potential")])
     }
-}
-
-/// Sorting by potential reorders the list but keeps each player's real standing on their badge.
-private func rowsSorted<T: BoardRow>(_ rows: [T], by sort: BoardSort) -> [T] {
-    sort == .points ? rows : rows.sorted { a, b in a.possible != b.possible ? a.possible > b.possible : a.place < b.place }
 }
 
 struct WeekBoardView: View {
     @Environment(AppModel.self) private var model
     let week: Int
-    let sort: BoardSort
     /// List or grid, decided by the toggle on the row above (`BoardView`).
     let grid: Bool
     @State private var board: Loadable<WeekBoardResponse> = .idle
@@ -212,10 +202,9 @@ struct WeekBoardView: View {
                     Button("Make your picks") { model.pickWeek = week; model.tab = .picks }.buttonStyle(.tally(.primary, size: .small))
                 }
             } else if grid {
-                BoardGrid(rows: rowsSorted(data.rows, by: sort), started: started)
-                    .animation(Motion.settle, value: sort)
+                BoardGrid(rows: data.rows, started: started)
             } else {
-                ForEach(Array(rowsSorted(data.rows, by: sort).enumerated()), id: \.element.id) { index, row in
+                ForEach(Array(data.rows.enumerated()), id: \.element.id) { index, row in
                     let won = !top.isEmpty && row.place == 1 && row.picksMade > 0
                     BoardRowCard(place: row.place, name: row.name, isMe: row.playerId == model.player?.id, mine: row.isMine, points: row.points, muted: !started,
                                  crowned: won,
@@ -245,7 +234,6 @@ struct WeekBoardView: View {
                     .dealt(index)
                     .scrollSettle()
                 }
-                .animation(Motion.settle, value: sort)
             }
             // How far through the week this is, and which prize it settles — underneath, because
             // it is a footnote about the standings rather than a heading over them, and the top
@@ -268,7 +256,6 @@ struct WeekBoardView: View {
 
 struct SeasonBoardView: View {
     @Environment(AppModel.self) private var model
-    let sort: BoardSort
     @State private var board: Loadable<SeasonBoardResponse> = .idle
     @State private var open: String?
 
@@ -328,7 +315,7 @@ struct SeasonBoardView: View {
             if data.rows.isEmpty {
                 EmptyState(title: "Nobody's on the board yet.", body: "Standings show up once people start picking.")
             } else {
-                ForEach(Array(rowsSorted(data.rows, by: sort).enumerated()), id: \.element.id) { index, row in
+                ForEach(Array(data.rows.enumerated()), id: \.element.id) { index, row in
                     let subtitle: String = {
                         if row.weeksPlayed == 0 { return "No picks yet" }
                         var s = "\(row.correct) right · \(row.weeksPlayed) wk\(row.weeksPlayed == 1 ? "" : "s")"
@@ -347,7 +334,6 @@ struct SeasonBoardView: View {
                     .dealt(index)
                     .scrollSettle()
                 }
-                .animation(Motion.settle, value: sort)
             }
             WinningsCard()
         }

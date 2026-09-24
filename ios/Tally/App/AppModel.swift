@@ -64,10 +64,6 @@ enum BoardScope: String, Hashable {
     case week, season
 }
 
-enum BoardSort: String, Hashable {
-    case points, possible
-}
-
 struct Toast: Identifiable, Equatable {
     enum Kind { case info, success, error }
     let id = UUID()
@@ -188,7 +184,6 @@ final class AppModel {
     var pickWeek: Int?
     var boardWeek: Int?
     var boardScope: BoardScope = .week
-    var boardSort: BoardSort = .points
     var showRules = false
     var showCommissioner = false
     var showLeagueOffice = false
@@ -815,7 +810,6 @@ final class AppModel {
                 boardScope = .week
                 boardWeek = w
             }
-            if query["sort"] == "possible" { boardSort = .possible }
             tab = .board
         case "rules":
             showRules = true

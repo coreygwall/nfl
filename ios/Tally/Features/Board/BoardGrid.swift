@@ -152,34 +152,14 @@ private struct GridCell: View {
     }
 }
 
-/// List or grid, on the week board. Two glyphs rather than a third segmented control: the
-/// line already holds two, and this is a way of looking rather than a different board.
+/// List or grid, on the week board: glyphs rather than words, since this is a way of looking
+/// rather than a different board, but the same control as the switch beside it.
 struct BoardLayoutToggle: View {
     @Binding var grid: Bool
 
+    /// The same segmented control as Week/Season beside it — same track, pill and height — at its
+    /// own width, with a glyph where the words would be.
     var body: some View {
-        HStack(spacing: 2) {
-            glyph("list.bullet", label: "List", active: !grid) { grid = false }
-            glyph("tablecells", label: "Grid", active: grid) { grid = true }
-        }
-        .padding(2)
-        .background(RoundedRectangle(cornerRadius: 10, style: .continuous).fill(Color.paper2))
-    }
-
-    private func glyph(_ symbol: String, label: String, active: Bool, act: @escaping () -> Void) -> some View {
-        Button {
-            guard !active else { return }
-            Haptics.tap()
-            withAnimation(Motion.fade) { act() }
-        } label: {
-            Image(systemName: symbol)
-                .font(.system(size: 13, weight: .bold))
-                .foregroundStyle(active ? Color.paper : Color.ink2)
-                .frame(width: 34, height: 28)
-                .background(RoundedRectangle(cornerRadius: 8, style: .continuous).fill(active ? Color.ink : Color.clear))
-        }
-        .buttonStyle(.plain)
-        .accessibilityLabel(label)
-        .accessibilityAddTraits(active ? .isSelected : [])
+        TallySegmented(value: $grid, symbols: [(false, "list.bullet", "List"), (true, "tablecells", "Grid")])
     }
 }
