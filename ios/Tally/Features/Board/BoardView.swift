@@ -41,8 +41,9 @@ struct BoardView: View {
  right-aligned row and the segmented control keeps its full width.
 
  The layout toggle is drawn for the whole of the week tab rather than only once rows land, so the
- row does not reflow under your thumb as the board loads. The season board has no grid, so it has
- no toggle and never needs the second row.
+ row does not reflow under your thumb as the board loads. The season board has no grid, but it
+ keeps the toggle's slot — hidden, untappable and silent to VoiceOver — because without it
+ Week/Season stretched into the gap and changed width every time you switched between them.
  */
 private struct BoardControls: View {
     @Binding var scope: BoardScope
@@ -50,20 +51,24 @@ private struct BoardControls: View {
     let showLayout: Bool
 
     var body: some View {
-        if showLayout {
-            ViewThatFits(in: .horizontal) {
-                HStack(spacing: 8) {
-                    pair
-                    BoardLayoutToggle(grid: $grid)
-                }
-                VStack(alignment: .trailing, spacing: 8) {
-                    HStack(spacing: 8) { pair }
-                    BoardLayoutToggle(grid: $grid)
-                }
+        ViewThatFits(in: .horizontal) {
+            HStack(spacing: 8) {
+                pair
+                toggle
             }
-        } else {
-            HStack(spacing: 8) { pair }
+            VStack(alignment: .trailing, spacing: 8) {
+                HStack(spacing: 8) { pair }
+                toggle
+            }
         }
+    }
+
+    /// Always in the layout, only visible on the week, so the switch beside it never moves.
+    private var toggle: some View {
+        BoardLayoutToggle(grid: $grid)
+            .opacity(showLayout ? 1 : 0)
+            .allowsHitTesting(showLayout)
+            .accessibilityHidden(!showLayout)
     }
 
     /// Which board.

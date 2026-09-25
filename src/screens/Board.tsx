@@ -40,7 +40,9 @@ export function Board({ tab }: { tab: "week" | "season" }) {
           <EntryPicker />
           {/* Every way of reading the board together: which board and — on the week — list or
               grid. The toggle is drawn for the whole of the week tab rather than only once rows
-              land, so the row does not reflow as the board loads. */}
+              land, so the row does not reflow as the board loads. The season board has no grid,
+              but its slot is still held there, invisible and inert: without it Week/Season
+              stretched into the gap and jumped width every time you switched between them. */}
           <div className="flex flex-wrap items-stretch gap-2 sm:gap-3">
             <div className="min-w-[9.5rem] flex-1">
               <Segmented
@@ -54,11 +56,9 @@ export function Board({ tab }: { tab: "week" | "season" }) {
                 onChange={(v) => nav(v === "week" ? `/board/week/${boardWeek}${keepView}` : `/board/season${keepView}`)}
               />
             </div>
-            {tab === "week" && (
-              <div className="ml-auto flex">
-                <LayoutToggle view={view} onChange={setView} />
-              </div>
-            )}
+            <div className={`ml-auto flex ${tab === "week" ? "" : "invisible"}`} aria-hidden={tab !== "week"} inert={tab !== "week"}>
+              <LayoutToggle view={view} onChange={setView} />
+            </div>
           </div>
           <div className="mt-4">
             {tab === "week" ? (
