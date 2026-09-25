@@ -447,7 +447,9 @@ took last week. (A golf card has its own three; see above.)
   on Sunday wants it that way on Monday. **The toggle rides with the week/season switch**, since
   both are ways of reading the same standings, and it is drawn for the whole of the week tab
   rather than appearing once rows land — a control that arrives with the data reflows the row
-  under your thumb.
+  under your thumb. **On the season tab its slot is still held, invisible and inert**: the
+  season has no grid, but a switch that stretches into the gap changes width every time you
+  change tabs.
 - **There is no sort by "potential".** It sat beside the week/season switch, confused more than it
   told, and cost a control's width on every phone. What each player still has to play for is on
   their own row instead ("up to 14", both surfaces). An old `?sort=possible` link is ignored rather
