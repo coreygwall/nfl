@@ -64,7 +64,7 @@ struct PoolShellView: View {
                 }
             }
             Tab("Account", systemImage: "person.crop.circle.fill", value: AppTab.account) {
-                PoolScreen(week: nil, onWeek: { _ in }) {
+                PoolScreen(week: nil, onWeek: { _ in }, account: true) {
                     AccountView()
                 }
             }
@@ -97,6 +97,7 @@ struct PoolScreen<Content: View>: View {
     /// The app's home is headed "Tally" and wears none of the pool's controls: the megaphone is
     /// this pool's feed, and a page about every pool cannot honestly carry one pool's megaphone.
     var hub = false
+    var account = false
     @ViewBuilder let content: Content
 
     var body: some View {
@@ -107,7 +108,9 @@ struct PoolScreen<Content: View>: View {
                     VStack(spacing: 0) {
                         if !model.online { OfflineBanner() }
                         VStack(spacing: 0) {
-                            if hub {
+                            if account {
+                                // Account supplies its own title; pool branding and controls belong to pool tabs.
+                            } else if hub {
                                 ScreenHeader(mark: "TallyMark", title: "Tally")
                             } else {
                                 ScreenHeader(mark: "FootballMark", title: model.poolName) {

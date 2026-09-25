@@ -34,7 +34,7 @@ struct GolfShellView: View {
                 GolfScreen(cardId: cardId) { ScorecardView(cardId: cardId) }
             }
             Tab("Account", systemImage: "person.crop.circle.fill", value: GolfTab.account) {
-                GolfScreen(cardId: cardId) { AccountView(inPool: false) }
+                GolfScreen(cardId: cardId, account: true) { AccountView(inPool: false) }
             }
         }
         /**
@@ -62,6 +62,7 @@ struct GolfScreen<Content: View>: View {
     let cardId: String
     /// The app's home is headed "Tally" and wears none of this card's controls.
     var hub = false
+    var account = false
     @ViewBuilder let content: Content
 
     var body: some View {
@@ -70,7 +71,9 @@ struct GolfScreen<Content: View>: View {
                 PaperBackground()
                 ScrollView {
                     VStack(spacing: 0) {
-                        if hub {
+                        if account {
+                            // Account supplies its own title, independent of the active card.
+                        } else if hub {
                             ScreenHeader(mark: "TallyMark", title: "Tally")
                         } else {
                             ScreenHeader(mark: "GolfMark", title: golf.card(cardId)?.name ?? "Golf")
@@ -88,7 +91,7 @@ struct GolfScreen<Content: View>: View {
                 }
             }
             .toolbar {
-                if !hub {
+                if !hub && !account {
                     ToolbarItem(placement: .topBarTrailing) { CardMenu(cardId: cardId) }
                 }
             }
