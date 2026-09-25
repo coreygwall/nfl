@@ -46,13 +46,17 @@ extension AppModel {
     // MARK: Loading
 
     func refreshMessages(quiet: Bool = false) async {
+        let requestedPool = pool
+        let requestedPlayer = player?.id
         if !quiet, messageFeed.value == nil { messageFeed = .loading }
         do {
             let page = try await service.messages()
+            guard pool == requestedPool, player?.id == requestedPlayer, !Task.isCancelled else { return }
             messageFeed = .loaded(page)
             messages = page.messages
             messagesCursor = page.nextCursor
         } catch {
+            guard pool == requestedPool, player?.id == requestedPlayer, !Task.isCancelled else { return }
             // A refresh that fails leaves what is already on screen alone: stale announcements are
             // better than an error where announcements used to be.
             if messageFeed.value == nil { messageFeed = .failed(error.asAPIError) }

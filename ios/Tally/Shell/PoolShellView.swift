@@ -40,9 +40,12 @@ struct PoolShellView: View {
             Tab("Picks", systemImage: "football.fill", value: AppTab.picks) {
                 PoolScreen(week: model.activePickWeek, onWeek: { model.pickWeek = $0 }) {
                     VStack(alignment: .leading, spacing: 14) {
+                        WeekContext(week: model.activePickWeek, currentWeek: model.currentWeek, destination: "picks") {
+                            model.pickWeek = nil
+                        }
                         EntryPicker()
                         PickFlowView(week: model.activePickWeek)
-                            .id("\(model.player?.id ?? "-"):\(model.activePickWeek)")
+                            .id("\(model.pool.host)/\(model.pool.slug):\(model.player?.id ?? "-"):\(model.activePickWeek)")
                     }
                 }
                 .safeAreaInset(edge: .bottom) {
@@ -55,16 +58,17 @@ struct PoolShellView: View {
                 }
                 .animation(.spring(response: 0.35, dampingFraction: 0.85), value: model.tray == nil)
             }
-            Tab("Board", systemImage: "trophy.fill", value: AppTab.board) {
+            Tab("Standings", systemImage: "trophy.fill", value: AppTab.board) {
                 PoolScreen(week: model.boardScope == .week ? model.activeBoardWeek : nil, onWeek: { model.boardWeek = $0 }) {
                     VStack(alignment: .leading, spacing: 14) {
-                        EntryPicker()
+                        EntryPicker(standings: true)
                         BoardView()
+                            .id("\(model.pool.host)/\(model.pool.slug)")
                     }
                 }
             }
             Tab("Account", systemImage: "person.crop.circle.fill", value: AppTab.account) {
-                PoolScreen(week: nil, onWeek: { _ in }) {
+                PoolScreen(week: nil, onWeek: { _ in }, hub: true) {
                     AccountView()
                 }
             }
@@ -155,6 +159,28 @@ struct WeekMenu: View {
             }
         }
         .accessibilityLabel("Choose week")
+        .accessibilityValue("Week \(week)")
+    }
+}
+
+/// Keep historical context next to the content, with a one-tap route back to the default week.
+struct WeekContext: View {
+    let week: Int
+    let currentWeek: Int
+    let destination: String
+    let returnToCurrent: () -> Void
+
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Text("Week \(week) \(destination)").display(22)
+                .accessibilityAddTraits(.isHeader)
+            if week != currentWeek {
+                Text(week < currentWeek ? "You're viewing an earlier week." : "You're viewing an upcoming week.")
+                    .sans(13).foregroundStyle(Color.ink2)
+                Button("Back to Week \(currentWeek)", action: returnToCurrent)
+                    .buttonStyle(.tally(.plain, size: .small))
+            }
+        }
     }
 }
 

@@ -13,37 +13,53 @@ import TallyKit
  */
 struct EntryPicker: View {
     @Environment(AppModel.self) private var model
+    @Environment(\.accessibilityReduceMotion) private var reduceMotion
+    var standings = false
 
     var body: some View {
         if model.entries.count > 1 {
-            ScrollView(.horizontal, showsIndicators: false) {
-                HStack(spacing: 6) {
-                    ForEach(model.entries) { p in
-                        let active = p.id == model.player?.id
-                        Button {
-                            guard !active else { return }
-                            Haptics.tap()
-                            model.switchTo(p.id)
-                        } label: {
-                            Text(p.name)
-                                .font(TallyFont.display(13, weight: .bold))
-                                .foregroundStyle(active ? Color.paper : Color.ink)
-                                .lineLimit(1)
-                                .padding(.horizontal, 12)
-                                .padding(.vertical, 7)
-                                .background(Capsule().fill(active ? Color.ink : Color.surface))
-                                .overlay(Capsule().strokeBorder(Color.ink, lineWidth: 2))
+            VStack(alignment: .leading, spacing: 6) {
+                Text(standings ? "Highlight entry" : "Picking for")
+                    .sans(12, weight: .bold).foregroundStyle(Color.ink2)
+                ScrollViewReader { proxy in
+                    ScrollView(.horizontal, showsIndicators: false) {
+                        HStack(spacing: 6) {
+                            ForEach(model.entries) { p in
+                                let active = p.id == model.player?.id
+                                Button {
+                                    guard !active else { return }
+                                    Haptics.tap()
+                                    model.switchTo(p.id)
+                                } label: {
+                                    Text(p.name)
+                                        .font(TallyFont.display(13, weight: .bold))
+                                        .foregroundStyle(active ? Color.paper : Color.ink)
+                                        .lineLimit(1)
+                                        .padding(.horizontal, 12)
+                                        .padding(.vertical, 7)
+                                        .frame(minHeight: 44)
+                                        .background(Capsule().fill(active ? Color.ink : Color.surface))
+                                        .overlay(Capsule().strokeBorder(Color.ink, lineWidth: 2))
+                                }
+                                .buttonStyle(.plain)
+                                .id(p.id)
+                                .accessibilityLabel(standings ? "Highlight \(p.name)" : "Pick as \(p.name)")
+                                .accessibilityAddTraits(active ? .isSelected : [])
+                            }
                         }
-                        .buttonStyle(.plain)
-                        .accessibilityLabel("Pick as \(p.name)")
-                        .accessibilityAddTraits(active ? .isSelected : [])
+                        // Room for the border, which a scroll view would otherwise shave off.
+                        .padding(2)
+                    }
+                    .accessibilityElement(children: .contain)
+                    .accessibilityLabel(standings ? "Highlighted entry" : "Picking for")
+                    .onAppear { proxy.scrollTo(model.player?.id, anchor: .center) }
+                    .onChange(of: model.player?.id) { _, id in
+                        withAnimation(reduceMotion ? nil : .easeInOut(duration: 0.2)) {
+                            proxy.scrollTo(id, anchor: .center)
+                        }
                     }
                 }
-                // Room for the border, which a scroll view would otherwise shave off.
-                .padding(2)
             }
-            .accessibilityElement(children: .contain)
-            .accessibilityLabel("Picking as")
         }
     }
 }

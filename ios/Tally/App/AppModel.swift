@@ -537,15 +537,19 @@ final class AppModel {
     // MARK: Bootstrap
 
     func refreshBootstrap() async {
+        let requestedPool = pool
+        let requestedPlayer = player?.id
         if boot.value == nil { boot = .loading }
         do {
             let fresh = try await service.bootstrap()
+            guard pool == requestedPool, player?.id == requestedPlayer, !Task.isCancelled else { return }
             boot = .loaded(fresh)
             bootUpdatedAt = Date()
             catalog.open(pool, name: fresh.poolName)
             catalog.save()
             reconcile(with: fresh)
         } catch {
+            guard pool == requestedPool, player?.id == requestedPlayer, !Task.isCancelled else { return }
             let err = error.asAPIError
             if boot.value == nil { boot = .failed(err) }
             if err.code == "ENTRY_FORBIDDEN", let p = player, p.isManagedEntry {
