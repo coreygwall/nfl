@@ -41,7 +41,7 @@ struct HomeView: View {
         // One pass on arrival rather than a poll: nothing here changes between a tap and a glance,
         // and the board tab is where a live week belongs. What the key is made of, and why each
         // part of it has to be in there, is on `loadKey`.
-        .task(id: loadKey) { await load() }
+        .task(id: "\(loadKey)#\(model.refreshTick)") { await load() }
     }
 
     // MARK: This pool

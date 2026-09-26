@@ -19,7 +19,7 @@ struct SelectStep: View {
     let picked: Int
     let slotCount: Int
     let status: (label: String, fill: Color)?
-    let onPick: (Game, String) -> Void
+    let onPick: (Game, String, CGRect?) -> Void
 
     @State private var showStarted: Bool? = nil
 
@@ -105,7 +105,7 @@ struct SelectStep: View {
             frozenPick: frozenByGame[g.id],
             counts: pickCounts[g.id],
             muted: full && draft.selections[g.id] == nil && frozenByGame[g.id] == nil,
-            onPick: { onPick(g, $0) }
+            onPick: { onPick(g, $0, $1) }
         )
     }
 }
@@ -178,6 +178,21 @@ struct RankStep: View {
 
 // MARK: Done
 
+/**
+ Five picks, saved: the one moment in the week the app is allowed to make a fuss.
+
+ It is choreographed rather than faded in, because the order is the point. The three rising taps of
+ `Haptics.lockedIn` start first and the stamp is timed so their heaviest beat lands on the frame
+ the stamp hits the page — a thud you feel in the hand at the instant you see it. The page gives a
+ couple of points under the blow, a ring of ink spreads from the edge of the stamp, the paper goes
+ up, and then the five are counted out one by one with a tick each: a tally, being kept.
+
+ It all used to be `.transition`s on the stamp and the rows, which never ran — a transition only
+ fires on the view being inserted, and here the whole step is inserted at once — so the payoff of
+ the whole flow was a cross-fade. This drives the sequence from state instead, and plays it once:
+ coming back to the tab later finds the stamp already down. With Reduce Motion on, everything is
+ simply there, and the haptic still says it.
+ */
 struct DoneStep: View {
     @Environment(AppModel.self) private var model
     let name: String
@@ -186,27 +201,64 @@ struct DoneStep: View {
     let gamesById: [String: Game]
     let onReview: () -> Void
     let shareURL: URL
+    /// The instant the stamp lands, which is where the confetti belongs.
+    var onStamp: () -> Void = {}
+
+    @State private var down = false
+    /// How many of the five have been counted onto the page.
+    @State private var counted = 0
+    /// Bumped on impact; the page's give and the ring of ink both key off it.
+    @State private var thud = 0
+
+    private struct Ripple {
+        var scale: CGFloat = 1
+        var opacity: Double = 0
+    }
 
     var body: some View {
+        let sorted = picks.sorted { $0.rank < $1.rank }
         VStack(spacing: 8) {
             Stamp(text: "Locked in")
-                .rotationEffect(.degrees(-6))
+                .background {
+                    RoundedRectangle(cornerRadius: 12)
+                        .strokeBorder(Color.turf, lineWidth: 3)
+                        .keyframeAnimator(initialValue: Ripple(), trigger: thud) { ring, v in
+                            ring.scaleEffect(v.scale).opacity(v.opacity)
+                        } keyframes: { _ in
+                            KeyframeTrack(\.scale) {
+                                MoveKeyframe(1)
+                                CubicKeyframe(1.7, duration: 0.5)
+                            }
+                            KeyframeTrack(\.opacity) {
+                                MoveKeyframe(0.6)
+                                LinearKeyframe(0, duration: 0.5)
+                            }
+                        }
+                }
+                .scaleEffect(down ? 1 : 2.8)
+                .rotationEffect(.degrees(down ? -6 : -18))
+                .opacity(down ? 1 : 0)
+                .blur(radius: down ? 0 : 4)
                 .padding(.top, 24)
-                .transition(.scale(scale: 3).combined(with: .opacity))
             Text("Nice, \(name).").display(26).padding(.top, 16)
             Text("Your five are in for Week \(week).").sans(14).foregroundStyle(Color.ink2)
             VStack(spacing: 8) {
-                ForEach(Array(picks.sorted { $0.rank < $1.rank }.enumerated()), id: \.element.id) { i, p in
+                ForEach(Array(sorted.enumerated()), id: \.element.id) { i, p in
+                    let shown = i < counted
                     HStack(spacing: 12) {
                         RankBadge(rank: p.rank, size: .small)
+                            .scaleEffect(shown ? 1 : 0.4)
                         TeamSticker(team: model.sport.teamOrPlaceholder(p.team), size: 36, flat: true)
                         MatchupText(pick: p, game: gamesById[p.gameId])
                         Spacer()
                     }
                     .padding(8)
                     .cardFlat()
-                    .transition(.move(edge: .leading).combined(with: .opacity))
-                    .animation(.easeOut(duration: 0.25).delay(0.25 + Double(i) * 0.07), value: picks.count)
+                    // Opacity and offset rather than insertion, so the list has its full height
+                    // from the first frame and nothing underneath moves as the rows arrive.
+                    .opacity(shown ? 1 : 0)
+                    .offset(x: shown ? 0 : -28)
+                    .rotationEffect(.degrees(shown ? 0 : -3), anchor: .leading)
                 }
             }
             .frame(maxWidth: 400)
@@ -227,6 +279,44 @@ struct DoneStep: View {
             .foregroundStyle(Color.ink2)
         }
         .frame(maxWidth: .infinity)
+        // The page taking the blow: down a few points and back, once, on impact.
+        .keyframeAnimator(initialValue: CGFloat(0), trigger: thud) { page, y in
+            page.offset(y: y)
+        } keyframes: { _ in
+            KeyframeTrack {
+                CubicKeyframe(5, duration: 0.05)
+                SpringKeyframe(0, duration: 0.45, spring: .bouncy)
+            }
+        }
+        .task { await play(count: sorted.count) }
+    }
+
+    private func play(count: Int) async {
+        // Once. The tab keeps this view's state, so coming back to it finds the stamp down.
+        guard !down else { return }
+        guard !Motion.reduced else {
+            down = true
+            counted = count
+            Haptics.lockedIn()
+            onStamp()
+            return
+        }
+        // Let the step's own fade settle, so the stamp is the first thing that moves.
+        try? await Task.sleep(for: .milliseconds(120))
+        // The taps lead: their heaviest beat is 0.18s in, and this spring first reaches the page
+        // about 0.1s after it starts — so the stamp leaves 0.08s after the first tap.
+        Haptics.lockedIn()
+        try? await Task.sleep(for: .milliseconds(80))
+        withAnimation(.spring(response: 0.24, dampingFraction: 0.58)) { down = true }
+        try? await Task.sleep(for: .milliseconds(100))
+        thud += 1
+        onStamp()
+        try? await Task.sleep(for: .milliseconds(300))
+        for i in 0..<count {
+            withAnimation(Motion.slap) { counted = i + 1 }
+            Haptics.tap()
+            try? await Task.sleep(for: .milliseconds(95))
+        }
     }
 }
 
@@ -316,10 +406,14 @@ struct ReviewStep: View {
                             MatchupText(pick: row.pick, game: row.game)
                             Spacer()
                             OutcomeTag(outcome: row.outcome, points: row.points)
+                                .id(row.outcome)
+                                .transition(.scale(scale: 0.4).combined(with: .opacity))
                         }
                         .padding(8)
                         .background(RoundedRectangle(cornerRadius: 16, style: .continuous).fill(OutcomeStyle.fill(row.outcome)))
                         .overlay(RoundedRectangle(cornerRadius: 16, style: .continuous).strokeBorder(OutcomeStyle.border(row.outcome), lineWidth: 2))
+                        .modifier(SettleFlourish(outcome: row.outcome))
+                        .animation(Motion.slap, value: row.outcome)
                     }
                 }
                 HStack(spacing: 8) {
@@ -345,6 +439,74 @@ struct ReviewStep: View {
                 }
             }
         }
+    }
+}
+
+/**
+ A pick settling while you watch.
+
+ On a Sunday this screen is left open on the arm of a sofa, and a result used to arrive as a row
+ quietly changing colour on the next poll. Now it arrives: a win swells a touch and a band of green
+ light passes across it, left to right, as the "+5" pops in; a loss gives a short shake of the
+ head. Only a change *from* live or not-yet counts — a row that was already decided when the screen
+ opened is history, not news. The buzz for the same moment is the board's (`Haptics.won`/`lost`
+ in `WeekBoardView.react`); this is what the eye gets. Nothing moves with Reduce Motion on, and
+ the colours still change.
+ */
+private struct SettleFlourish: ViewModifier {
+    let outcome: PickOutcome
+    @State private var won = 0
+    @State private var lost = 0
+
+    func body(content: Content) -> some View {
+        content
+            .overlay {
+                GeometryReader { geo in
+                    LinearGradient(
+                        colors: [Color.turf2.opacity(0), Color.turf2.opacity(0.4), Color.turf2.opacity(0)],
+                        startPoint: .leading,
+                        endPoint: .trailing
+                    )
+                    .frame(width: 90)
+                    .rotationEffect(.degrees(16))
+                    .keyframeAnimator(initialValue: CGFloat(-140), trigger: won) { band, x in
+                        band.offset(x: x)
+                    } keyframes: { _ in
+                        KeyframeTrack {
+                            MoveKeyframe(-140)
+                            CubicKeyframe(geo.size.width + 60, duration: 0.75)
+                            MoveKeyframe(-140)
+                        }
+                    }
+                }
+                .clipShape(RoundedRectangle(cornerRadius: 16, style: .continuous))
+                .allowsHitTesting(false)
+                .accessibilityHidden(true)
+            }
+            .keyframeAnimator(initialValue: CGFloat(1), trigger: won) { row, scale in
+                row.scaleEffect(scale)
+            } keyframes: { _ in
+                KeyframeTrack {
+                    CubicKeyframe(1.03, duration: 0.12)
+                    SpringKeyframe(1, duration: 0.4, spring: .bouncy)
+                }
+            }
+            .keyframeAnimator(initialValue: CGFloat(0), trigger: lost) { row, x in
+                row.offset(x: x)
+            } keyframes: { _ in
+                KeyframeTrack {
+                    LinearKeyframe(-7, duration: 0.06)
+                    LinearKeyframe(6, duration: 0.07)
+                    LinearKeyframe(-4, duration: 0.07)
+                    LinearKeyframe(2, duration: 0.06)
+                    SpringKeyframe(0, duration: 0.2)
+                }
+            }
+            .onChange(of: outcome) { old, new in
+                guard !Motion.reduced, old == .live || old == .pending else { return }
+                if new == .win { won += 1 }
+                if new == .loss { lost += 1 }
+            }
     }
 }
 

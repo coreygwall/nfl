@@ -217,6 +217,8 @@ struct RankBadge: View {
             Text("\(points)")
                 .font(TallyFont.display(size == .large ? 24 : size == .small ? 12 : 16))
                 .monospacedDigit()
+                // Rolls up or down with the change, wherever the caller animates one.
+                .contentTransition(.numericText(value: Double(points)))
             if size != .small {
                 Text("PTS").font(TallyFont.sans(8, weight: .bold)).tracking(0.8)
             }

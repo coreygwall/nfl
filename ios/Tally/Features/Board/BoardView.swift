@@ -86,6 +86,8 @@ struct WeekBoardView: View {
     @State private var open: String?
     @State private var celebrating = false
     @State private var confetti = 0
+    /// Who moved on the last reload, and how far (`PlaceMoves`). Worn for a few seconds.
+    @State private var moves = BoardMoves()
 
     var body: some View {
         Group {
@@ -97,7 +99,8 @@ struct WeekBoardView: View {
             }
         }
         .overlay { if confetti > 0 { ConfettiView(trigger: confetti).allowsHitTesting(false) } }
-        .task(id: week) { await load() }
+        .task(id: "\(week)#\(model.refreshTick)") { await load() }
+        .task(id: moves.generation) { await moves.fade(in: $moves) }
         .task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(60))
@@ -110,7 +113,16 @@ struct WeekBoardView: View {
         if !quiet, board.value == nil { board = .loading }
         do {
             let fresh = try await model.service.weekBoard(week)
-            board = .loaded(fresh)
+            // The same week reloaded: the rows glide to their new places and wear how far they
+            // went. A different week is a different table, and arrives the ordinary way.
+            if let before = board.value, before.week == fresh.week {
+                withAnimation(Motion.settle) {
+                    moves.note(PlaceMoves.between(before.rows, fresh.rows))
+                    board = .loaded(fresh)
+                }
+            } else {
+                board = .loaded(fresh)
+            }
             react(to: fresh)
         } catch {
             if board.value == nil { board = .failed(error.asAPIError) }
@@ -212,7 +224,7 @@ struct WeekBoardView: View {
                 ForEach(Array(data.rows.enumerated()), id: \.element.id) { index, row in
                     let won = !top.isEmpty && row.place == 1 && row.picksMade > 0
                     BoardRowCard(place: row.place, name: row.name, isMe: row.playerId == model.player?.id, mine: row.isMine, points: row.points, muted: !started,
-                                 crowned: won,
+                                 crowned: won, moved: moves.by[row.playerId] ?? 0,
                                  subtitle: row.picksMade == 0 ? "No picks"
                                     : !started ? "\(Format.plural(row.picksMade, "pick")) in · up to \(row.possible)"
                                     : "\(row.correct) of \(row.picksMade) right · up to \(row.possible)",
@@ -263,6 +275,7 @@ struct SeasonBoardView: View {
     @Environment(AppModel.self) private var model
     @State private var board: Loadable<SeasonBoardResponse> = .idle
     @State private var open: String?
+    @State private var moves = BoardMoves()
 
     var body: some View {
         Group {
@@ -273,7 +286,8 @@ struct SeasonBoardView: View {
             case .loaded(let data): content(data)
             }
         }
-        .task { await load() }
+        .task(id: model.refreshTick) { await load() }
+        .task(id: moves.generation) { await moves.fade(in: $moves) }
         .task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(60))
@@ -286,7 +300,14 @@ struct SeasonBoardView: View {
         if !quiet, board.value == nil { board = .loading }
         do {
             let fresh = try await model.service.seasonBoard()
-            board = .loaded(fresh)
+            if let before = board.value {
+                withAnimation(Motion.settle) {
+                    moves.note(PlaceMoves.between(before.rows, fresh.rows))
+                    board = .loaded(fresh)
+                }
+            } else {
+                board = .loaded(fresh)
+            }
             // Going top of the table is the one season change worth feeling. Slipping down is not:
             // the app should not be the thing that rubs it in.
             if let me = model.player?.id, !fresh.notStarted,
@@ -329,7 +350,7 @@ struct SeasonBoardView: View {
                         return s
                     }()
                     BoardRowCard(place: row.place, name: row.name, isMe: row.playerId == model.player?.id, mine: row.isMine, points: row.points, muted: data.throughWeek == 0,
-                                 subtitle: subtitle, open: open == row.playerId,
+                                 moved: moves.by[row.playerId] ?? 0, subtitle: subtitle, open: open == row.playerId,
                                  onToggle: { withAnimation(Motion.fade) { open = open == row.playerId ? nil : row.playerId } }) {
                         WeekBars(row: row, fromWeek: data.seasonStartsAt, throughWeek: data.throughWeek) { w in
                             model.boardScope = .week
@@ -364,7 +385,7 @@ struct WinningsCard: View {
             case .loaded(let data): content(data)
             }
         }
-        .task { await load() }
+        .task(id: model.refreshTick) { await load() }
         .task {
             while !Task.isCancelled {
                 try? await Task.sleep(for: .seconds(300))
@@ -461,6 +482,8 @@ struct BoardRowCard<Detail: View>: View {
     /// Took the week. Only ever true once the week is over, so it reads as a result rather than a
     /// lead — "top of the table right now" is what the place badge is for.
     var crowned = false
+    /// Places gained (positive) or lost on the last reload, worn for a few seconds.
+    var moved = 0
     let subtitle: String
     let open: Bool
     let onToggle: () -> Void
@@ -477,6 +500,7 @@ struct BoardRowCard<Detail: View>: View {
                             if isMe { Chip(text: "you", size: 10) }
                             if mine && !isMe { Chip(text: "yours", size: 10) }
                             if crowned { Chip(text: "winner", fill: .flag, size: 10, label: .onAccent) }
+                            if moved != 0 { MovedChip(by: moved).transition(.scale.combined(with: .opacity)) }
                         }
                         Text(subtitle).sans(12).foregroundStyle(Color.ink2).lineLimit(1)
                     }
@@ -508,6 +532,57 @@ struct BoardRowCard<Detail: View>: View {
         // No .clipped() here: the card's own offset shadow lives outside its bounds, and clipping
         // sliced it off on the highlighted row.
         .modifier(TallyCard(hard: isMe || crowned, fill: isMe || crowned ? .flagSoft : .surface, border: .cardBorder, radius: TallyRadius.card, dashed: false))
+    }
+}
+
+/**
+ ▲2 or ▼1 beside a name that has just changed place. Going up takes the turf; going down is said
+ in grey, because the board should report a slide rather than rub it in.
+ */
+struct MovedChip: View {
+    let by: Int
+
+    var body: some View {
+        HStack(spacing: 2) {
+            Image(systemName: by > 0 ? "arrowtriangle.up.fill" : "arrowtriangle.down.fill")
+                .font(.system(size: 7, weight: .black))
+            Text("\(abs(by))").font(TallyFont.sans(10, weight: .bold)).monospacedDigit()
+        }
+        .foregroundStyle(by > 0 ? Color.onFill : Color.ink2)
+        .padding(.horizontal, 5)
+        .padding(.vertical, 1)
+        .background(Capsule().fill(by > 0 ? Color.turf : Color.paper2))
+        .overlay(Capsule().strokeBorder(by > 0 ? Color.ink : Color.line, lineWidth: 1.5))
+        .accessibilityLabel(by > 0 ? "Up \(by)" : "Down \(-by)")
+    }
+}
+
+/**
+ The movement a board is wearing, and the clock that takes it off again.
+
+ Each reload that moves somebody starts a fresh few seconds; a reload that moves nobody leaves the
+ last lot to fade on schedule rather than wiping them, and an older timer never clears a newer set.
+ */
+struct BoardMoves {
+    private(set) var by: [String: Int] = [:]
+    private var stamp = 0
+
+    mutating func note(_ moved: [String: Int]) {
+        guard !moved.isEmpty else { return }
+        by = moved
+        stamp += 1
+    }
+
+    var generation: Int { stamp }
+
+    /// Wait, then take the chips off — unless a newer reload has put its own on meanwhile. Run
+    /// from `.task(id: generation)`, which also cancels the wait the moment a newer set arrives.
+    @MainActor func fade(in binding: Binding<BoardMoves>) async {
+        guard !by.isEmpty else { return }
+        let mine = stamp
+        try? await Task.sleep(for: .seconds(6))
+        guard !Task.isCancelled, binding.wrappedValue.stamp == mine else { return }
+        withAnimation(Motion.fade) { binding.wrappedValue.by = [:] }
     }
 }
 

@@ -12,7 +12,12 @@ struct GameCard: View {
     let counts: PickCount?
     /// Five are already picked and this one is not among them. Still tappable, just quieter.
     let muted: Bool
-    let onPick: (String) -> Void
+    /// The team, and where its sticker was on screen when it was tapped — the tray flight's
+    /// starting point (`PickFlights`).
+    let onPick: (String, CGRect?) -> Void
+
+    /// Each side's sticker in window coordinates, read only when one is tapped.
+    @State private var stickers = FrameBox()
 
     private var imminent: Bool {
         let toKick = game.kickoffAt.timeIntervalSince(now)
@@ -59,10 +64,11 @@ struct GameCard: View {
         let dim = selection != nil && !sel
         let won = game.winner == abbr
         return Button {
-            onPick(abbr)
+            onPick(abbr, stickers.frames[abbr])
         } label: {
             VStack(spacing: 4) {
                 TeamSticker(team: team, size: 50, selected: sel, dimmed: dim)
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { stickers.frames[abbr] = $0 }
                 Text(team.nickname)
                     .font(TallyFont.display(13.5))
                     .foregroundStyle(dim ? Color.ink3 : Color.ink)
@@ -111,6 +117,7 @@ struct PressScaleStyle: ButtonStyle {
 /// The five slots and the button, floating over the tab bar on glass.
 struct PickTrayView: View {
     @Environment(AppModel.self) private var model
+    @Environment(PickFlights.self) private var flights: PickFlights?
     let state: PickTrayState
 
     var body: some View {
@@ -126,14 +133,15 @@ struct PickTrayView: View {
                         RoundedRectangle(cornerRadius: 12, style: .continuous)
                             .fill(Color.paper2.opacity(0.6))
                             .overlay(RoundedRectangle(cornerRadius: 12, style: .continuous).strokeBorder(Color.line, style: StrokeStyle(lineWidth: 2, dash: [4, 3])))
-                        if let pick {
+                        // Held empty while its sticker is still in the air (`PickFlights`).
+                        if let pick, !(flights?.landing.contains(pick.gameId) ?? false) {
                             let frozen = state.frozenIds.contains(pick.gameId)
                             Button {
                                 if !frozen { state.onRemove(pick.gameId) }
                             } label: {
                                 // 30 inside a 40pt slot: the slot's corner radius is 12, so a
                                 // bigger square would have its corners hanging over the dashes.
-                                TeamSticker(team: model.sport.teamOrPlaceholder(pick.team), size: 30, flat: true)
+                                TeamSticker(team: model.sport.teamOrPlaceholder(pick.team), size: PickFlightLayer.slotSticker, flat: true)
                                     .overlay(alignment: .bottomTrailing) {
                                         if frozen {
                                             Image(systemName: "lock.fill")
@@ -151,6 +159,7 @@ struct PickTrayView: View {
                         }
                     }
                     .frame(width: 40, height: 40)
+                    .onGeometryChange(for: CGRect.self) { $0.frame(in: .global) } action: { flights?.slots.frames["\(i)"] = $0 }
                 }
             }
             .animation(.spring(response: 0.3, dampingFraction: 0.6), value: state.merged)
@@ -266,6 +275,11 @@ struct OutcomeTag: View {
  is what keeps a scroll a scroll: a finger that moves first is scrolling and the sequence never
  starts, one that stays is lifting and the scroll view lets it go. The chevrons do the same thing
  one step at a time, for anyone who would rather tap.
+
+ The badges answer the drag while it is happening. A row held over another already wears the
+ points it would be worth if you let go there, and the rows it pushes aside wear theirs — digits
+ rolling, a tick in the hand at every slot crossed — so "how sure am I about this one" is read off
+ the number as you move it, not found out after you drop it.
  */
 struct ReorderList: View {
     @Environment(AppModel.self) private var model
@@ -291,10 +305,11 @@ struct ReorderList: View {
             ForEach(Array(order.enumerated()), id: \.element) { i, gameId in
                 let isDragging = dragging == gameId
                 let shift = shiftFor(index: i)
+                let slot = projected(index: i)
                 RankRow(
                     gameId: gameId,
                     team: selections[gameId] ?? "",
-                    rank: i < availableRanks.count ? availableRanks[i] : Scoring.maxPicks,
+                    rank: slot < availableRanks.count ? availableRanks[slot] : Scoring.maxPicks,
                     game: gamesById[gameId],
                     canUp: i > 0,
                     canDown: i < order.count - 1,
@@ -323,6 +338,26 @@ struct ReorderList: View {
         }
         .frame(height: CGFloat(order.count) * (rowHeight + gap) - gap, alignment: .top)
         .animation(.spring(response: 0.3, dampingFraction: 0.8), value: order)
+        // A tick for every slot the held row crosses: the detent a physical list would have.
+        .onChange(of: target) { old, new in
+            if old != nil, new != nil, old != new { Haptics.tap() }
+        }
+    }
+
+    /// Where the held row would land if it were let go now.
+    private var target: Int? {
+        guard let dragging, let from = order.firstIndex(of: dragging) else { return nil }
+        return max(0, min(order.count - 1, from + Int((dragOffset / (rowHeight + gap)).rounded())))
+    }
+
+    /// Which slot row `i` would be in if the held row were let go now — its own index when
+    /// nothing is held.
+    private func projected(index i: Int) -> Int {
+        guard let dragging, let from = order.firstIndex(of: dragging), let target else { return i }
+        if order[i] == dragging { return target }
+        if from < i, i <= target { return i - 1 }
+        if target <= i, i < from { return i + 1 }
+        return i
     }
 
     /// The drag itself, shared by the grip and the held card: lift on the first movement, drop
@@ -343,11 +378,8 @@ struct ReorderList: View {
 
     /// How far a resting row moves aside while another is dragged over it.
     private func shiftFor(index i: Int) -> CGFloat {
-        guard let dragging, let from = order.firstIndex(of: dragging), dragging != order[i] else { return 0 }
-        let target = max(0, min(order.count - 1, from + Int((dragOffset / (rowHeight + gap)).rounded())))
-        if from < i, i <= target { return -(rowHeight + gap) }
-        if target <= i, i < from { return rowHeight + gap }
-        return 0
+        guard let dragging, dragging != order[i] else { return 0 }
+        return CGFloat(projected(index: i) - i) * (rowHeight + gap)
     }
 }
 
@@ -370,9 +402,18 @@ struct RankRow<G: Gesture, H: Gesture>: View {
 
     var body: some View {
         HStack(spacing: 12) {
+            // The digits roll and the badge gives a little pop when the rank changes — while
+            // the row is being dragged as much as when it is dropped (`ReorderList`).
             RankBadge(rank: rank)
-                .id(rank)
-                .transition(.scale)
+                .keyframeAnimator(initialValue: CGFloat(1), trigger: rank) { badge, scale in
+                    badge.scaleEffect(scale)
+                } keyframes: { _ in
+                    KeyframeTrack {
+                        CubicKeyframe(1.16, duration: 0.08)
+                        SpringKeyframe(1, duration: 0.3, spring: .bouncy)
+                    }
+                }
+                .animation(Motion.snap, value: rank)
             TeamSticker(team: model.sport.teamOrPlaceholder(team), size: 48, flat: true)
             MatchupText(pick: Pick(gameId: gameId, team: team, rank: rank), game: game, compact: true)
             Spacer()

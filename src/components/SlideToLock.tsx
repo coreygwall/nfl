@@ -83,7 +83,8 @@ export function SlideToLock({
           style={{ transform: `scaleX(${Math.max(0, progress - 0.08)})`, transition: dragging ? "none" : "transform 180ms ease-out" }}
         />
         <span className="pointer-events-none absolute inset-0 z-10 flex items-center justify-center gap-2 pl-12 font-display font-bold" aria-live="polite">
-          {label} <Lock size={18} />
+          {/* The resting words catch a sweep of light, left to right — the direction to go. */}
+          <span className={progress === 0 && !pending && !disabled ? "slide-gleam" : undefined}>{label}</span> <Lock size={18} />
         </span>
         <button
           type="button" aria-label={`${words.idle}, ${Math.round(progress * 100)}% complete`} aria-describedby="slide-lock-help" disabled={disabled}

@@ -357,10 +357,7 @@ struct TallyHero: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 14) {
             HStack(spacing: 12) {
-                Image("TallyMark")
-                    .resizable()
-                    .scaledToFit()
-                    .frame(width: 56, height: 56)
+                WritingMark(side: 56)
                     .background(RoundedRectangle(cornerRadius: 15, style: .continuous).fill(Color.ink).offset(x: 3, y: 3))
                     .overlay(RoundedRectangle(cornerRadius: 15, style: .continuous).strokeBorder(Color.ink, lineWidth: 2))
                 Text("Tally").font(TallyFont.display(40))
@@ -377,20 +374,84 @@ struct TallyHero: View {
     }
 }
 
+/**
+ The app icon, writing itself.
+
+ The first screen anybody from the App Store sees used to open on a picture of the mark. It is
+ the same badge now — the icon's yellow, its inner border, its five strokes, laid out from
+ `public/icon.svg`'s 128-point box — except that the strokes are written in, four uprights and
+ then the fifth through them, the way the loader and a pull to refresh write them. It is the
+ app's name being spelled out as a count, which is the whole idea in one second.
+
+ Always the light palette, as the icon is: the icon has one look, and in the dark `ink` would turn
+ the strokes white on the yellow. With Reduce Motion on the mark is simply there.
+ */
+struct WritingMark: View {
+    var side: CGFloat = 56
+    @State private var progress: Double = 0
+
+    var body: some View {
+        let k = side / 128
+        // The yellow ground is `FlagMark`'s, which is the one place the flag may sit under a mark.
+        FlagMark(size: side, corner: 30 * k, bordered: false) {
+            ZStack(alignment: .topLeading) {
+                RoundedRectangle(cornerRadius: 27.5 * k, style: .continuous)
+                    .strokeBorder(Color.ink, lineWidth: 7 * k)
+                    .padding(3.5 * k)
+                Color.clear
+                    .modifier(Writing(progress: progress))
+                    .frame(width: 100 * k, height: 68 * k)
+                    .offset(x: 18 * k, y: 29 * k)
+            }
+        }
+        .environment(\.colorScheme, .light)
+        .accessibilityHidden(true)
+        .onAppear {
+            guard progress == 0 else { return }
+            if Motion.reduced { progress = 1; return }
+            withAnimation(.easeInOut(duration: 1.15).delay(0.25)) { progress = 1 }
+        }
+    }
+
+    /// `TallyGlyph`, drawn as far as `progress`. A `Canvas` on its own cannot be animated — it only
+    /// sees the value it was built with — so the progress rides in on an animatable modifier and
+    /// the canvas is redrawn at every step between.
+    private struct Writing: ViewModifier, Animatable {
+        var progress: Double
+        var animatableData: Double {
+            get { progress }
+            set { progress = newValue }
+        }
+
+        func body(content: Content) -> some View {
+            Canvas { context, size in
+                TallyGlyph.draw(into: context, size: size, progress: progress, ink: .ink, ground: .flag)
+            }
+        }
+    }
+}
+
 /// A few teams for warmth. Deliberately a fixed, short row: it has to fit the narrowest phone
-/// without pushing the layout wider than the screen.
+/// without pushing the layout wider than the screen. They go on one after another once the mark
+/// has finished writing, each with the sticker's own slap.
 private struct TeamStrip: View {
     @Environment(AppModel.self) private var model
     private let abbrs = ["KC", "PHI", "DET", "BUF", "SF", "DAL"]
+    @State private var stuck = false
 
     var body: some View {
         HStack(spacing: 6) {
-            ForEach(abbrs, id: \.self) { abbr in
+            ForEach(Array(abbrs.enumerated()), id: \.element) { i, abbr in
                 TeamSticker(team: model.sport.teamOrPlaceholder(abbr), size: 38)
+                    .scaleEffect(stuck ? 1 : 1.8)
+                    .rotationEffect(.degrees(stuck ? 0 : (i.isMultiple(of: 2) ? -14 : 12)))
+                    .opacity(stuck ? 1 : 0)
+                    .animation(Motion.slap?.delay(1.1 + Double(i) * 0.08), value: stuck)
             }
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .accessibilityHidden(true)
+        .onAppear { stuck = true }
     }
 }
 
