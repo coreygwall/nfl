@@ -9,6 +9,7 @@ import TallyKit
  */
 struct PickFlowView: View {
     @Environment(AppModel.self) private var model
+    @Environment(PickFlights.self) private var flights: PickFlights?
     let week: Int
 
     enum Step { case select, rank, done, review }
@@ -73,7 +74,7 @@ struct PickFlowView: View {
                 content(data)
             }
         }
-        .task(id: "\(playerId):\(week)") { await load() }
+        .task(id: "\(playerId):\(week)#\(model.refreshTick)") { await load() }
         .task {
             // Countdowns and lock states stay honest; the slate refreshes on the web's cadence.
             var beat = 0
@@ -111,7 +112,7 @@ struct PickFlowView: View {
                      onOrder: { draft = Draft(selections: draft.selections, order: $0) }, onBack: { setStep(.select) }, onSubmit: { Task { await submit() } })
         case .done:
             DoneStep(name: model.player?.name ?? "", week: week, picks: myPicks.isEmpty ? merged : myPicks, gamesById: gamesById,
-                     onReview: { setStep(nil) }, shareURL: model.shareURL)
+                     onReview: { setStep(nil) }, shareURL: model.shareURL, onStamp: { confetti += 1 })
         }
     }
 
@@ -186,7 +187,7 @@ struct PickFlowView: View {
         syncTray()
     }
 
-    private func onPick(_ game: Game, _ team: String) {
+    private func onPick(_ game: Game, _ team: String, _ from: CGRect?) {
         guard !lockedNow(game) else { return }
         let already = draft.selections[game.id] != nil
         if !already, frozen.count + draftOrder.count >= Scoring.maxPicks {
@@ -200,6 +201,10 @@ struct PickFlowView: View {
         withAnimation(.spring(response: 0.3, dampingFraction: 0.7)) {
             draft = draft.toggling(gameId: game.id, team: team)
         }
+        // Chosen rather than taken back: throw the sticker to its slot in the tray.
+        if draft.selections[game.id] == team, let from, let slot = merged.firstIndex(where: { $0.gameId == game.id }) {
+            flights?.launch(gameId: game.id, team: team, from: from, slot: slot)
+        }
     }
 
     private func submit() async {
@@ -212,9 +217,8 @@ struct PickFlowView: View {
             seeded = false
             draft = .empty
             wk = .loaded(WeekResponse(now: res.now, week: week, games: games, myPicks: res.picks, pickCounts: wk.value?.pickCounts ?? [:], submitted: wk.value?.submitted ?? 0))
+            // The haptic and the paper are the stamp's to play, on the frame it lands (`DoneStep`).
             setStep(.done)
-            Haptics.lockedIn()
-            confetti += 1
             await load(quiet: true)
             await model.refreshBootstrap()
             // The moment to ask: five picks are in, there is visibly something to be told about,

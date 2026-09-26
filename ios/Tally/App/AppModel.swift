@@ -199,6 +199,10 @@ final class AppModel {
     var toasts: [Toast] = []
     /// The pick tray, when the picks screen wants one floating over the tab bar (its `useHideNav`).
     var tray: PickTrayState?
+    /// Bumped by a pull to refresh (`TallyRefresh`). The screens that fetch their own data key
+    /// their `.task` on it, so one pull reloads whatever is on screen without any of them knowing
+    /// who asked.
+    var refreshTick = 0
 
     // MARK: Offices
 

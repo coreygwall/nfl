@@ -17,6 +17,8 @@ import TallyKit
 struct PoolShellView: View {
     @Environment(AppModel.self) private var model
     @Environment(HubModel.self) private var hub
+    /// Stickers on their way from a game card to the tray, drawn over everything.
+    @State private var flights = PickFlights()
 
     var body: some View {
         @Bindable var model = model
@@ -69,6 +71,8 @@ struct PoolShellView: View {
                 }
             }
         }
+        .environment(flights)
+        .overlay { PickFlightLayer().environment(flights) }
         .sheet(isPresented: $model.showRules) {
             RulesSheet()
         }
@@ -92,6 +96,7 @@ struct PoolShellView: View {
 /// pool's buttons in the bar.
 struct PoolScreen<Content: View>: View {
     @Environment(AppModel.self) private var model
+    @Environment(HubModel.self) private var hubModel
     let week: Int?
     let onWeek: (Int) -> Void
     /// The app's home is headed "Tally" and wears none of the pool's controls: the megaphone is
@@ -135,11 +140,24 @@ struct PoolScreen<Content: View>: View {
                         .padding(.bottom, 120)
                     }
                 }
+                .tallyRefresh { await refresh() }
             }
             // Nothing is left up there. The pool's controls sit on the name's line now, and an
             // empty inline bar is forty-odd points of glass saying nothing on every tab.
             .toolbar(.hidden, for: .navigationBar)
         }
+    }
+}
+
+extension PoolScreen {
+    /// What a pull asks again: who you are and what the pool knows (the bootstrap), what has been
+    /// said, and — through `refreshTick` — whatever this tab fetches for itself. Home also asks
+    /// every other pool, since that page is about all of them.
+    fileprivate func refresh() async {
+        model.refreshTick += 1
+        await model.refreshBootstrap()
+        await model.refreshMessages(quiet: true)
+        if hub { await hubModel.refresh(model: model, force: true) }
     }
 }
 

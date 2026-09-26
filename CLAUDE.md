@@ -382,6 +382,26 @@ It also carries its own `widgetURL` (`RoundActivityAttributes.deepLink`/`cardId(
 forces `.pool` context on anything it accepts, so a round's link is caught in `TallyApp`'s
 `onOpenURL` — the one place that holds both models — before it ever reaches `open(_:)`.
 
+## Motion: three things that are not obvious from any one file
+
+The vocabulary is `Motion` (`snap`, `settle`, `slap`, `fade`, `deal`) and `Haptics`, and everything
+reads Reduce Motion through them. Three rules have each cost a bug:
+
+- **A `.transition` inside a view that is inserted whole never runs.** Only the inserted view's
+  own transition fires, which is how the "Locked in" stamp and its five rows shipped as a
+  cross-fade for months. A moment with an order to it (`DoneStep`, the golf stamp) is driven from
+  state on appear — and guarded, because the tab keeps that state and a second visit must find the
+  stamp already down.
+- **Geometry that is read on a tap goes in a `FrameBox`, never `@State` of a value.** The tray
+  flight (`PickFlights`) needs every sticker's window frame, and those change on every frame of a
+  scroll; written into a class, the writes cost nothing, where a state value would redraw each
+  sticker sixty times a second for a number nobody draws.
+- **Pull to refresh is `model.refreshTick`, not `.refreshable`.** The system control draws its own
+  spinner and nothing replaces it, so `TallyRefresh` reads the scroll geometry and writes the tally
+  mark instead. It bumps the tick and every screen that fetches for itself keys its `.task` on it —
+  **a new screen that loads its own data has to do the same**, or a pull on that tab will spin and
+  change nothing.
+
 ## Four tabs in a pool, and what is deliberately not one
 
 Pool · Picks · Board · Account on iOS, after the app's Home; Home · Picks · Board · Account on the

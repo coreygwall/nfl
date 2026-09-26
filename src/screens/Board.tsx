@@ -15,6 +15,7 @@ import { TeamSticker } from "../components/TeamSticker.tsx";
 import { Lock } from "../components/Icons.tsx";
 import { BoardGrid } from "../components/BoardGrid.tsx";
 import { fallbackPoolWeeks } from "../lib/poolFallback.ts";
+import { usePlaceMoves } from "../lib/placeMoves.ts";
 
 export type BoardView = "list" | "grid";
 
@@ -181,6 +182,33 @@ function LayoutToggle({ view, onChange }: { view: BoardView; onChange: (v: Board
   );
 }
 
+/**
+ * ▲2 or ▼1 beside a name that has just changed place (`usePlaceMoves`). Up takes the turf; down is
+ * said in grey, because the board should report a slide rather than rub it in. iOS: `MovedChip`.
+ */
+function MovedChip({ by }: { by: number }) {
+  return (
+    <AnimatePresence initial={false}>
+      {by !== 0 && (
+        <motion.span
+          key={by}
+          initial={{ scale: 0, opacity: 0 }}
+          animate={{ scale: 1, opacity: 1 }}
+          exit={{ scale: 0, opacity: 0 }}
+          transition={{ type: "spring", stiffness: 520, damping: 22 }}
+          className={`chip shrink-0 py-0 text-[10px] tabular ${by > 0 ? "bg-turf text-on-turf" : "bg-paper-2 text-ink-2"}`}
+          aria-label={by > 0 ? `Up ${by}` : `Down ${-by}`}
+        >
+          <span aria-hidden="true">
+            {by > 0 ? "▲" : "▼"}
+            {Math.abs(by)}
+          </span>
+        </motion.span>
+      )}
+    </AnimatePresence>
+  );
+}
+
 function PlaceBadge({ place, size = "md", muted = false }: { place: number; size?: "md" | "sm"; muted?: boolean }) {
   const tone = muted
     ? "bg-paper-2 text-ink-3"
@@ -197,6 +225,7 @@ function WeekBoardView({ week, view, onWeek }: { week: number; view: BoardView; 
   const board = useWeekBoard(week);
   const { player } = usePlayer();
   const [open, setOpen] = useState<string | null>(null);
+  const moves = usePlaceMoves(board.data?.rows, week);
   useHeaderWeek(week, onWeek);
   return (
     <div>
@@ -230,6 +259,7 @@ function WeekBoardView({ week, view, onWeek }: { week: number; view: BoardView; 
                   isMe={row.playerId === player?.id}
                   week={week}
                   started={board.data.lockedCount > 0}
+                  moved={moves[row.playerId]}
                 />
               ))}
             </motion.ul>
@@ -255,7 +285,7 @@ function WeekBoardView({ week, view, onWeek }: { week: number; view: BoardView; 
   );
 }
 
-export function WeekRowItem({ row, index, open, onToggle, isMe, week, started }: { row: WeekRow; index: number; open: boolean; onToggle: () => void; isMe: boolean; week: number; started: boolean }) {
+export function WeekRowItem({ row, index, open, onToggle, isMe, week, started, moved = 0 }: { row: WeekRow; index: number; open: boolean; onToggle: () => void; isMe: boolean; week: number; started: boolean; moved?: number }) {
   const hidden = row.picksMade - row.picks.length;
   return (
     <motion.li
@@ -274,6 +304,7 @@ export function WeekRowItem({ row, index, open, onToggle, isMe, week, started }:
             {/* One of the account's other entries: not who you are picking as, but yours all the
                 same — and, since the server knows that too, its picks open whole below. */}
             {row.mine && !isMe && <span className="chip bg-surface py-0 text-[10px]">yours</span>}
+            <MovedChip by={moved} />
           </div>
           <div className="text-xs text-ink-2">
             {row.picksMade === 0 ? (
@@ -421,6 +452,7 @@ function SeasonBoardView() {
   const board = useSeasonBoard();
   const { player } = usePlayer();
   const [open, setOpen] = useState<string | null>(null);
+  const moves = usePlaceMoves(board.data?.rows, "season");
   if (board.isPending) return <BoardSkeleton />;
   if (board.error) return <ErrorState message={board.error.message} onRetry={() => board.refetch()} />;
   const rows = board.data.rows;
@@ -444,7 +476,7 @@ function SeasonBoardView() {
       ) : (
         <motion.ul layout className="space-y-2">
           {rows.map((row, i) => (
-            <SeasonRowItem key={row.playerId} row={row} index={i} isMe={row.playerId === player?.id} open={open === row.playerId} onToggle={() => setOpen(open === row.playerId ? null : row.playerId)} throughWeek={board.data.throughWeek} fromWeek={board.data.fromWeek} />
+            <SeasonRowItem key={row.playerId} row={row} index={i} isMe={row.playerId === player?.id} open={open === row.playerId} onToggle={() => setOpen(open === row.playerId ? null : row.playerId)} throughWeek={board.data.throughWeek} fromWeek={board.data.fromWeek} moved={moves[row.playerId]} />
           ))}
         </motion.ul>
       )}
@@ -574,7 +606,7 @@ function SeasonWeekChart({ row, fromWeek, throughWeek }: { row: SeasonRow; fromW
   );
 }
 
-export function SeasonRowItem({ row, index, isMe, open, onToggle, throughWeek, fromWeek = SEASON_START_WEEK }: { row: SeasonRow; index: number; isMe: boolean; open: boolean; onToggle: () => void; throughWeek: number; fromWeek?: number }) {
+export function SeasonRowItem({ row, index, isMe, open, onToggle, throughWeek, fromWeek = SEASON_START_WEEK, moved = 0 }: { row: SeasonRow; index: number; isMe: boolean; open: boolean; onToggle: () => void; throughWeek: number; fromWeek?: number; moved?: number }) {
   return (
     <motion.li
       layout
@@ -590,6 +622,7 @@ export function SeasonRowItem({ row, index, isMe, open, onToggle, throughWeek, f
             <span className="truncate">{row.name}</span>
             {isMe && <span className="chip bg-surface py-0 text-[10px]">you</span>}
             {row.mine && !isMe && <span className="chip bg-surface py-0 text-[10px]">yours</span>}
+            <MovedChip by={moved} />
           </div>
           <div className="text-xs text-ink-2">
             {row.weeksPlayed === 0
