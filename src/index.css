@@ -247,7 +247,12 @@ body {
     padding: 0 0.9rem;
     font-size: 0.92rem;
   }
-  .chip {
+  /* Zero specificity on purpose: a chip is nearly always drawn with a fill or a size of its own
+     (`chip bg-flag`, `chip py-0 text-[10px]`), and this rule sits after Tailwind's utilities in the
+     same layer — as a plain `.chip` it beat every one of them. That is how "Free to play" drew
+     black-on-dark in the dark theme: `bg-flag` lost to the surface fill while `.bg-flag`'s black
+     label still applied. Defaults only; the classes beside it win. */
+  :where(.chip) {
     display: inline-flex;
     align-items: center;
     gap: 0.35rem;
